@@ -1,0 +1,103 @@
+@import 'tailwindcss';
+
+@import '@fontsource/space-grotesk/500.css';
+@import '@fontsource/space-grotesk/600.css';
+@import '@fontsource/space-grotesk/700.css';
+@import '@fontsource/ibm-plex-mono/400.css';
+@import '@fontsource/ibm-plex-mono/500.css';
+@import '@fontsource/ibm-plex-mono/600.css';
+
+@theme {
+  /* Surfaces — README "Design Tokens" */
+  --color-canvas: #1a1815;
+  --color-panel: #1e1b17;
+  --color-surface: #211e1a;
+  --color-input: #26221d;
+  --color-raised: #33302a;
+
+  /* Text + accents */
+  --color-ink: #eee9e2;
+  --color-accent: #c68a46;
+  --color-select: #4fa3ff;
+  --color-success: #6fbf73;
+  --color-danger: #e08a8a;
+  --color-hairline: rgb(255 255 255 / 0.08);
+
+  --font-display: 'Space Grotesk', sans-serif;
+  --font-mono: 'IBM Plex Mono', monospace;
+  --font-sans: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+}
+
+/*
+ * These must live in @layer base. Unlayered rules outrank every layered
+ * Tailwind utility in the cascade, so an unlayered `button { background: none }`
+ * silently defeats `bg-accent` on every button in the app.
+ */
+@layer base {
+  html,
+  body {
+    margin: 0;
+    height: 100%;
+    background: var(--color-canvas);
+    overflow: hidden;
+  }
+
+  #root {
+    height: 100%;
+  }
+
+  button {
+    font-family: inherit;
+    cursor: pointer;
+    color: inherit;
+  }
+
+  button:disabled {
+    cursor: default;
+  }
+
+  input {
+    font-family: inherit;
+  }
+
+  /* Keyboard focus only — the design has no ring on mouse interaction. */
+  :focus-visible {
+    outline: 2px solid var(--color-select);
+    outline-offset: 1px;
+  }
+
+  ::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+  }
+  ::-webkit-scrollbar-thumb {
+    background: rgb(255 255 255 / 0.14);
+    border-radius: 4px;
+  }
+  ::-webkit-scrollbar-track {
+    background: transparent;
+  }
+
+  input[type='number']::-webkit-inner-spin-button {
+    opacity: 0.5;
+  }
+
+  input[type='range'] {
+    accent-color: var(--color-accent);
+  }
+}
+
+@keyframes toast-in {
+  from {
+    opacity: 0;
+    transform: translate(-50%, 10px);
+  }
+  to {
+    opacity: 1;
+    transform: translate(-50%, 0);
+  }
+}
+
+.animate-toast-in {
+  animation: toast-in 0.2s ease;
+}

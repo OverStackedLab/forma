@@ -1,0 +1,71 @@
+import { lazy, Suspense, useEffect } from 'react';
+import { useDocumentStore } from '@/store/documentStore';
+import { clearHistory } from '@/store/history';
+import { loadDisplayUnit, loadDocument, startAutosave, startDisplayUnitSync } from '@/store/persistence';
+import { useUiStore } from '@/store/uiStore';
+import { CutList } from '@/ui/CutList';
+import { HistoryPanel } from '@/ui/HistoryPanel';
+import { LeftSidebar } from '@/ui/LeftSidebar';
+import { RightSidebar } from '@/ui/RightSidebar';
+import { StatusBar } from '@/ui/StatusBar';
+import { Toast } from '@/ui/Toast';
+import { Toolbar } from '@/ui/Toolbar';
+import { useKeyboardShortcuts } from '@/ui/useKeyboardShortcuts';
+
+// three.js is ~600 kB; the Cut List path should not pay for it up front.
+const Viewport = lazy(() => import('@/viewport/Viewport').then((m) => ({ default: m.Viewport })));
+
+export function App() {
+  const viewMode = useUiStore((s) => s.viewMode);
+  useKeyboardShortcuts();
+
+  useEffect(() => {
+    const saved = loadDocument();
+    if (saved) {
+      useDocumentStore.getState().hydrate(saved);
+      // A restored document is the baseline, not an undoable step.
+      clearHistory();
+    }
+    const savedUnit = loadDisplayUnit();
+    if (savedUnit) useUiStore.getState().setDisplayUnit(savedUnit);
+
+    const stopAutosave = startAutosave();
+    const stopUnitSync = startDisplayUnitSync();
+    return () => {
+      stopAutosave();
+      stopUnitSync();
+    };
+  }, []);
+
+  const showSidebars = viewMode !== 'render';
+
+  return (
+    <div className="flex h-full flex-col bg-canvas font-sans text-ink">
+      <Toolbar />
+
+      <div className="relative flex min-h-0 flex-1">
+        {showSidebars && <LeftSidebar />}
+
+        <Suspense fallback={<ViewportFallback />}>
+          <Viewport />
+        </Suspense>
+
+        {showSidebars && <RightSidebar />}
+
+        {viewMode === 'cutlist' && <CutList />}
+        <HistoryPanel />
+        <Toast />
+      </div>
+
+      <StatusBar />
+    </div>
+  );
+}
+
+function ViewportFallback() {
+  return (
+    <div className="flex min-w-0 flex-1 items-center justify-center bg-[linear-gradient(160deg,#E9E5DC_0%,#C9C3B6_100%)]">
+      <span className="font-mono text-[11px] text-canvas/50">Loading viewport…</span>
+    </div>
+  );
+}

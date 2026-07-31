@@ -1,0 +1,28 @@
+import type { Transform } from '@/domain/types';
+import type { CameraPreset } from './CameraController';
+
+/**
+ * A tiny imperative surface onto the single live viewport, so toolbar and
+ * render-bar buttons can drive the camera and export a PNG without threading
+ * refs through the whole tree.
+ */
+export type ViewportApi = {
+  frameSelection: (ids: readonly string[]) => void;
+  frameAll: () => void;
+  goToPreset: (preset: CameraPreset) => void;
+  exportImage: () => string | null;
+  /** Combined world bounding box of a selection, in millimetres. */
+  selectionSize: (ids: readonly string[]) => { w: number; h: number; d: number } | null;
+  /** Mutates the live scene and returns the resulting transforms, ready to commit. */
+  computeFloorSnap: (ids: readonly string[]) => Record<string, Transform> | null;
+};
+
+let current: ViewportApi | null = null;
+
+export function setViewportApi(api: ViewportApi | null): void {
+  current = api;
+}
+
+export function viewportApi(): ViewportApi | null {
+  return current;
+}

@@ -1,0 +1,1586 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20,400,0,0&display=block" rel="stylesheet">
+<script type="importmap">{"imports":{"three":"https://unpkg.com/three@0.184.0/build/three.module.js","three/addons/controls/OrbitControls.js":"https://unpkg.com/three@0.184.0/examples/jsm/controls/OrbitControls.js","three/addons/controls/TransformControls.js":"https://unpkg.com/three@0.184.0/examples/jsm/controls/TransformControls.js"}}</script>
+<style>
+html,body{margin:0;height:100%;background:#1A1815;overflow:hidden}
+*{box-sizing:border-box}
+::-webkit-scrollbar{width:8px;height:8px}
+::-webkit-scrollbar-thumb{background:rgba(255,255,255,.14);border-radius:4px}
+::-webkit-scrollbar-track{background:transparent}
+input[type=number]::-webkit-inner-spin-button{opacity:0.5}
+@keyframes toastIn{from{opacity:0;transform:translate(-50%,10px)}to{opacity:1;transform:translate(-50%,0)}}
+@keyframes spin{to{transform:rotate(360deg)}}
+</style>
+</helmet>
+<div style="position:fixed;inset:0;display:flex;flex-direction:column;background:#1A1815;color:#EEE9E2;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;">
+  <div data-screen-label="Toolbar" style="height:56px;flex:none;display:grid;grid-template-columns:1fr auto 1fr;align-items:center;padding:0 20px;background:#211E1A;border-bottom:1px solid rgba(255,255,255,.08);gap:16px;">
+    <div style="display:flex;align-items:center;gap:14px;min-width:0;">
+      <div style="font-family:'Space Grotesk',sans-serif;font-weight:700;font-size:18px;letter-spacing:-.01em;color:#EEE9E2;display:flex;align-items:center;gap:8px;white-space:nowrap;">
+        <div style="width:20px;height:20px;border-radius:5px;background:#C68A46;display:flex;align-items:center;justify-content:center;font-size:12px;color:#1A1815;font-weight:700;">K</div>
+        Kerf
+      </div>
+      <div style="width:1px;height:22px;background:rgba(255,255,255,.1);flex:none;"></div>
+      <div style="display:flex;flex-direction:column;line-height:1.2;min-width:0;">
+        <span style="font-size:13px;font-weight:600;color:#EEE9E2;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">Walnut Sideboard</span>
+        <span style="font-size:10.5px;color:rgba(238,233,226,.4);font-family:'IBM Plex Mono',monospace;">{{ dimsSummary }} · Autosaved</span>
+      </div>
+    </div>
+    <div style="justify-self:center;display:flex;background:#1A1815;border:1px solid rgba(255,255,255,.08);border-radius:9px;padding:3px;gap:2px;">
+      <button style="{{ modelTabStyle }}" onClick="{{ goModelTab }}">
+        <span style="font-family:'Material Symbols Outlined';font-size:16px;line-height:1;">view_in_ar</span>
+        Model
+      </button>
+      <button style="{{ cutlistTabStyle }}" onClick="{{ goCutlistTab }}">
+        <span style="font-family:'Material Symbols Outlined';font-size:16px;line-height:1;">content_cut</span>
+        Cut List
+      </button>
+      <button style="{{ renderTabStyle }}" onClick="{{ goRenderTab }}">
+        <span style="font-family:'Material Symbols Outlined';font-size:16px;line-height:1;">auto_awesome</span>
+        Render
+      </button>
+    </div>
+    <div style="justify-self:end;display:flex;align-items:center;gap:6px;">
+      <button style="{{ undoBtnStyle }}" onClick="{{ undo }}" title="Undo">
+        <span style="font-family:'Material Symbols Outlined';font-size:18px;line-height:1;">undo</span>
+      </button>
+      <button style="{{ redoBtnStyle }}" onClick="{{ redo }}" title="Redo">
+        <span style="font-family:'Material Symbols Outlined';font-size:18px;line-height:1;">redo</span>
+      </button>
+      <div style="width:1px;height:20px;background:rgba(255,255,255,.1);flex:none;"></div>
+      <button style="{{ measureBtnStyle }}" onClick="{{ toggleMeasure }}" title="Measurement tool">
+        <span style="font-family:'Material Symbols Outlined';font-size:18px;line-height:1;">straighten</span>
+      </button>
+      <button style="{{ historyBtnStyle }}" onClick="{{ toggleHistory }}" title="Version history">
+        <span style="font-family:'Material Symbols Outlined';font-size:18px;line-height:1;">history</span>
+      </button>
+      <div style="width:1px;height:20px;background:rgba(255,255,255,.1);flex:none;"></div>
+      <button style="height:32px;padding:0 14px;border-radius:7px;border:none;background:#C68A46;color:#1A1815;font-size:12.5px;font-weight:700;cursor:pointer;font-family:inherit;display:flex;align-items:center;gap:6px;white-space:nowrap;" onClick="{{ saveVersion }}">
+        <span style="font-family:'Material Symbols Outlined';font-size:16px;line-height:1;">save</span>
+        Save Version
+      </button>
+    </div>
+  </div>
+  <div style="flex:1;display:flex;min-height:0;position:relative;">
+    <div data-screen-label="Left sidebar" style="{{ leftSidebarStyle }}">
+      <div style="display:flex;flex:none;border-bottom:1px solid rgba(255,255,255,.08);">
+        <button style="{{ assemblyTabStyle }}" onClick="{{ goAssemblyTab }}">Assembly</button>
+        <button style="{{ libraryTabStyle }}" onClick="{{ goLibraryTab }}">Library</button>
+      </div>
+      <sc-if value="{{ isAssemblyTab }}" hint-placeholder-val="{{ true }}">
+        <div style="flex:1;overflow-y:auto;padding:10px 6px;">
+          <div style="display:flex;align-items:center;justify-content:space-between;padding:2px 8px 10px;">
+            <span style="font-size:10.5px;color:rgba(238,233,226,.4);font-family:'IBM Plex Mono',monospace;">{{ selectionCountLabel }}</span>
+            <div style="display:flex;gap:12px;">
+              <span style="font-size:11px;font-weight:600;color:#4FA3FF;cursor:pointer;" onClick="{{ selectAll }}">Select All</span>
+              <sc-if value="{{ hasSelection }}" hint-placeholder-val="{{ false }}">
+                <span style="font-size:11px;font-weight:600;color:rgba(238,233,226,.5);cursor:pointer;" onClick="{{ clearSelection }}">Clear</span>
+              </sc-if>
+            </div>
+          </div>
+          <sc-for list="{{ assemblyGroups }}" as="grp" hint-placeholder-count="4">
+            <div style="margin-bottom:2px;">
+              <div style="display:flex;align-items:center;gap:6px;height:30px;padding:0 8px;border-radius:6px;cursor:pointer;" onClick="{{ grp.onToggle }}">
+                <span style="width:12px;font-size:10px;color:rgba(238,233,226,.4);">{{ grp.chevron }}</span>
+                <span style="font-size:12px;font-weight:600;color:rgba(238,233,226,.85);flex:1;">{{ grp.label }}</span>
+                <span style="font-size:10.5px;color:rgba(238,233,226,.35);font-family:'IBM Plex Mono',monospace;">{{ grp.count }}</span>
+              </div>
+              <sc-if value="{{ grp.expanded }}" hint-placeholder-val="{{ true }}">
+                <div>
+                  <sc-for list="{{ grp.parts }}" as="part" hint-placeholder-count="3">
+                    <div style="{{ part.rowStyle }}" onClick="{{ part.onClick }}">
+                      <span style="flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">{{ part.label }}</span>
+                      <button style="{{ part.eyeBtnStyle }}" onClick="{{ part.onToggleVisible }}" title="Toggle visibility">
+                        <span style="font-family:'Material Symbols Outlined';font-size:15px;line-height:1;">{{ part.eyeIcon }}</span>
+                      </button>
+                      <sc-if value="{{ part.deletable }}" hint-placeholder-val="{{ false }}">
+                        <button style="{{ part.eyeBtnStyle }}" onClick="{{ part.onDelete }}" title="Delete part">
+                          <span style="font-family:'Material Symbols Outlined';font-size:15px;line-height:1;">delete</span>
+                        </button>
+                      </sc-if>
+                    </div>
+                  </sc-for>
+                </div>
+              </sc-if>
+            </div>
+          </sc-for>
+        </div>
+      </sc-if>
+      <sc-if value="{{ isLibraryTab }}" hint-placeholder-val="{{ false }}">
+        <div style="flex:1;overflow-y:auto;padding:14px 12px;display:flex;flex-direction:column;gap:18px;">
+          <div>
+            <div style="font-size:11px;font-weight:600;color:rgba(238,233,226,.45);text-transform:uppercase;letter-spacing:.04em;margin-bottom:8px;">Panels</div>
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;">
+              <sc-for list="{{ libraryOptions.panels }}" as="opt" hint-placeholder-count="4">
+                <div style="{{ opt.cardStyle }}" draggable="true" onClick="{{ opt.onClick }}" onDragStart="{{ opt.onDragStart }}">
+                  <svg viewBox="0 0 16 16" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"><rect x="2" y="2" width="12" height="12" rx="1"></rect></svg>
+                  <span style="{{ opt.labelStyle }}">{{ opt.label }}</span>
+                </div>
+              </sc-for>
+            </div>
+          </div>
+          <div>
+            <div style="font-size:11px;font-weight:600;color:rgba(238,233,226,.45);text-transform:uppercase;letter-spacing:.04em;margin-bottom:8px;">Leg Style</div>
+            <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;">
+              <sc-for list="{{ libraryOptions.legs }}" as="opt" hint-placeholder-count="3">
+                <div style="{{ opt.cardStyle }}" draggable="true" onClick="{{ opt.onClick }}" onDragStart="{{ opt.onDragStart }}">
+                  <svg viewBox="0 0 16 16" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"><path d="M8 2v9M5.5 15l1.2-4h2.6l1.2 4"></path></svg>
+                  <span style="{{ opt.labelStyle }}">{{ opt.label }}</span>
+                </div>
+              </sc-for>
+            </div>
+          </div>
+          <div>
+            <div style="font-size:11px;font-weight:600;color:rgba(238,233,226,.45);text-transform:uppercase;letter-spacing:.04em;margin-bottom:8px;">Handle Style</div>
+            <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;">
+              <sc-for list="{{ libraryOptions.handles }}" as="opt" hint-placeholder-count="3">
+                <div style="{{ opt.cardStyle }}" draggable="true" onClick="{{ opt.onClick }}" onDragStart="{{ opt.onDragStart }}">
+                  <svg viewBox="0 0 16 16" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"><rect x="4" y="3" width="8" height="3" rx="1.2"></rect><path d="M6 6v7M10 6v7"></path></svg>
+                  <span style="{{ opt.labelStyle }}">{{ opt.label }}</span>
+                </div>
+              </sc-for>
+            </div>
+          </div>
+          <div>
+            <div style="font-size:11px;font-weight:600;color:rgba(238,233,226,.45);text-transform:uppercase;letter-spacing:.04em;margin-bottom:8px;">Base Style</div>
+            <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;">
+              <sc-for list="{{ libraryOptions.bases }}" as="opt" hint-placeholder-count="2">
+                <div style="{{ opt.cardStyle }}" draggable="true" onClick="{{ opt.onClick }}" onDragStart="{{ opt.onDragStart }}">
+                  <svg viewBox="0 0 16 16" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"><rect x="3" y="2" width="10" height="7" rx="0.6"></rect><path d="M4 12.5h8"></path></svg>
+                  <span style="{{ opt.labelStyle }}">{{ opt.label }}</span>
+                </div>
+              </sc-for>
+            </div>
+          </div>
+          <div style="font-size:11.5px;line-height:1.5;color:rgba(238,233,226,.35);">Click a style to apply it, drag a panel onto the scene to add it.</div>
+        </div>
+      </sc-if>
+    </div>
+    <div style="flex:1;position:relative;background:linear-gradient(160deg,#E9E5DC 0%,#C9C3B6 100%);">
+      <div ref="{{ viewportRef }}" style="position:absolute;inset:0;"></div>
+      <sc-if value="{{ marquee }}" hint-placeholder-val="{{ false }}">
+        <div data-role="marquee" style="{{ marqueeStyle }}"></div>
+      </sc-if>
+      <div ref="{{ measureLabelRef }}" data-role="measure-label" style="position:absolute;display:none;transform:translate(-50%,-130%);background:#1A1815;color:#4FA3FF;font-family:'IBM Plex Mono',monospace;font-size:11px;padding:3px 7px;border-radius:5px;border:1px solid rgba(79,163,255,.4);pointer-events:none;white-space:nowrap;z-index:5;"></div>
+      <div style="position:absolute;left:16px;bottom:14px;font-size:11px;color:rgba(26,24,21,.5);font-family:'IBM Plex Mono',monospace;">Drag to orbit · Shift-drag to box select · G/R/S transform · H pan · F frame · ⌘D duplicate · ⌘A select all · Del delete</div>
+      <div style="position:absolute;top:14px;left:14px;display:flex;flex-direction:column;gap:6px;z-index:4;">
+        <button style="{{ gizmoSelectStyle }}" onClick="{{ setGizmoSelect }}" title="Select (Q)">
+          <span style="font-family:'Material Symbols Outlined';font-size:19px;line-height:1;">arrow_selector_tool</span>
+        </button>
+        <button style="{{ gizmoPanStyle }}" onClick="{{ setGizmoPan }}" title="Pan (H)">
+          <span style="font-family:'Material Symbols Outlined';font-size:19px;line-height:1;">pan_tool</span>
+        </button>
+        <button style="{{ gizmoMoveStyle }}" onClick="{{ setGizmoMove }}" title="Move (G)">
+          <span style="font-family:'Material Symbols Outlined';font-size:19px;line-height:1;">open_with</span>
+        </button>
+        <button style="{{ gizmoRotateStyle }}" onClick="{{ setGizmoRotate }}" title="Rotate (R)">
+          <span style="font-family:'Material Symbols Outlined';font-size:19px;line-height:1;">rotate_right</span>
+        </button>
+        <button style="{{ gizmoScaleStyle }}" onClick="{{ setGizmoScale }}" title="Scale (S)">
+          <span style="font-family:'Material Symbols Outlined';font-size:19px;line-height:1;">aspect_ratio</span>
+        </button>
+        <div style="height:1px;background:rgba(26,24,21,.15);margin:2px 4px;"></div>
+        <button style="{{ gridBtnStyle }}" onClick="{{ toggleGrid }}" title="Toggle placement grid">
+          <span style="font-family:'Material Symbols Outlined';font-size:19px;line-height:1;">grid_on</span>
+        </button>
+        <button style="{{ snapBtnStyle }}" onClick="{{ toggleSnap }}" title="Toggle snapping">
+          <span style="font-family:'Material Symbols Outlined';font-size:19px;line-height:1;">zoom_in_map</span>
+        </button>
+      </div>
+      <sc-if value="{{ showGizmoHint }}" hint-placeholder-val="{{ false }}">
+        <div style="position:absolute;top:14px;left:64px;background:rgba(26,24,21,.85);color:#EEE9E2;font-size:11.5px;padding:6px 14px;border-radius:20px;z-index:4;white-space:nowrap;">Select a part to transform it</div>
+      </sc-if>
+      <sc-if value="{{ measureActive }}" hint-placeholder-val="{{ false }}">
+        <div style="position:absolute;top:14px;left:50%;transform:translateX(-50%);background:rgba(26,24,21,.85);color:#EEE9E2;font-size:11.5px;padding:6px 14px;border-radius:20px;z-index:4;white-space:nowrap;">Click two points on the model to measure</div>
+      </sc-if>
+      <button style="position:absolute;top:14px;right:14px;height:30px;padding:0 12px;border-radius:7px;border:1px solid rgba(26,24,21,.15);background:rgba(255,255,255,.6);color:#1A1815;font-size:11.5px;font-weight:600;cursor:pointer;font-family:inherit;display:flex;align-items:center;gap:6px;z-index:4;" onClick="{{ frameCamera }}">
+        <span style="font-family:'Material Symbols Outlined';font-size:15px;line-height:1;">center_focus_strong</span>
+        Frame
+      </button>
+      <div data-screen-label="Cut List" style="position:absolute;inset:0;background:#1E1B17;z-index:10;display:{{ cutlistDisplay }};flex-direction:column;overflow-y:auto;">
+        <div style="max-width:900px;margin:0 auto;width:100%;padding:36px 32px 60px;">
+          <div style="display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:22px;gap:20px;">
+            <div>
+              <div style="font-family:'Space Grotesk',sans-serif;font-size:22px;font-weight:700;color:#EEE9E2;margin-bottom:4px;">Cut List</div>
+              <div style="font-size:12.5px;color:rgba(238,233,226,.45);">Walnut Sideboard · {{ dimsSummary }}</div>
+            </div>
+            <button style="height:34px;padding:0 16px;border-radius:7px;border:none;background:#C68A46;color:#1A1815;font-size:12.5px;font-weight:700;cursor:pointer;font-family:inherit;display:flex;align-items:center;gap:7px;flex:none;" onClick="{{ exportCSV }}">
+              <span style="font-family:'Material Symbols Outlined';font-size:16px;line-height:1;">download</span>
+              Export CSV
+            </button>
+          </div>
+          <div style="display:flex;gap:10px;margin-bottom:22px;">
+            <div style="flex:1;background:#211E1A;border:1px solid rgba(255,255,255,.08);border-radius:8px;padding:12px 14px;">
+              <div style="font-size:10.5px;color:rgba(238,233,226,.4);margin-bottom:4px;">Sheets Needed</div>
+              <div style="font-family:'IBM Plex Mono',monospace;font-size:18px;color:#EEE9E2;">{{ bomTotals.sheets }}</div>
+              <div style="font-size:10px;color:rgba(238,233,226,.35);">2440×1220mm ply</div>
+            </div>
+            <div style="flex:1;background:#211E1A;border:1px solid rgba(255,255,255,.08);border-radius:8px;padding:12px 14px;">
+              <div style="font-size:10.5px;color:rgba(238,233,226,.4);margin-bottom:4px;">Edge Banding</div>
+              <div style="font-family:'IBM Plex Mono',monospace;font-size:18px;color:#EEE9E2;">{{ bomTotals.edgeBandM }}</div>
+              <div style="font-size:10px;color:rgba(238,233,226,.35);">meters</div>
+            </div>
+            <div style="flex:1;background:#211E1A;border:1px solid rgba(255,255,255,.08);border-radius:8px;padding:12px 14px;">
+              <div style="font-size:10.5px;color:rgba(238,233,226,.4);margin-bottom:4px;">Parts</div>
+              <div style="font-family:'IBM Plex Mono',monospace;font-size:18px;color:#EEE9E2;">{{ bomTotals.partCount }}</div>
+              <div style="font-size:10px;color:rgba(238,233,226,.35);">total pieces</div>
+            </div>
+          </div>
+          <div style="border:1px solid rgba(255,255,255,.08);border-radius:8px;overflow:hidden;margin-bottom:24px;">
+            <div style="display:grid;grid-template-columns:2fr .5fr 1.1fr .7fr .7fr .7fr .9fr .9fr;column-gap:10px;background:#211E1A;padding:9px 14px;font-size:10.5px;font-weight:600;color:rgba(238,233,226,.45);text-transform:uppercase;letter-spacing:.03em;">
+              <div>Part</div><div>Qty</div><div>Material</div><div>W</div><div>H</div><div>D</div><div>Edge Band</div><div>Grain</div>
+            </div>
+            <sc-for list="{{ bomRows }}" as="row" hint-placeholder-count="6">
+              <div style="display:grid;grid-template-columns:2fr .5fr 1.1fr .7fr .7fr .7fr .9fr .9fr;column-gap:10px;padding:9px 14px;font-size:12px;color:rgba(238,233,226,.8);border-top:1px solid rgba(255,255,255,.06);font-family:'IBM Plex Mono',monospace;">
+                <div style="font-family:inherit;">{{ row.label }}</div><div>{{ row.qty }}</div><div>{{ row.material }}</div><div>{{ row.w }}</div><div>{{ row.h }}</div><div>{{ row.d }}</div><div>{{ row.edge }}</div><div>{{ row.grain }}</div>
+              </div>
+            </sc-for>
+          </div>
+          <div style="font-size:11px;font-weight:600;color:rgba(238,233,226,.45);text-transform:uppercase;letter-spacing:.04em;margin-bottom:10px;">Hardware</div>
+          <div style="display:flex;gap:24px;font-size:12.5px;color:rgba(238,233,226,.7);font-family:'IBM Plex Mono',monospace;">
+            <div>Hinges <span style="color:#EEE9E2;">{{ bomHardware.hinges }}</span></div>
+            <div>Drawer Slides <span style="color:#EEE9E2;">{{ bomHardware.slides }}</span></div>
+            <div>Pulls <span style="color:#EEE9E2;">{{ bomHardware.handles }}</span></div>
+            <div>Levelers <span style="color:#EEE9E2;">{{ bomHardware.levelers }}</span></div>
+          </div>
+        </div>
+      </div>
+      <div data-screen-label="Render mode bar" style="position:absolute;bottom:22px;left:50%;transform:translateX(-50%);z-index:8;display:{{ renderBarDisplay }};align-items:center;gap:8px;background:rgba(26,24,21,.85);border-radius:12px;padding:8px;">
+        <button style="height:34px;padding:0 14px;border-radius:8px;border:none;background:rgba(255,255,255,.06);color:#EEE9E2;font-size:12px;font-weight:600;cursor:pointer;font-family:inherit;" onClick="{{ presetFront }}">Front</button>
+        <button style="height:34px;padding:0 14px;border-radius:8px;border:none;background:rgba(255,255,255,.06);color:#EEE9E2;font-size:12px;font-weight:600;cursor:pointer;font-family:inherit;" onClick="{{ presetAngle }}">3/4 Angle</button>
+        <button style="height:34px;padding:0 14px;border-radius:8px;border:none;background:rgba(255,255,255,.06);color:#EEE9E2;font-size:12px;font-weight:600;cursor:pointer;font-family:inherit;" onClick="{{ presetTop }}">Top</button>
+        <div style="width:1px;height:20px;background:rgba(255,255,255,.12);"></div>
+        <button style="height:34px;padding:0 16px;border-radius:8px;border:none;background:#C68A46;color:#1A1815;font-size:12px;font-weight:700;cursor:pointer;font-family:inherit;display:flex;align-items:center;gap:6px;" onClick="{{ exportImage }}">
+          <span style="font-family:'Material Symbols Outlined';font-size:16px;line-height:1;">photo_camera</span>
+          Export Image
+        </button>
+      </div>
+    </div>
+    <div data-screen-label="Right sidebar" style="{{ rightSidebarStyle }}">
+      <div style="display:flex;flex:none;border-bottom:1px solid rgba(255,255,255,.08);">
+        <button style="{{ propertiesTabStyle }}" onClick="{{ goPropertiesTab }}">Properties</button>
+        <button style="{{ materialsTabStyle }}" onClick="{{ goMaterialsTab }}">Materials</button>
+      </div>
+      <sc-if value="{{ isPropertiesTab }}" hint-placeholder-val="{{ true }}">
+        <div style="padding:16px;">
+          <div style="font-size:11px;font-weight:600;color:rgba(238,233,226,.45);text-transform:uppercase;letter-spacing:.04em;margin-bottom:10px;">Overall Dimensions</div>
+          <div style="padding:6px 2px 14px;">
+            <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px;">
+              <span style="font-size:12.5px;color:rgba(238,233,226,.7);">Width</span>
+              <div style="display:flex;align-items:center;gap:4px;">
+                <input type="number" value="{{ dims.width }}" onChange="{{ onWidthChange }}" style="width:58px;height:22px;background:#26221D;border:1px solid rgba(255,255,255,.1);border-radius:5px;color:#EEE9E2;font-family:'IBM Plex Mono',monospace;font-size:11.5px;text-align:right;padding:0 6px;">
+                <span style="font-family:'IBM Plex Mono',monospace;font-size:11px;color:rgba(238,233,226,.5);">mm</span>
+              </div>
+            </div>
+            <input type="range" min="600" max="2400" step="10" value="{{ dims.width }}" onChange="{{ onWidthChange }}" style="width:100%;accent-color:#C68A46;">
+          </div>
+          <div style="padding:6px 2px 14px;">
+            <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px;">
+              <span style="font-size:12.5px;color:rgba(238,233,226,.7);">Height</span>
+              <div style="display:flex;align-items:center;gap:4px;">
+                <input type="number" value="{{ dims.height }}" onChange="{{ onHeightChange }}" style="width:58px;height:22px;background:#26221D;border:1px solid rgba(255,255,255,.1);border-radius:5px;color:#EEE9E2;font-family:'IBM Plex Mono',monospace;font-size:11.5px;text-align:right;padding:0 6px;">
+                <span style="font-family:'IBM Plex Mono',monospace;font-size:11px;color:rgba(238,233,226,.5);">mm</span>
+              </div>
+            </div>
+            <input type="range" min="400" max="1400" step="10" value="{{ dims.height }}" onChange="{{ onHeightChange }}" style="width:100%;accent-color:#C68A46;">
+          </div>
+          <div style="padding:6px 2px 14px;">
+            <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px;">
+              <span style="font-size:12.5px;color:rgba(238,233,226,.7);">Depth</span>
+              <div style="display:flex;align-items:center;gap:4px;">
+                <input type="number" value="{{ dims.depth }}" onChange="{{ onDepthChange }}" style="width:58px;height:22px;background:#26221D;border:1px solid rgba(255,255,255,.1);border-radius:5px;color:#EEE9E2;font-family:'IBM Plex Mono',monospace;font-size:11.5px;text-align:right;padding:0 6px;">
+                <span style="font-family:'IBM Plex Mono',monospace;font-size:11px;color:rgba(238,233,226,.5);">mm</span>
+              </div>
+            </div>
+            <input type="range" min="250" max="800" step="10" value="{{ dims.depth }}" onChange="{{ onDepthChange }}" style="width:100%;accent-color:#C68A46;">
+          </div>
+          <sc-if value="{{ isLegsBase }}" hint-placeholder-val="{{ true }}">
+            <div style="padding:6px 2px 14px;">
+              <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px;">
+                <span style="font-size:12.5px;color:rgba(238,233,226,.7);">Leg Height</span>
+                <div style="display:flex;align-items:center;gap:4px;">
+                  <input type="number" value="{{ dims.legHeight }}" onChange="{{ onLegHeightChange }}" style="width:58px;height:22px;background:#26221D;border:1px solid rgba(255,255,255,.1);border-radius:5px;color:#EEE9E2;font-family:'IBM Plex Mono',monospace;font-size:11.5px;text-align:right;padding:0 6px;">
+                  <span style="font-family:'IBM Plex Mono',monospace;font-size:11px;color:rgba(238,233,226,.5);">mm</span>
+                </div>
+              </div>
+              <input type="range" min="60" max="300" step="5" value="{{ dims.legHeight }}" onChange="{{ onLegHeightChange }}" style="width:100%;accent-color:#C68A46;">
+            </div>
+          </sc-if>
+          <div style="padding:6px 2px 2px;">
+            <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px;">
+              <span style="font-size:12.5px;color:rgba(238,233,226,.7);">Panel Thickness</span>
+              <div style="display:flex;align-items:center;gap:4px;">
+                <input type="number" value="{{ dims.thickness }}" onChange="{{ onThicknessChange }}" style="width:58px;height:22px;background:#26221D;border:1px solid rgba(255,255,255,.1);border-radius:5px;color:#EEE9E2;font-family:'IBM Plex Mono',monospace;font-size:11.5px;text-align:right;padding:0 6px;">
+                <span style="font-family:'IBM Plex Mono',monospace;font-size:11px;color:rgba(238,233,226,.5);">mm</span>
+              </div>
+            </div>
+            <input type="range" min="12" max="40" step="1" value="{{ dims.thickness }}" onChange="{{ onThicknessChange }}" style="width:100%;accent-color:#C68A46;">
+          </div>
+          <div style="font-size:11px;line-height:1.5;color:rgba(238,233,226,.35);margin-top:10px;">Fronts, panels and legs scale automatically from these dimensions.</div>
+          <sc-if value="{{ hasSelection }}" hint-placeholder-val="{{ false }}">
+            <div>
+              <div style="height:1px;background:rgba(255,255,255,.08);margin:16px 0;"></div>
+              <div style="font-size:11px;font-weight:600;color:rgba(238,233,226,.45);text-transform:uppercase;letter-spacing:.04em;margin-bottom:10px;">Selected</div>
+              <div style="font-size:12.5px;font-weight:600;color:#EEE9E2;margin-bottom:10px;">{{ selectedInfo.label }}</div>
+              <sc-if value="{{ selectedInfo.isGroup }}" hint-placeholder-val="{{ false }}">
+                <div style="display:flex;gap:8px;margin-bottom:10px;">
+                  <div style="flex:1;background:#211E1A;border:1px solid rgba(255,255,255,.08);border-radius:6px;padding:6px 8px;">
+                    <div style="font-size:9.5px;color:rgba(238,233,226,.4);">W</div>
+                    <div style="font-family:'IBM Plex Mono',monospace;font-size:12px;color:rgba(238,233,226,.8);">{{ selectedInfo.size.w }}</div>
+                  </div>
+                  <div style="flex:1;background:#211E1A;border:1px solid rgba(255,255,255,.08);border-radius:6px;padding:6px 8px;">
+                    <div style="font-size:9.5px;color:rgba(238,233,226,.4);">H</div>
+                    <div style="font-family:'IBM Plex Mono',monospace;font-size:12px;color:rgba(238,233,226,.8);">{{ selectedInfo.size.h }}</div>
+                  </div>
+                  <div style="flex:1;background:#211E1A;border:1px solid rgba(255,255,255,.08);border-radius:6px;padding:6px 8px;">
+                    <div style="font-size:9.5px;color:rgba(238,233,226,.4);">D</div>
+                    <div style="font-family:'IBM Plex Mono',monospace;font-size:12px;color:rgba(238,233,226,.8);">{{ selectedInfo.size.d }}</div>
+                  </div>
+                </div>
+              </sc-if>
+              <sc-if value="{{ selectedInfo.isFixed }}" hint-placeholder-val="{{ false }}">
+                <div style="display:flex;gap:8px;margin-bottom:10px;">
+                  <div style="flex:1;background:#211E1A;border:1px solid rgba(255,255,255,.08);border-radius:6px;padding:6px 8px;">
+                    <div style="font-size:9.5px;color:rgba(238,233,226,.4);">W</div>
+                    <div style="font-family:'IBM Plex Mono',monospace;font-size:12px;color:rgba(238,233,226,.8);">{{ selectedInfo.size.w }}</div>
+                  </div>
+                  <div style="flex:1;background:#211E1A;border:1px solid rgba(255,255,255,.08);border-radius:6px;padding:6px 8px;">
+                    <div style="font-size:9.5px;color:rgba(238,233,226,.4);">H</div>
+                    <div style="font-family:'IBM Plex Mono',monospace;font-size:12px;color:rgba(238,233,226,.8);">{{ selectedInfo.size.h }}</div>
+                  </div>
+                  <div style="flex:1;background:#211E1A;border:1px solid rgba(255,255,255,.08);border-radius:6px;padding:6px 8px;">
+                    <div style="font-size:9.5px;color:rgba(238,233,226,.4);">D</div>
+                    <div style="font-family:'IBM Plex Mono',monospace;font-size:12px;color:rgba(238,233,226,.8);">{{ selectedInfo.size.d }}</div>
+                  </div>
+                </div>
+              </sc-if>
+              <sc-if value="{{ selectedInfo.isCustom }}" hint-placeholder-val="{{ false }}">
+                <div style="display:flex;gap:8px;margin-bottom:10px;">
+                  <div style="flex:1;">
+                    <div style="font-size:9.5px;color:rgba(238,233,226,.4);margin-bottom:3px;">W (mm)</div>
+                    <input type="number" value="{{ selectedInfo.size.w }}" onChange="{{ onCustomWChange }}" style="width:100%;height:26px;background:#211E1A;border:1px solid rgba(255,255,255,.08);border-radius:6px;color:#EEE9E2;font-family:'IBM Plex Mono',monospace;font-size:11.5px;text-align:center;padding:0 4px;">
+                  </div>
+                  <div style="flex:1;">
+                    <div style="font-size:9.5px;color:rgba(238,233,226,.4);margin-bottom:3px;">H (mm)</div>
+                    <input type="number" value="{{ selectedInfo.size.h }}" onChange="{{ onCustomHChange }}" style="width:100%;height:26px;background:#211E1A;border:1px solid rgba(255,255,255,.08);border-radius:6px;color:#EEE9E2;font-family:'IBM Plex Mono',monospace;font-size:11.5px;text-align:center;padding:0 4px;">
+                  </div>
+                  <div style="flex:1;">
+                    <div style="font-size:9.5px;color:rgba(238,233,226,.4);margin-bottom:3px;">D (mm)</div>
+                    <input type="number" value="{{ selectedInfo.size.d }}" onChange="{{ onCustomDChange }}" style="width:100%;height:26px;background:#211E1A;border:1px solid rgba(255,255,255,.08);border-radius:6px;color:#EEE9E2;font-family:'IBM Plex Mono',monospace;font-size:11.5px;text-align:center;padding:0 4px;">
+                  </div>
+                </div>
+              </sc-if>
+              <div style="font-size:11px;line-height:1.5;color:rgba(238,233,226,.35);margin-bottom:10px;">Derived from overall dimensions, plus any manual move/rotate/scale from the viewport gizmo.</div>
+              <div style="display:flex;gap:8px;flex-wrap:wrap;">
+                <button style="height:28px;padding:0 12px;border-radius:6px;border:1px solid rgba(255,255,255,.12);background:transparent;color:rgba(238,233,226,.7);font-size:11.5px;cursor:pointer;font-family:inherit;" onClick="{{ clearSelection }}">Clear selection</button>
+                <button style="height:28px;padding:0 12px;border-radius:6px;border:1px solid rgba(255,255,255,.12);background:transparent;color:rgba(238,233,226,.7);font-size:11.5px;cursor:pointer;font-family:inherit;" onClick="{{ resetPartTransform }}">Reset transform</button>
+                <sc-if value="{{ selectedInfo.isCustom }}" hint-placeholder-val="{{ false }}">
+                  <button style="height:28px;padding:0 12px;border-radius:6px;border:1px solid rgba(255,255,255,.12);background:transparent;color:rgba(238,233,226,.7);font-size:11.5px;cursor:pointer;font-family:inherit;" onClick="{{ duplicateSelectedParts }}">Duplicate</button>
+                </sc-if>
+                <button style="height:28px;padding:0 12px;border-radius:6px;border:1px solid rgba(220,90,90,.3);background:rgba(220,90,90,.1);color:#e08a8a;font-size:11.5px;cursor:pointer;font-family:inherit;" onClick="{{ deleteSelectedParts }}">Delete</button>
+              </div>
+            </div>
+          </sc-if>
+          <sc-if value="{{ noSelection }}" hint-placeholder-val="{{ true }}">
+            <div>
+              <div style="height:1px;background:rgba(255,255,255,.08);margin:16px 0;"></div>
+              <div style="font-size:12px;line-height:1.5;color:rgba(238,233,226,.4);">Click a part in the viewport or the Assembly tree to inspect it.</div>
+            </div>
+          </sc-if>
+        </div>
+      </sc-if>
+      <sc-if value="{{ isMaterialsTab }}" hint-placeholder-val="{{ false }}">
+        <div style="padding:16px;">
+          <div style="display:flex;align-items:center;gap:8px;margin-bottom:16px;padding:8px 10px;background:#211E1A;border-radius:7px;border:1px solid rgba(255,255,255,.08);">
+            <span style="font-size:11.5px;color:rgba(238,233,226,.5);">Editing:</span>
+            <span style="font-size:12px;font-weight:600;color:#EEE9E2;flex:1;">{{ materialScopeLabel }}</span>
+            <sc-if value="{{ hasSelection }}" hint-placeholder-val="{{ false }}">
+              <button style="width:20px;height:20px;border:none;background:none;color:rgba(238,233,226,.5);cursor:pointer;display:flex;align-items:center;justify-content:center;" onClick="{{ clearSelection }}" title="Back to whole piece"><span style="font-family:'Material Symbols Outlined';font-size:14px;">close</span></button>
+            </sc-if>
+          </div>
+          <div style="font-size:11px;font-weight:600;color:rgba(238,233,226,.45);text-transform:uppercase;letter-spacing:.04em;margin-bottom:8px;">Body Finish</div>
+          <div style="display:grid;grid-template-columns:1fr 1fr 1fr 1fr 1fr;gap:8px;margin-bottom:6px;">
+            <sc-for list="{{ materialOptions.body }}" as="f" hint-placeholder-count="5">
+              <div style="display:flex;flex-direction:column;gap:4px;">
+                <div style="{{ f.swatchStyle }}" onClick="{{ f.onClick }}" title="{{ f.label }}"></div>
+                <span style="font-size:9.5px;color:rgba(238,233,226,.55);text-align:center;line-height:1.2;">{{ f.label }}</span>
+              </div>
+            </sc-for>
+          </div>
+          <sc-if value="{{ materialOptions.hasBodyOverride }}" hint-placeholder-val="{{ false }}">
+            <div style="font-size:11px;color:#4FA3FF;cursor:pointer;margin-bottom:16px;" onClick="{{ resetBodyOverride }}">Reset to piece default</div>
+          </sc-if>
+          <div style="height:1px;background:rgba(255,255,255,.08);margin:16px 0;"></div>
+          <div style="font-size:11px;font-weight:600;color:rgba(238,233,226,.45);text-transform:uppercase;letter-spacing:.04em;margin-bottom:8px;">Hardware Finish</div>
+          <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;">
+            <sc-for list="{{ materialOptions.hardware }}" as="f" hint-placeholder-count="3">
+              <div style="display:flex;flex-direction:column;gap:4px;">
+                <div style="{{ f.swatchStyle }}" onClick="{{ f.onClick }}" title="{{ f.label }}"></div>
+                <span style="font-size:9.5px;color:rgba(238,233,226,.55);text-align:center;line-height:1.2;">{{ f.label }}</span>
+              </div>
+            </sc-for>
+          </div>
+        </div>
+      </sc-if>
+    </div>
+  </div>
+  <div data-screen-label="Status bar" style="height:28px;flex:none;background:#211E1A;border-top:1px solid rgba(255,255,255,.08);display:flex;align-items:center;padding:0 16px;gap:14px;font-size:11px;color:rgba(238,233,226,.4);font-family:'IBM Plex Mono',monospace;">
+    <span>{{ selectionBreadcrumb }}</span>
+    <span style="opacity:.3;">·</span>
+    <span>{{ dimsSummary }}</span>
+    <span style="flex:1;"></span>
+    <span style="width:6px;height:6px;border-radius:50%;background:#6FBF73;"></span>
+    <span>Autosaved</span>
+  </div>
+</div>
+<div data-screen-label="Version history" style="{{ historyPanelStyle }}">
+  <div style="flex:none;display:flex;align-items:center;justify-content:space-between;padding:16px;border-bottom:1px solid rgba(255,255,255,.08);">
+    <span style="font-family:'Space Grotesk',sans-serif;font-size:14px;font-weight:700;color:#EEE9E2;">Version History</span>
+    <button style="width:24px;height:24px;border:none;background:none;color:rgba(238,233,226,.5);cursor:pointer;display:flex;align-items:center;justify-content:center;" onClick="{{ toggleHistory }}"><span style="font-family:'Material Symbols Outlined';font-size:16px;">close</span></button>
+  </div>
+  <div style="flex:1;overflow-y:auto;padding:8px 12px;">
+    <sc-for list="{{ versions }}" as="v" hint-placeholder-count="3">
+      <div style="display:flex;gap:10px;padding:12px 8px;border-bottom:1px solid rgba(255,255,255,.06);align-items:flex-start;">
+        <span style="width:10px;height:10px;border-radius:50%;flex:none;margin-top:4px;background:{{ v.dotColor }};border:1px solid rgba(255,255,255,.2);"></span>
+        <div style="flex:1;min-width:0;">
+          <div style="font-size:12.5px;font-weight:600;color:#EEE9E2;">{{ v.label }}</div>
+          <div style="font-size:10.5px;color:rgba(238,233,226,.4);margin:2px 0 4px;">{{ v.time }} · {{ v.dims.width }}×{{ v.dims.height }}×{{ v.dims.depth }}mm</div>
+        </div>
+        <sc-if value="{{ v.isCurrent }}" hint-placeholder-val="{{ false }}">
+          <span style="font-size:10px;font-weight:600;color:#6FBF73;background:rgba(111,191,115,.15);padding:3px 8px;border-radius:5px;flex:none;">Current</span>
+        </sc-if>
+        <sc-if value="{{ v.notCurrent }}" hint-placeholder-val="{{ true }}">
+          <button style="font-size:10.5px;font-weight:600;color:#4FA3FF;background:rgba(79,163,255,.12);border:none;padding:4px 9px;border-radius:5px;cursor:pointer;flex:none;font-family:inherit;" onClick="{{ v.restore }}">Restore</button>
+        </sc-if>
+      </div>
+    </sc-for>
+  </div>
+  <div style="flex:none;padding:14px 16px;border-top:1px solid rgba(255,255,255,.08);">
+    <button style="width:100%;height:34px;border-radius:7px;border:none;background:#C68A46;color:#1A1815;font-size:12.5px;font-weight:700;cursor:pointer;font-family:inherit;" onClick="{{ saveVersion }}">Save current as version</button>
+  </div>
+</div>
+<sc-if value="{{ toast }}" hint-placeholder-val="{{ false }}">
+  <div style="position:fixed;bottom:44px;left:50%;transform:translateX(-50%);background:#26221D;border:1px solid rgba(255,255,255,.12);color:#EEE9E2;font-size:12.5px;padding:9px 18px;border-radius:20px;box-shadow:0 8px 24px rgba(0,0,0,.35);z-index:50;animation:toastIn .2s ease;display:flex;align-items:center;gap:8px;">
+    <span style="width:6px;height:6px;border-radius:50%;background:#C68A46;"></span>
+    {{ toast.msg }}
+  </div>
+</sc-if>
+</x-dc>
+<script type="text/x-dc" data-dc-script>
+class Component extends DCLogic {
+  constructor(props) {
+    super(props);
+    this.viewportRef = React.createRef();
+    this.undoStack = [];
+    this.redoStack = [];
+    this.state = {
+      dims: { width: 1400, height: 780, depth: 420, legHeight: 150, thickness: 18 },
+      baseStyle: 'legs',
+      legStyle: 'tapered',
+      handleStyle: 'bar',
+      bodyMaterialId: 'walnut',
+      hardwareMaterialId: 'brass',
+      overrides: {},
+      selectedPartIds: [],
+      viewMode: 'model',
+      leftTab: 'assembly',
+      rightTab: 'properties',
+      measureActive: false,
+      measurePoints: [],
+      gizmoMode: 'select',
+      gridVisible: true,
+      snapEnabled: true,
+      historyOpen: false,
+      toast: null,
+      customParts: [],
+      deletedFixedIds: [],
+      hiddenIds: [],
+      marquee: null,
+      treeExpanded: { carcass: true, base: true, fronts: true, hardware: true, custom: true },
+      versions: [
+        { id: 'v1', label: 'Initial concept', time: '3 days ago', dims: { width: 1300, height: 760, depth: 400, legHeight: 150, thickness: 18 }, baseStyle: 'legs', legStyle: 'straight', handleStyle: 'knob', bodyMaterialId: 'oak', hardwareMaterialId: 'steel' },
+        { id: 'v2', label: 'Client revision — wider', time: 'yesterday', dims: { width: 1400, height: 780, depth: 420, legHeight: 150, thickness: 18 }, baseStyle: 'legs', legStyle: 'tapered', handleStyle: 'bar', bodyMaterialId: 'walnut', hardwareMaterialId: 'brass' },
+      ],
+      currentVersionId: 'v2',
+    };
+  }
+
+  getParams(state) {
+    const s = state || this.state;
+    return { width: s.dims.width, height: s.dims.height, depth: s.dims.depth, legHeight: s.dims.legHeight, thickness: s.dims.thickness,
+      baseStyle: s.baseStyle, legStyle: s.legStyle, handleStyle: s.handleStyle, bodyMaterialId: s.bodyMaterialId, hardwareMaterialId: s.hardwareMaterialId };
+  }
+
+  snapshotState() {
+    const s = this.state;
+    return { dims: { ...s.dims }, baseStyle: s.baseStyle, legStyle: s.legStyle, handleStyle: s.handleStyle, bodyMaterialId: s.bodyMaterialId, hardwareMaterialId: s.hardwareMaterialId, overrides: JSON.parse(JSON.stringify(s.overrides)), customParts: JSON.parse(JSON.stringify(s.customParts)), deletedFixedIds: [...s.deletedFixedIds] };
+  }
+
+  pushUndo() {
+    this.undoStack.push(this.snapshotState());
+    if (this.undoStack.length > 30) this.undoStack.shift();
+    this.redoStack = [];
+  }
+
+  undo() {
+    if (!this.undoStack.length) return;
+    const prev = this.undoStack.pop();
+    this.redoStack.push(this.snapshotState());
+    this.setState(prev);
+  }
+
+  redo() {
+    if (!this.redoStack.length) return;
+    const next = this.redoStack.pop();
+    this.undoStack.push(this.snapshotState());
+    this.setState(next);
+  }
+
+  showToast(msg) {
+    const id = Math.random().toString(36).slice(2);
+    this.setState({ toast: { id, msg } });
+    clearTimeout(this._toastTimer);
+    this._toastTimer = setTimeout(() => this.setState((s) => (s.toast && s.toast.id === id ? { toast: null } : null)), 2600);
+  }
+
+  async componentDidMount() {
+    const THREE = await import('three');
+    const { OrbitControls } = await import('three/addons/controls/OrbitControls.js');
+    const { TransformControls } = await import('three/addons/controls/TransformControls.js');
+    const FM = await import('./furniture-model.js');
+    this.THREE = THREE;
+    this.FM = FM;
+    const el = this.viewportRef.current;
+    if (!el) return;
+
+    const scene = new THREE.Scene();
+    const camera = new THREE.PerspectiveCamera(35, el.clientWidth / el.clientHeight || 1, 0.1, 50);
+    camera.position.set(2.5, 1.5, 2.7);
+    const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true, preserveDrawingBuffer: true });
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+    renderer.shadowMap.enabled = true;
+    el.appendChild(renderer.domElement);
+
+    const controls = new OrbitControls(camera, renderer.domElement);
+    controls.mouseButtons.LEFT = THREE.MOUSE.ROTATE;
+    controls.enableDamping = true;
+    controls.dampingFactor = 0.08;
+    controls.target.set(0, 0.4, 0);
+    controls.minDistance = 1.2;
+    controls.maxDistance = 7;
+    controls.maxPolarAngle = Math.PI * 0.49;
+
+    const hemi = new THREE.HemisphereLight(0xfff4e6, 0x3a3229, 1.0);
+    const dir = new THREE.DirectionalLight(0xfff2df, 2.4);
+    dir.position.set(3, 5, 2.2);
+    dir.castShadow = true;
+    dir.shadow.mapSize.set(1024, 1024);
+    dir.shadow.camera.near = 0.5;
+    dir.shadow.camera.far = 12;
+    const fill = new THREE.DirectionalLight(0xdfe8ff, 0.35);
+    fill.position.set(-3, 2, -2);
+    scene.add(hemi, dir, fill);
+
+    const ground = new THREE.Mesh(new THREE.PlaneGeometry(12, 12), new THREE.ShadowMaterial({ opacity: 0.24 }));
+    ground.rotation.x = -Math.PI / 2;
+    ground.receiveShadow = true;
+    scene.add(ground);
+
+    const grid = new THREE.GridHelper(4, 40, 0x4a4030, 0x6b5f48);
+    grid.material.transparent = true;
+    grid.material.opacity = 0.65;
+    scene.add(grid);
+
+    const modelGroup = new THREE.Group();
+    scene.add(modelGroup);
+
+    const customGroup = new THREE.Group();
+    scene.add(customGroup);
+
+    const transformControls = new TransformControls(camera, renderer.domElement);
+    transformControls.size = 0.85;
+    scene.add(transformControls.getHelper());
+    transformControls.addEventListener('dragging-changed', (e) => { controls.enabled = !e.value; });
+    transformControls.addEventListener('objectChange', () => {
+      const ids = this.state.selectedPartIds;
+      if (!ids.length) return;
+      if (ids.length > 1 && this._multiPivot && transformControls.object === this._multiPivot) {
+        this._applyMultiPivot(ids);
+        return;
+      }
+      const obj = transformControls.object;
+      if (!obj || obj === this._multiPivot) return;
+      this.manualTransforms[ids[0]] = { position: obj.position.toArray(), quaternion: obj.quaternion.toArray(), scale: obj.scale.toArray() };
+    });
+
+    Object.assign(this, { scene, camera, renderer, controls, modelGroup, customGroup, ground, grid, transformControls });
+    this.manualTransforms = {};
+    this.updateSnap();
+    this.updateNavMode();
+
+    this.resizeObserver = new ResizeObserver(() => this.handleResize());
+    this.resizeObserver.observe(el);
+    this.handleResize();
+
+    this.raycaster = new THREE.Raycaster();
+    this.pointer = new THREE.Vector2();
+    el.addEventListener('pointerdown', (e) => this.onViewportPointerDown(e));
+    el.addEventListener('pointermove', (e) => this.onViewportPointerMove(e));
+    el.addEventListener('pointerup', (e) => this.onViewportPointerUp(e));
+    el.addEventListener('pointerleave', () => { if (this._marqueeStart) this.finishMarquee(); else this._marqueePending = null; });
+    el.addEventListener('dragover', (e) => e.preventDefault());
+    el.addEventListener('drop', (e) => this.onViewportDrop(e));
+    this._onKeyDown = (e) => this.onKeyDown(e);
+    window.addEventListener('keydown', this._onKeyDown);
+
+    const loop = () => {
+      this.rafId = requestAnimationFrame(loop);
+      controls.update();
+      this.updateMeasureLabel();
+      renderer.render(scene, camera);
+    };
+    loop();
+    this.rebuildModel();
+    this.setState({ ready: true });
+  }
+
+  rebuildModel() {
+    const { THREE, FM, modelGroup } = this;
+    if (!THREE || !FM || !modelGroup) return;
+    if (this.transformControls) this.transformControls.detach();
+    while (modelGroup.children.length) {
+      const c = modelGroup.children.pop();
+      c.traverse((n) => { if (n.geometry) n.geometry.dispose(); if (n.material) n.material.dispose(); });
+    }
+    const params = this.getParams();
+    const { group, partsById } = FM.buildFurnitureModel(THREE, params, this.state.overrides);
+    this.state.deletedFixedIds.forEach((id) => {
+      const mesh = partsById[id];
+      if (mesh) {
+        if (mesh.parent) mesh.parent.remove(mesh);
+        mesh.traverse((n) => { if (n.geometry) n.geometry.dispose(); if (n.material) n.material.dispose(); });
+        delete partsById[id];
+      }
+    });
+    Object.keys(this.manualTransforms || {}).forEach((id) => {
+      const mesh = partsById[id];
+      const t = this.manualTransforms[id];
+      if (mesh && t) { mesh.position.fromArray(t.position); mesh.quaternion.fromArray(t.quaternion); mesh.scale.fromArray(t.scale); }
+    });
+    modelGroup.add(group);
+    this.fixedPartsById = partsById;
+    this.partsById = { ...partsById, ...(this.customPartsById || {}) };
+    this.applyVisibility();
+    this.applyHighlight();
+    this.syncGizmo();
+  }
+
+  rebuildCustomParts() {
+    const { THREE, FM, customGroup } = this;
+    if (!THREE || !FM || !customGroup) return;
+    if (this.transformControls) this.transformControls.detach();
+    while (customGroup.children.length) {
+      const c = customGroup.children.pop();
+      if (c.geometry) c.geometry.dispose();
+      if (c.material) c.material.dispose();
+    }
+    const newPartsById = {};
+    this.state.customParts.forEach((p) => {
+      const ov = this.state.overrides[p.id];
+      const finish = FM.findFinish((ov && ov.body) || this.state.bodyMaterialId);
+      const mesh = FM.buildPanelMesh(THREE, p, finish);
+      const t = this.manualTransforms[p.id];
+      if (t) { mesh.position.fromArray(t.position); mesh.quaternion.fromArray(t.quaternion); mesh.scale.fromArray(t.scale); }
+      customGroup.add(mesh);
+      newPartsById[p.id] = mesh;
+    });
+    this.customPartsById = newPartsById;
+    this.partsById = { ...(this.fixedPartsById || {}), ...newPartsById };
+    this.applyVisibility();
+    this.applyHighlight();
+    this.syncGizmo();
+  }
+
+  addCustomPanel(presetId, point) {
+    if (!this.FM) return;
+    const preset = this.FM.PANEL_PRESETS.find((p) => p.id === presetId) || this.FM.PANEL_PRESETS[0];
+    this.pushUndo();
+    const id = 'custom-' + Date.now() + '-' + Math.floor(Math.random() * 1000);
+    const n = this.state.customParts.length;
+    const x = point ? point.x : ((n % 4) - 1.5) * 0.5;
+    const z = point ? point.z : (this.getParams().depth / 2000 + 0.6);
+    const y = preset.h / 2000;
+    this.manualTransforms[id] = { position: [x, y, z], quaternion: [0, 0, 0, 1], scale: [1, 1, 1] };
+    this.setState((s) => ({
+      customParts: [...s.customParts, { id, label: preset.label, w: preset.w, h: preset.h, d: preset.d }],
+      overrides: { ...s.overrides, [id]: { body: s.bodyMaterialId } },
+      selectedPartIds: [id],
+      gizmoMode: (s.gizmoMode === 'select' || s.gizmoMode === 'pan') ? 'translate' : s.gizmoMode,
+      rightTab: 'properties',
+      leftTab: 'assembly',
+    }));
+    this.showToast(preset.label + ' added to scene');
+  }
+
+  deleteParts(ids) {
+    if (!ids.length) return;
+    this.pushUndo();
+    const customIdSet = new Set(this.state.customParts.map((p) => p.id));
+    const customIds = ids.filter((id) => customIdSet.has(id));
+    const fixedIds = ids.filter((id) => !customIdSet.has(id));
+    customIds.forEach((id) => delete this.manualTransforms[id]);
+    this.setState((s) => {
+      const overrides = { ...s.overrides };
+      ids.forEach((id) => delete overrides[id]);
+      return {
+        customParts: customIds.length ? s.customParts.filter((p) => !customIds.includes(p.id)) : s.customParts,
+        deletedFixedIds: fixedIds.length ? [...new Set([...s.deletedFixedIds, ...fixedIds])] : s.deletedFixedIds,
+        selectedPartIds: s.selectedPartIds.filter((x) => !ids.includes(x)),
+        overrides,
+      };
+    });
+    this.showToast(ids.length > 1 ? ids.length + ' parts deleted' : 'Part deleted');
+  }
+
+  deleteSelectedParts() {
+    this.deleteParts(this.state.selectedPartIds);
+  }
+
+  setCustomDim(key, value) {
+    const n = Number(value);
+    if (!isFinite(n) || n <= 0) return;
+    const id = this.state.selectedPartIds[0];
+    if (!id) return;
+    this.pushUndo();
+    if (this.manualTransforms[id]) this.manualTransforms[id].scale = [1, 1, 1];
+    this.setState((s) => ({ customParts: s.customParts.map((p) => (p.id === id ? { ...p, [key]: n } : p)) }));
+  }
+
+  applyHighlight() {
+    const { THREE } = this;
+    (this._haloMeshes || []).forEach((halo) => { if (halo.parent) halo.parent.remove(halo); halo.material.dispose(); });
+    this._haloMeshes = [];
+    const ids = this.state.selectedPartIds;
+    if (!ids.length || !this.partsById) return;
+    ids.forEach((id) => {
+      const mesh = this.partsById[id];
+      if (!mesh || !mesh.geometry) return;
+      const halo = new THREE.Mesh(mesh.geometry, new THREE.MeshBasicMaterial({ color: 0x4fa3ff, side: THREE.BackSide, transparent: true, opacity: 0.85 }));
+      halo.scale.set(1.045, 1.045, 1.045);
+      mesh.add(halo);
+      this._haloMeshes.push(halo);
+    });
+  }
+
+  syncGizmo() {
+    const tc = this.transformControls;
+    if (!tc) return;
+    const ids = this.state.selectedPartIds.filter((id) => this.partsById && this.partsById[id]);
+    const mode = this.state.gizmoMode;
+    if (!ids.length || mode === 'select' || mode === 'pan') {
+      tc.detach();
+      this._clearMultiPivot();
+      return;
+    }
+    tc.setMode(mode);
+    if (ids.length === 1) {
+      this._clearMultiPivot();
+      tc.attach(this.partsById[ids[0]]);
+      return;
+    }
+    this._setupMultiPivot(ids);
+  }
+
+  _setupMultiPivot(ids) {
+    const { THREE } = this;
+    if (!this._multiPivot) { this._multiPivot = new THREE.Object3D(); this.scene.add(this._multiPivot); }
+    const pivot = this._multiPivot;
+    const center = new THREE.Vector3();
+    ids.forEach((id) => {
+      const mesh = this.partsById[id];
+      mesh.updateMatrixWorld(true);
+      center.add(mesh.getWorldPosition(new THREE.Vector3()));
+    });
+    center.divideScalar(ids.length);
+    pivot.position.copy(center);
+    pivot.rotation.set(0, 0, 0);
+    pivot.scale.set(1, 1, 1);
+    pivot.updateMatrixWorld(true);
+    const pivotInv = new THREE.Matrix4().copy(pivot.matrixWorld).invert();
+    this._multiRel = {};
+    ids.forEach((id) => {
+      const mesh = this.partsById[id];
+      mesh.updateMatrixWorld(true);
+      this._multiRel[id] = new THREE.Matrix4().multiplyMatrices(pivotInv, mesh.matrixWorld);
+    });
+    this.transformControls.attach(pivot);
+  }
+
+  _applyMultiPivot(ids) {
+    const { THREE } = this;
+    const pivot = this._multiPivot;
+    if (!pivot) return;
+    pivot.updateMatrixWorld(true);
+    ids.forEach((id) => {
+      const mesh = this.partsById[id];
+      const rel = this._multiRel && this._multiRel[id];
+      if (!mesh || !rel) return;
+      const worldMat = new THREE.Matrix4().multiplyMatrices(pivot.matrixWorld, rel);
+      const pos = new THREE.Vector3(), quat = new THREE.Quaternion(), scale = new THREE.Vector3();
+      worldMat.decompose(pos, quat, scale);
+      mesh.position.copy(pos); mesh.quaternion.copy(quat); mesh.scale.copy(scale);
+      this.manualTransforms[id] = { position: pos.toArray(), quaternion: quat.toArray(), scale: scale.toArray() };
+    });
+  }
+
+  _clearMultiPivot() {
+    if (this._multiPivot) { this.scene.remove(this._multiPivot); this._multiPivot = null; }
+    this._multiRel = null;
+  }
+
+  selectAll() {
+    if (!this.FM) return;
+    const ids = this.FM.allPartIds(this.getParams())
+      .filter((id) => !this.state.deletedFixedIds.includes(id))
+      .concat(this.state.customParts.map((p) => p.id));
+    this.setState({ selectedPartIds: ids, rightTab: 'properties' });
+  }
+
+  setGizmoMode(mode) {
+    this.setState({ gizmoMode: mode, measureActive: false });
+  }
+
+  updateNavMode() {
+    const controls = this.controls;
+    if (!controls || !this.THREE) return;
+    controls.mouseButtons.LEFT = this.state.gizmoMode === 'pan' ? this.THREE.MOUSE.PAN : this.THREE.MOUSE.ROTATE;
+  }
+
+  updateSnap() {
+    const tc = this.transformControls;
+    if (!tc) return;
+    const on = this.state.snapEnabled;
+    tc.setTranslationSnap(on ? 0.1 : null);
+    tc.setRotationSnap(on ? Math.PI / 12 : null);
+    tc.setScaleSnap(on ? 0.1 : null);
+  }
+
+  toggleGrid() {
+    this.setState((s) => ({ gridVisible: !s.gridVisible }));
+  }
+
+  toggleSnap() {
+    this.setState((s) => ({ snapEnabled: !s.snapEnabled }));
+  }
+
+  resetPartTransform() {
+    const ids = this.state.selectedPartIds;
+    if (!ids.length) return;
+    const customIdSet = new Set(this.state.customParts.map((p) => p.id));
+    ids.forEach((id) => {
+      const mesh = this.partsById && this.partsById[id];
+      if (customIdSet.has(id)) {
+        // custom panels keep their placement; only orientation and scale reset
+        const t = this.manualTransforms[id];
+        if (t) { t.quaternion = [0, 0, 0, 1]; t.scale = [1, 1, 1]; }
+        if (mesh) { mesh.rotation.set(0, 0, 0); mesh.scale.set(1, 1, 1); }
+      } else {
+        delete this.manualTransforms[id];
+        if (mesh) { mesh.position.set(0, 0, 0); mesh.rotation.set(0, 0, 0); mesh.scale.set(1, 1, 1); }
+      }
+    });
+    this.rebuildModel();
+    this.rebuildCustomParts();
+    this.showToast('Transform reset');
+  }
+
+  duplicateSelectedParts() {
+    const customParts = this.state.customParts;
+    const sources = this.state.selectedPartIds
+      .map((id) => customParts.find((p) => p.id === id))
+      .filter(Boolean);
+    if (!sources.length) { this.showToast('Only library panels can be duplicated'); return; }
+    this.pushUndo();
+    const newIds = [];
+    const clones = sources.map((src) => {
+      const id = 'custom-' + Date.now() + '-' + Math.floor(Math.random() * 10000);
+      newIds.push(id);
+      const t = this.manualTransforms[src.id];
+      this.manualTransforms[id] = t
+        ? { position: [t.position[0] + 0.08, t.position[1], t.position[2] + 0.08], quaternion: [...t.quaternion], scale: [...t.scale] }
+        : { position: [0.08, src.h / 2000, 0.08], quaternion: [0, 0, 0, 1], scale: [1, 1, 1] };
+      return { id, label: src.label, w: src.w, h: src.h, d: src.d };
+    });
+    this.setState((s) => {
+      const overrides = { ...s.overrides };
+      sources.forEach((src, i) => { if (overrides[src.id]) overrides[clones[i].id] = { ...overrides[src.id] }; });
+      return { customParts: [...s.customParts, ...clones], overrides, selectedPartIds: newIds };
+    });
+    this.showToast(clones.length > 1 ? clones.length + ' parts duplicated' : 'Part duplicated');
+  }
+
+  frameSelected() {
+    const { THREE } = this;
+    const ids = this.state.selectedPartIds.filter((id) => this.partsById && this.partsById[id]);
+    if (!ids.length || !THREE) { this.frameCamera(); return; }
+    const box = new THREE.Box3();
+    ids.forEach((id) => box.expandByObject(this.partsById[id]));
+    if (box.isEmpty()) { this.frameCamera(); return; }
+    const center = box.getCenter(new THREE.Vector3());
+    const radius = Math.max(box.getSize(new THREE.Vector3()).length() / 2, 0.15);
+    const dist = Math.min(Math.max(radius * 3.2, 0.9), 6);
+    const dir = new THREE.Vector3(0.8, 0.55, 0.9).normalize();
+    this._flight = { pos: center.clone().add(dir.multiplyScalar(dist)), target: center, t: 0 };
+    if (!this._flightRaf) this.runFlight();
+  }
+
+  onKeyDown(e) {
+    const tag = (e.target && e.target.tagName) || '';
+    if (tag === 'INPUT' || tag === 'TEXTAREA') return;
+    if (e.metaKey || e.ctrlKey) {
+      if (e.key.toLowerCase() === 'z') { e.preventDefault(); e.shiftKey ? this.redo() : this.undo(); }
+      if (e.key.toLowerCase() === 'a') { e.preventDefault(); this.selectAll(); }
+      if (e.key.toLowerCase() === 'd') { e.preventDefault(); this.duplicateSelectedParts(); }
+      return;
+    }
+    if (e.key.toLowerCase() === 'f') { this.frameSelected(); return; }
+    if (e.key === 'Delete' || e.key === 'Backspace') {
+      if (this.state.selectedPartIds.length) { e.preventDefault(); this.deleteParts(this.state.selectedPartIds); }
+      return;
+    }
+    const map = { q: 'select', escape: 'select', h: 'pan', g: 'translate', m: 'translate', r: 'rotate', s: 'scale' };
+    const mode = map[e.key.toLowerCase()];
+    if (mode) this.setGizmoMode(mode);
+  }
+
+  onViewportPointerDown(e) {
+    this._downPos = { x: e.clientX, y: e.clientY };
+    const canMarquee = e.shiftKey && this.state.gizmoMode !== 'pan' && !this.state.measureActive;
+    if (canMarquee) {
+      const rect = this.viewportRef.current.getBoundingClientRect();
+      this._marqueePending = { x: e.clientX - rect.left, y: e.clientY - rect.top };
+      this._marqueeAdditive = e.metaKey || e.ctrlKey;
+    }
+  }
+
+  onViewportPointerMove(e) {
+    const rect = this.viewportRef.current.getBoundingClientRect();
+    const cx = e.clientX - rect.left, cy = e.clientY - rect.top;
+    if (this._marqueePending && !this._marqueeStart) {
+      const p = this._marqueePending;
+      if (Math.hypot(cx - p.x, cy - p.y) < 5) return;
+      this._marqueeStart = p;
+      if (this.controls) this.controls.enabled = false;
+    }
+    if (!this._marqueeStart) return;
+    const s = this._marqueeStart;
+    this.setState({ marquee: { x: Math.min(s.x, cx), y: Math.min(s.y, cy), w: Math.abs(cx - s.x), h: Math.abs(cy - s.y) } });
+  }
+
+  finishMarquee() {
+    const box = this.state.marquee;
+    this._marqueeStart = null;
+    this._marqueePending = null;
+    if (this.controls) this.controls.enabled = true;
+    this.setState({ marquee: null });
+    if (!box || (box.w < 4 && box.h < 4) || !this.partsById) return;
+    const { THREE } = this;
+    const el = this.viewportRef.current;
+    const W = el.clientWidth, H = el.clientHeight;
+    const hits = [];
+    Object.keys(this.partsById).forEach((id) => {
+      const mesh = this.partsById[id];
+      if (!mesh || mesh.visible === false) return;
+      mesh.updateMatrixWorld(true);
+      const p = mesh.getWorldPosition(new THREE.Vector3()).project(this.camera);
+      if (p.z > 1) return;
+      const sx = (p.x * 0.5 + 0.5) * W, sy = (-p.y * 0.5 + 0.5) * H;
+      if (sx >= box.x && sx <= box.x + box.w && sy >= box.y && sy <= box.y + box.h) hits.push(id);
+    });
+    if (!hits.length && !this._marqueeAdditive) { this.setState({ selectedPartIds: [] }); return; }
+    if (!hits.length) return;
+    this.setState((s) => ({
+      selectedPartIds: this._marqueeAdditive ? [...new Set([...s.selectedPartIds, ...hits])] : hits,
+      rightTab: 'properties',
+    }));
+    this.showToast(hits.length + (hits.length > 1 ? ' parts selected' : ' part selected'));
+  }
+
+  onViewportPointerUp(e) {
+    if (this._marqueeStart) { this._downPos = null; this._marqueePending = null; this.finishMarquee(); return; }
+    this._marqueePending = null;
+    const down = this._downPos;
+    this._downPos = null;
+    if (!down) return;
+    const dist = Math.hypot(e.clientX - down.x, e.clientY - down.y);
+    if (dist > 5) return;
+    const el = this.viewportRef.current;
+    const rect = el.getBoundingClientRect();
+    this.pointer.x = ((e.clientX - rect.left) / rect.width) * 2 - 1;
+    this.pointer.y = -((e.clientY - rect.top) / rect.height) * 2 + 1;
+    this.raycaster.setFromCamera(this.pointer, this.camera);
+    const pickables = this.modelGroup.children.concat(this.customGroup ? this.customGroup.children : []);
+    const hits = this.raycaster.intersectObjects(pickables, true).filter((h) => h.object.userData && h.object.userData.partId);
+    if (this.state.measureActive) {
+      if (hits.length) this.addMeasurePoint(hits[0].point);
+      return;
+    }
+    const additive = e.shiftKey || e.metaKey || e.ctrlKey;
+    if (hits.length) this.selectPart(hits[0].object.userData.partId, additive);
+    else if (!additive) this.setState({ selectedPartIds: [] });
+  }
+
+  onViewportDrop(e) {
+    e.preventDefault();
+    const data = e.dataTransfer.getData('text/plain');
+    if (!data) return;
+    const [kind, id] = data.split(':');
+    if (kind === 'legStyle') this.applyStyle('legStyle', id);
+    if (kind === 'handleStyle') this.applyStyle('handleStyle', id);
+    if (kind === 'baseStyle') this.applyStyle('baseStyle', id);
+    if (kind === 'panel') {
+      const el = this.viewportRef.current;
+      const rect = el.getBoundingClientRect();
+      const nx = ((e.clientX - rect.left) / rect.width) * 2 - 1;
+      const ny = -((e.clientY - rect.top) / rect.height) * 2 + 1;
+      this.raycaster.setFromCamera({ x: nx, y: ny }, this.camera);
+      const hit = this.ground ? this.raycaster.intersectObject(this.ground)[0] : null;
+      this.addCustomPanel(id, hit ? hit.point : null);
+    }
+  }
+
+  addMeasurePoint(point) {
+    const pts = this.state.measurePoints.length >= 2 ? [] : this.state.measurePoints;
+    this.setState({ measurePoints: [...pts, point.clone()] });
+  }
+
+  updateMeasureLabel() {
+    const label = this._measureLabelEl;
+    if (!label) return;
+    const pts = this.state.measurePoints;
+    if (!this.scene || !this._measureLine) return;
+    if (pts.length === 2) {
+      const mid = pts[0].clone().add(pts[1]).multiplyScalar(0.5);
+      const proj = mid.clone().project(this.camera);
+      const el = this.viewportRef.current;
+      if (!el) return;
+      const x = (proj.x * 0.5 + 0.5) * el.clientWidth;
+      const y = (-proj.y * 0.5 + 0.5) * el.clientHeight;
+      label.style.display = proj.z < 1 ? 'block' : 'none';
+      label.style.left = x + 'px';
+      label.style.top = y + 'px';
+      label.textContent = Math.round(pts[0].distanceTo(pts[1]) * 1000) + ' mm';
+    } else {
+      label.style.display = 'none';
+    }
+  }
+
+  rebuildMeasureVisuals() {
+    const { THREE, scene } = this;
+    if (!THREE || !scene) return;
+    if (this._measureGroup) { scene.remove(this._measureGroup); }
+    const group = new THREE.Group();
+    const pts = this.state.measurePoints;
+    const mat = new THREE.MeshBasicMaterial({ color: 0x4fa3ff });
+    pts.forEach((p) => {
+      const dot = new THREE.Mesh(new THREE.SphereGeometry(0.008, 12, 12), mat);
+      dot.position.copy(p);
+      group.add(dot);
+    });
+    if (pts.length === 2) {
+      const geo = new THREE.BufferGeometry().setFromPoints(pts);
+      const line = new THREE.Line(geo, new THREE.LineDashedMaterial({ color: 0x4fa3ff, dashSize: 0.02, gapSize: 0.012 }));
+      line.computeLineDistances();
+      group.add(line);
+    }
+    scene.add(group);
+    this._measureGroup = group;
+    this._measureLine = true;
+  }
+
+  selectPart(id, additive) {
+    this.setState((s) => {
+      const ids = additive ? (s.selectedPartIds.includes(id) ? s.selectedPartIds.filter((x) => x !== id) : [...s.selectedPartIds, id]) : [id];
+      return { selectedPartIds: ids, rightTab: 'properties' };
+    });
+  }
+
+  applyStyle(key, value) {
+    this.pushUndo();
+    this.setState({ [key]: value });
+    const label = key === 'legStyle' ? 'Leg style' : key === 'handleStyle' ? 'Handle style' : 'Base style';
+    this.showToast(label + ' updated');
+  }
+
+  setDim(key, value) {
+    const n = Number(value);
+    if (!isFinite(n) || n <= 0) return;
+    this.pushUndo();
+    this.setState((s) => ({ dims: { ...s.dims, [key]: n } }));
+  }
+
+  applyBodyMaterial(id) {
+    this.pushUndo();
+    const sel = this.state.selectedPartIds;
+    if (sel.length) {
+      this.setState((s) => { const overrides = { ...s.overrides }; sel.forEach((pid) => { overrides[pid] = { ...overrides[pid], body: id }; }); return { overrides }; });
+    } else {
+      this.setState({ bodyMaterialId: id });
+    }
+  }
+
+  applyHardwareMaterial(id) {
+    this.pushUndo();
+    const sel = this.state.selectedPartIds;
+    if (sel.length) {
+      this.setState((s) => { const overrides = { ...s.overrides }; sel.forEach((pid) => { overrides[pid] = { ...overrides[pid], hardware: id }; }); return { overrides }; });
+    } else {
+      this.setState({ hardwareMaterialId: id });
+    }
+  }
+
+  resetOverride(partIds) {
+    this.pushUndo();
+    const ids = Array.isArray(partIds) ? partIds : [partIds];
+    this.setState((s) => { const o = { ...s.overrides }; ids.forEach((id) => delete o[id]); return { overrides: o }; });
+  }
+
+  toggleTreeGroup(id) {
+    this.setState((s) => ({ treeExpanded: { ...s.treeExpanded, [id]: !s.treeExpanded[id] } }));
+  }
+
+  togglePartVisibility(partId) {
+    this.setState((s) => ({
+      hiddenIds: s.hiddenIds.includes(partId) ? s.hiddenIds.filter((x) => x !== partId) : [...s.hiddenIds, partId],
+    }));
+  }
+
+  applyVisibility() {
+    if (!this.partsById) return;
+    const hidden = this.state.hiddenIds;
+    Object.keys(this.partsById).forEach((id) => {
+      const mesh = this.partsById[id];
+      if (mesh) mesh.visible = !hidden.includes(id);
+    });
+  }
+
+  setLeftTab(tab) { this.setState({ leftTab: tab }); }
+  setRightTab(tab) { this.setState({ rightTab: tab }); }
+  setViewMode(mode) { this.setState({ viewMode: mode }); setTimeout(() => this.handleResize(), 60); }
+
+  toggleMeasure() {
+    this.setState((s) => ({ measureActive: !s.measureActive, measurePoints: [], gizmoMode: 'select' }));
+  }
+
+  toggleHistory() { this.setState((s) => ({ historyOpen: !s.historyOpen })); }
+
+  saveVersion() {
+    const s = this.state;
+    const id = 'v' + (Date.now());
+    const v = { id, label: 'Version ' + (s.versions.length + 1), time: 'just now', dims: { ...s.dims }, baseStyle: s.baseStyle, legStyle: s.legStyle, handleStyle: s.handleStyle, bodyMaterialId: s.bodyMaterialId, hardwareMaterialId: s.hardwareMaterialId, customParts: JSON.parse(JSON.stringify(s.customParts)), deletedFixedIds: [...s.deletedFixedIds], overrides: JSON.parse(JSON.stringify(s.overrides)) };
+    this.setState({ versions: [...s.versions, v], currentVersionId: id });
+    this.showToast('Saved ' + v.label);
+  }
+
+  restoreVersion(id) {
+    const v = this.state.versions.find((x) => x.id === id);
+    if (!v) return;
+    this.pushUndo();
+    this.setState({ dims: { ...v.dims }, baseStyle: v.baseStyle, legStyle: v.legStyle, handleStyle: v.handleStyle, bodyMaterialId: v.bodyMaterialId, hardwareMaterialId: v.hardwareMaterialId, overrides: v.overrides ? JSON.parse(JSON.stringify(v.overrides)) : {}, customParts: v.customParts ? JSON.parse(JSON.stringify(v.customParts)) : [], deletedFixedIds: v.deletedFixedIds ? [...v.deletedFixedIds] : [], selectedPartIds: [], currentVersionId: id, historyOpen: false });
+    this.showToast('Restored ' + v.label);
+  }
+
+  setCameraPreset(name) {
+    const presets = {
+      front: { pos: [0, 0.55, 3.1], target: [0, 0.42, 0] },
+      angle: { pos: [2.5, 1.5, 2.7], target: [0, 0.4, 0] },
+      top: { pos: [0.1, 3.4, 0.1], target: [0, 0.3, 0] },
+    };
+    const p = presets[name];
+    if (!p || !this.camera) return;
+    this._flight = { pos: new this.THREE.Vector3(...p.pos), target: new this.THREE.Vector3(...p.target), t: 0 };
+    if (!this._flightRaf) this.runFlight();
+  }
+
+  runFlight() {
+    const step = () => {
+      const f = this._flight;
+      if (!f) { this._flightRaf = null; return; }
+      f.t = Math.min(1, f.t + 0.035);
+      this.camera.position.lerp(f.pos, 0.08);
+      this.controls.target.lerp(f.target, 0.08);
+      if (f.t < 1) this._flightRaf = requestAnimationFrame(step);
+      else { this._flightRaf = null; this._flight = null; }
+    };
+    this._flightRaf = requestAnimationFrame(step);
+  }
+
+  exportImage() {
+    if (!this.renderer) return;
+    this.renderer.render(this.scene, this.camera);
+    const url = this.renderer.domElement.toDataURL('image/png');
+    const a = document.createElement('a');
+    a.href = url; a.download = 'sideboard-render.png'; a.click();
+    this.showToast('Image exported');
+  }
+
+  exportCSV() {
+    const bom = this.buildBOM();
+    const lines = [['Part', 'Qty', 'Material', 'W (mm)', 'H (mm)', 'D (mm)', 'Edge Band', 'Grain'].join(',')];
+    bom.rows.forEach((r) => lines.push([r.label, r.qty, r.material, Math.round(r.w), Math.round(r.h), Math.round(r.d), r.edge ? 'Y' : 'N', r.grain].join(',')));
+    const blob = new Blob([lines.join('\n')], { type: 'text/csv' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url; a.download = 'cut-list.csv'; a.click();
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
+    this.showToast('Cut list exported');
+  }
+
+  frameCamera() {
+    this._flight = { pos: new this.THREE.Vector3(2.5, 1.5, 2.7), target: new this.THREE.Vector3(0, 0.4, 0), t: 0 };
+    if (!this._flightRaf) this.runFlight();
+  }
+
+  componentDidUpdate() {
+    const s = this.state;
+    const paramsKey = JSON.stringify(this.getParams(s)) + JSON.stringify(s.overrides) + JSON.stringify(s.deletedFixedIds);
+    if (paramsKey !== this._prevParamsKey) { this._prevParamsKey = paramsKey; this.rebuildModel(); }
+    const customKey = JSON.stringify(s.customParts) + JSON.stringify(s.overrides);
+    if (customKey !== this._prevCustomKey) { this._prevCustomKey = customKey; this.rebuildCustomParts(); }
+    if (s.selectedPartIds !== this._prevSelectedPartIds) { this._prevSelectedPartIds = s.selectedPartIds; this.applyHighlight(); this.syncGizmo(); }
+    if (s.gizmoMode !== this._prevGizmoMode) { this._prevGizmoMode = s.gizmoMode; this.syncGizmo(); this.updateNavMode(); }
+    if (s.measurePoints !== this._prevMeasurePoints) { this._prevMeasurePoints = s.measurePoints; this.rebuildMeasureVisuals(); }
+    if (s.viewMode !== this._prevViewMode) { this._prevViewMode = s.viewMode; setTimeout(() => this.handleResize(), 60); }
+    if (s.gridVisible !== this._prevGridVisible) { this._prevGridVisible = s.gridVisible; if (this.grid) this.grid.visible = s.gridVisible; }
+    if (s.snapEnabled !== this._prevSnapEnabled) { this._prevSnapEnabled = s.snapEnabled; this.updateSnap(); }
+    const hiddenKey = JSON.stringify(s.hiddenIds);
+    if (hiddenKey !== this._prevHiddenKey) { this._prevHiddenKey = hiddenKey; this.applyVisibility(); }
+  }
+
+  handleResize() {
+    const el = this.viewportRef.current;
+    if (!el || !this.renderer) return;
+    const w = el.clientWidth, h = el.clientHeight;
+    if (w < 1 || h < 1) return;
+    this.renderer.setSize(w, h);
+    this.camera.aspect = w / h;
+    this.camera.updateProjectionMatrix();
+  }
+
+  componentWillUnmount() {
+    if (this.rafId) cancelAnimationFrame(this.rafId);
+    if (this.resizeObserver) this.resizeObserver.disconnect();
+    if (this._onKeyDown) window.removeEventListener('keydown', this._onKeyDown);
+  }
+
+  buildAssemblyGroups() {
+    if (!this.FM) return [];
+    const params = this.getParams();
+    const ids = this.FM.allPartIds(params).filter((id) => !this.state.deletedFixedIds.includes(id));
+    const groupsOrder = ['carcass', 'base', 'fronts', 'hardware'];
+    const groupLabels = { carcass: 'Carcass', base: 'Base', fronts: 'Fronts', hardware: 'Hardware' };
+    const groups = groupsOrder.map((gid) => {
+      const parts = ids.filter((id) => this.FM.partMeta(id).group === gid).map((id) => {
+        const visible = !this.state.hiddenIds.includes(id);
+        const selected = this.state.selectedPartIds.includes(id);
+        return {
+          id, label: this.FM.partMeta(id).label, visible,
+          rowStyle: 'display:flex;align-items:center;gap:8px;height:28px;padding:0 10px 0 30px;border-radius:6px;cursor:pointer;font-size:12.5px;' + (selected ? 'background:rgba(79,163,255,.16);color:#eaf3ff;' : 'color:rgba(238,233,226,.75);'),
+          onClick: (e) => this.selectPart(id, e.shiftKey || e.metaKey || e.ctrlKey),
+          onToggleVisible: (e) => { e.stopPropagation(); this.togglePartVisibility(id); },
+          eyeBtnStyle: 'width:20px;height:20px;flex:none;border:none;background:none;cursor:pointer;display:flex;align-items:center;justify-content:center;color:' + (visible ? 'rgba(238,233,226,.55)' : 'rgba(238,233,226,.2)') + ';',
+          eyeIcon: visible ? 'visibility' : 'visibility_off',
+          deletable: true,
+          onDelete: (e) => { e.stopPropagation(); this.deleteParts([id]); },
+        };
+      });
+      if (!parts.length) return null;
+      const expanded = this.state.treeExpanded[gid];
+      return {
+        id: gid, label: groupLabels[gid], count: parts.length, expanded, parts,
+        chevron: expanded ? '\u25BE' : '\u25B8',
+        onToggle: () => this.toggleTreeGroup(gid),
+      };
+    }).filter(Boolean);
+    if (this.state.customParts.length) {
+      const customRows = this.state.customParts.map((p) => {
+        const visible = !this.state.hiddenIds.includes(p.id);
+        const selected = this.state.selectedPartIds.includes(p.id);
+        return {
+          id: p.id, label: p.label, visible,
+          rowStyle: 'display:flex;align-items:center;gap:8px;height:28px;padding:0 10px 0 30px;border-radius:6px;cursor:pointer;font-size:12.5px;' + (selected ? 'background:rgba(79,163,255,.16);color:#eaf3ff;' : 'color:rgba(238,233,226,.75);'),
+          onClick: (e) => this.selectPart(p.id, e.shiftKey || e.metaKey || e.ctrlKey),
+          onToggleVisible: (e) => { e.stopPropagation(); this.togglePartVisibility(p.id); },
+          eyeBtnStyle: 'width:20px;height:20px;flex:none;border:none;background:none;cursor:pointer;display:flex;align-items:center;justify-content:center;color:' + (visible ? 'rgba(238,233,226,.55)' : 'rgba(238,233,226,.2)') + ';',
+          eyeIcon: visible ? 'visibility' : 'visibility_off',
+          deletable: true,
+          onDelete: (e) => { e.stopPropagation(); this.deleteParts([p.id]); },
+        };
+      });
+      const expanded = this.state.treeExpanded.custom;
+      groups.push({
+        id: 'custom', label: 'Custom Parts', count: customRows.length, expanded, parts: customRows,
+        chevron: expanded ? '\u25BE' : '\u25B8',
+        onToggle: () => this.toggleTreeGroup('custom'),
+      });
+    }
+    return groups;
+  }
+
+  buildLibraryOptions() {
+    if (!this.FM) return { legs: [], handles: [], bases: [], panels: [] };
+    const mk = (arr, key, dragKind) => arr.map((it) => {
+      const active = this.state[key] === it.id;
+      return {
+        ...it, active,
+        cardStyle: 'border:1px solid ' + (active ? '#C68A46' : 'rgba(255,255,255,.1)') + ';background:' + (active ? 'rgba(198,138,70,.14)' : '#211E1A') + ';border-radius:8px;padding:10px 8px;display:flex;flex-direction:column;align-items:center;gap:6px;cursor:pointer;text-align:center;',
+        labelStyle: 'font-size:11px;line-height:1.25;color:' + (active ? '#EEE9E2' : 'rgba(238,233,226,.65)') + ';',
+        onClick: () => this.applyStyle(key, it.id),
+        onDragStart: (e) => e.dataTransfer.setData('text/plain', dragKind + ':' + it.id),
+      };
+    });
+    return {
+      legs: mk(this.FM.LEG_STYLES, 'legStyle', 'legStyle'),
+      handles: mk(this.FM.HANDLE_STYLES, 'handleStyle', 'handleStyle'),
+      bases: mk(this.FM.BASE_STYLES, 'baseStyle', 'baseStyle'),
+      panels: this.FM.PANEL_PRESETS.map((preset) => ({
+        ...preset,
+        cardStyle: 'border:1px solid rgba(255,255,255,.1);background:#211E1A;border-radius:8px;padding:10px 8px;display:flex;flex-direction:column;align-items:center;gap:6px;cursor:pointer;text-align:center;',
+        labelStyle: 'font-size:11px;line-height:1.25;color:rgba(238,233,226,.65);',
+        onClick: () => this.addCustomPanel(preset.id, null),
+        onDragStart: (e) => e.dataTransfer.setData('text/plain', 'panel:' + preset.id),
+      })),
+    };
+  }
+
+  buildMaterialOptions() {
+    if (!this.FM) return { body: [], hardware: [] };
+    const sel = this.state.selectedPartIds;
+    const first = sel[0];
+    const ov = first ? this.state.overrides[first] : null;
+    const currentBody = ov && ov.body ? ov.body : this.state.bodyMaterialId;
+    const currentHardware = ov && ov.hardware ? ov.hardware : this.state.hardwareMaterialId;
+    const anyBodyOverride = sel.some((id) => this.state.overrides[id] && this.state.overrides[id].body);
+    const anyHardwareOverride = sel.some((id) => this.state.overrides[id] && this.state.overrides[id].hardware);
+    const mk = (arr, currentId, apply) => arr.map((f) => {
+      const active = f.id === currentId;
+      return {
+        ...f, active,
+        swatchStyle: 'height:40px;border-radius:6px;background:' + f.color + ';border:2px solid ' + (active ? '#4FA3FF' : 'rgba(255,255,255,.12)') + ';cursor:pointer;',
+        onClick: () => apply(f.id),
+      };
+    });
+    return {
+      body: mk(this.FM.FINISHES, currentBody, (id) => this.applyBodyMaterial(id)),
+      hardware: mk(this.FM.HARDWARE_FINISHES, currentHardware, (id) => this.applyHardwareMaterial(id)),
+      hasBodyOverride: anyBodyOverride, hasHardwareOverride: anyHardwareOverride,
+    };
+  }
+
+  buildBOM() {
+    if (!this.FM) return { rows: [], totals: {}, hardware: {} };
+    const bom = this.FM.computeBOM(this.getParams());
+    const rows = bom.rows.map((r) => {
+      const qty = r.partIds ? r.partIds.filter((id) => !this.state.deletedFixedIds.includes(id)).length : r.qty;
+      return { ...r, qty, w: Math.round(r.w), h: Math.round(r.h), d: Math.round(r.d) };
+    }).filter((r) => r.qty > 0);
+    const customRows = this.state.customParts.map((p) => {
+      const mesh = this.partsById && this.partsById[p.id];
+      const scale = mesh ? mesh.scale : { x: 1, y: 1, z: 1 };
+      const ov = this.state.overrides[p.id];
+      const materialLabel = this.FM.findFinish((ov && ov.body) || this.state.bodyMaterialId).label;
+      return { label: p.label + ' (custom)', qty: 1, material: materialLabel, w: Math.round(p.w * scale.x), h: Math.round(p.h * scale.y), d: Math.round(p.d * scale.z), edge: true, grain: 'Horizontal' };
+    });
+    const allRows = rows.concat(customRows);
+    let sheetAreaM2 = 0, edgeBandM = 0, partCount = 0;
+    allRows.forEach((r) => {
+      if (r.sheet !== false) sheetAreaM2 += (r.w * r.h / 1e6) * r.qty;
+      if (r.edge) edgeBandM += (2 * (r.w + r.h) / 1000) * r.qty;
+      partCount += r.qty;
+    });
+    sheetAreaM2 = Math.round(sheetAreaM2 * 100) / 100;
+    edgeBandM = Math.round(edgeBandM * 10) / 10;
+    const sheets = Math.ceil(sheetAreaM2 / (2.44 * 1.22 * 0.82));
+    const totals = { sheetAreaM2, edgeBandM, sheets, partCount };
+    return { rows: allRows, totals, hardware: bom.hardware };
+  }
+
+  getSelectedInfo() {
+    const ids = this.state.selectedPartIds;
+    if (!ids.length || !this.FM) return null;
+    if (ids.length > 1) {
+      let size = null;
+      const THREE = this.THREE;
+      if (THREE && this.partsById) {
+        const box = new THREE.Box3();
+        ids.forEach((pid) => { const m = this.partsById[pid]; if (m) box.expandByObject(m); });
+        if (!box.isEmpty()) {
+          const v = box.getSize(new THREE.Vector3());
+          size = { w: Math.round(v.x * 1000), h: Math.round(v.y * 1000), d: Math.round(v.z * 1000) };
+        }
+      }
+      return { id: null, label: ids.length + ' parts selected', group: 'other', size, count: ids.length, isCustom: false, isFixed: false, isGroup: true };
+    }
+    const id = ids[0];
+    const customPart = this.state.customParts.find((p) => p.id === id);
+    if (customPart) {
+      const mesh = this.partsById && this.partsById[id];
+      const scale = mesh ? mesh.scale : { x: 1, y: 1, z: 1 };
+      return { id, label: customPart.label, group: 'custom', size: { w: Math.round(customPart.w * scale.x), h: Math.round(customPart.h * scale.y), d: Math.round(customPart.d * scale.z) }, count: 1, isCustom: true, isFixed: false, isGroup: false };
+    }
+    const meta = this.FM.partMeta(id);
+    const mesh = this.partsById && this.partsById[id];
+    let size = null;
+    if (mesh && mesh.geometry && mesh.geometry.parameters) {
+      const pr = mesh.geometry.parameters;
+      size = { w: Math.round((pr.width || 0) * 1000), h: Math.round((pr.height || 0) * 1000), d: Math.round((pr.depth || 0) * 1000) };
+    }
+    return { id, label: meta.label, group: meta.group, size, count: 1, isCustom: false, isFixed: true, isGroup: false };
+  }
+
+  pillTabStyle(active) {
+    return 'flex:1;padding:7px 16px;border-radius:7px;font-size:12.5px;font-weight:600;display:flex;align-items:center;justify-content:center;gap:6px;cursor:pointer;border:none;font-family:inherit;background:' + (active ? '#33302A' : 'transparent') + ';color:' + (active ? '#EEE9E2' : 'rgba(238,233,226,.55)') + ';white-space:nowrap;';
+  }
+
+  underlineTabStyle(active) {
+    return 'flex:1;height:40px;display:flex;align-items:center;justify-content:center;gap:6px;font-size:12px;font-weight:600;cursor:pointer;border:none;font-family:inherit;background:transparent;border-bottom:2px solid ' + (active ? '#C68A46' : 'transparent') + ';color:' + (active ? '#EEE9E2' : 'rgba(238,233,226,.5)') + ';';
+  }
+
+  gizmoBtnStyle(active) {
+    return 'width:34px;height:34px;border-radius:8px;display:flex;align-items:center;justify-content:center;cursor:pointer;border:1px solid ' + (active ? '#C68A46' : 'rgba(26,24,21,.12)') + ';background:' + (active ? '#C68A46' : 'rgba(255,255,255,.6)') + ';color:' + (active ? '#1A1815' : '#1A1815') + ';';
+  }
+
+  iconBtnStyle(active, disabled) {
+    return 'width:32px;height:32px;border-radius:7px;display:flex;align-items:center;justify-content:center;cursor:' + (disabled ? 'default' : 'pointer') + ';border:none;background:' + (active ? 'rgba(198,138,70,.18)' : 'transparent') + ';color:' + (disabled ? 'rgba(238,233,226,.25)' : active ? '#C68A46' : 'rgba(238,233,226,.7)') + ';opacity:' + (disabled ? '0.5' : '1') + ';';
+  }
+
+  renderVals() {
+    const s = this.state;
+    const groupLabels = { carcass: 'Carcass', base: 'Base', fronts: 'Fronts', hardware: 'Hardware', custom: 'Custom Parts', other: '' };
+    const selectedInfo = this.getSelectedInfo();
+    const mat = this.buildMaterialOptions();
+    const bom = this.buildBOM();
+    const totalPartCount = this.FM ? this.FM.allPartIds(this.getParams()).filter((id) => !s.deletedFixedIds.includes(id)).length + s.customParts.length : 0;
+    return {
+      viewportRef: this.viewportRef,
+      ready: !!s.ready,
+      viewMode: s.viewMode,
+      leftTab: s.leftTab,
+      rightTab: s.rightTab,
+      dims: s.dims,
+      baseStyle: s.baseStyle,
+      measureActive: s.measureActive,
+      historyOpen: s.historyOpen,
+      toast: s.toast,
+      canUndo: this.undoStack.length > 0,
+      canRedo: this.redoStack.length > 0,
+      setViewMode: (m) => this.setViewMode(m),
+      setLeftTab: (t) => this.setLeftTab(t),
+      setRightTab: (t) => this.setRightTab(t),
+      goModelTab: () => this.setViewMode('model'),
+      goCutlistTab: () => this.setViewMode('cutlist'),
+      goRenderTab: () => this.setViewMode('render'),
+      goAssemblyTab: () => this.setLeftTab('assembly'),
+      goLibraryTab: () => this.setLeftTab('library'),
+      goPropertiesTab: () => this.setRightTab('properties'),
+      goMaterialsTab: () => this.setRightTab('materials'),
+      historyBtnStyle: this.iconBtnStyle(s.historyOpen, false),
+      gizmoMode: s.gizmoMode,
+      gizmoSelectStyle: this.gizmoBtnStyle(s.gizmoMode === 'select'),
+      gizmoPanStyle: this.gizmoBtnStyle(s.gizmoMode === 'pan'),
+      setGizmoPan: () => this.setGizmoMode('pan'),
+      gizmoMoveStyle: this.gizmoBtnStyle(s.gizmoMode === 'translate'),
+      gizmoRotateStyle: this.gizmoBtnStyle(s.gizmoMode === 'rotate'),
+      gizmoScaleStyle: this.gizmoBtnStyle(s.gizmoMode === 'scale'),
+      setGizmoSelect: () => this.setGizmoMode('select'),
+      setGizmoMove: () => this.setGizmoMode('translate'),
+      setGizmoRotate: () => this.setGizmoMode('rotate'),
+      setGizmoScale: () => this.setGizmoMode('scale'),
+      resetPartTransform: () => this.resetPartTransform(),
+      showGizmoHint: s.gizmoMode !== 'select' && s.gizmoMode !== 'pan' && s.selectedPartIds.length === 0,
+      gridBtnStyle: this.gizmoBtnStyle(s.gridVisible),
+      snapBtnStyle: this.gizmoBtnStyle(s.snapEnabled),
+      toggleGrid: () => this.toggleGrid(),
+      toggleSnap: () => this.toggleSnap(),
+      isAssemblyTab: s.leftTab === 'assembly',
+      isLibraryTab: s.leftTab === 'library',
+      isPropertiesTab: s.rightTab === 'properties',
+      isMaterialsTab: s.rightTab === 'materials',
+      hasSelection: s.selectedPartIds.length > 0,
+      noSelection: s.selectedPartIds.length === 0,
+      selectAll: () => this.selectAll(),
+      selectionCountLabel: s.selectedPartIds.length ? s.selectedPartIds.length + ' selected' : totalPartCount + ' parts',
+      toggleMeasure: () => this.toggleMeasure(),
+      toggleHistory: () => this.toggleHistory(),
+      undo: () => this.undo(),
+      redo: () => this.redo(),
+      saveVersion: () => this.saveVersion(),
+      frameCamera: () => this.frameCamera(),
+      exportImage: () => this.exportImage(),
+      exportCSV: () => this.exportCSV(),
+      onWidthChange: (e) => this.setDim('width', e.target.value),
+      onHeightChange: (e) => this.setDim('height', e.target.value),
+      onDepthChange: (e) => this.setDim('depth', e.target.value),
+      onLegHeightChange: (e) => this.setDim('legHeight', e.target.value),
+      onThicknessChange: (e) => this.setDim('thickness', e.target.value),
+      onCustomWChange: (e) => this.setCustomDim('w', e.target.value),
+      onCustomHChange: (e) => this.setCustomDim('h', e.target.value),
+      onCustomDChange: (e) => this.setCustomDim('d', e.target.value),
+      deleteSelectedParts: () => this.deleteSelectedParts(),
+      duplicateSelectedParts: () => this.duplicateSelectedParts(),
+      frameSelected: () => this.frameSelected(),
+      marquee: s.marquee,
+      marqueeStyle: s.marquee
+        ? 'position:absolute;pointer-events:none;z-index:6;border:1px solid #4FA3FF;background:rgba(79,163,255,.14);left:' + s.marquee.x + 'px;top:' + s.marquee.y + 'px;width:' + s.marquee.w + 'px;height:' + s.marquee.h + 'px;'
+        : 'display:none;',
+      isLegsBase: s.baseStyle === 'legs',
+      assemblyGroups: this.buildAssemblyGroups(),
+      libraryOptions: this.buildLibraryOptions(),
+      materialOptions: mat,
+      materialScopeLabel: selectedInfo ? selectedInfo.label : 'Whole Piece',
+      selectedInfo,
+      clearSelection: () => this.setState({ selectedPartIds: [] }),
+      resetBodyOverride: () => this.resetOverride(s.selectedPartIds),
+      bomRows: bom.rows,
+      bomTotals: bom.totals,
+      bomHardware: bom.hardware,
+      versions: s.versions.slice().reverse().map((v) => ({ ...v, isCurrent: v.id === s.currentVersionId, notCurrent: v.id !== s.currentVersionId, dotColor: this.FM ? this.FM.findFinish(v.bodyMaterialId).color : '#999', restore: () => this.restoreVersion(v.id) })),
+      measureLabelRef: (el) => { this._measureLabelEl = el; },
+      modelTabStyle: this.pillTabStyle(s.viewMode === 'model'),
+      cutlistTabStyle: this.pillTabStyle(s.viewMode === 'cutlist'),
+      renderTabStyle: this.pillTabStyle(s.viewMode === 'render'),
+      assemblyTabStyle: this.underlineTabStyle(s.leftTab === 'assembly'),
+      libraryTabStyle: this.underlineTabStyle(s.leftTab === 'library'),
+      propertiesTabStyle: this.underlineTabStyle(s.rightTab === 'properties'),
+      materialsTabStyle: this.underlineTabStyle(s.rightTab === 'materials'),
+      undoBtnStyle: this.iconBtnStyle(false, this.undoStack.length === 0),
+      redoBtnStyle: this.iconBtnStyle(false, this.redoStack.length === 0),
+      measureBtnStyle: this.iconBtnStyle(s.measureActive, false),
+      sidebarsHidden: s.viewMode === 'render',
+      leftSidebarStyle: 'width:240px;flex:none;background:#1E1B17;border-right:1px solid rgba(255,255,255,.08);display:' + (s.viewMode === 'render' ? 'none' : 'flex') + ';flex-direction:column;min-height:0;',
+      rightSidebarStyle: 'width:300px;flex:none;background:#1E1B17;border-left:1px solid rgba(255,255,255,.08);display:' + (s.viewMode === 'render' ? 'none' : 'flex') + ';flex-direction:column;min-height:0;overflow-y:auto;',
+      cutlistDisplay: s.viewMode === 'cutlist' ? 'flex' : 'none',
+      renderBarDisplay: s.viewMode === 'render' ? 'flex' : 'none',
+      historyPanelStyle: 'position:absolute;top:0;right:0;bottom:0;width:320px;background:#1E1B17;border-left:1px solid rgba(255,255,255,.1);box-shadow:-12px 0 32px rgba(0,0,0,.35);display:flex;flex-direction:column;z-index:20;transform:translateX(' + (s.historyOpen ? '0' : '100%') + ');transition:transform .22s ease;',
+      selectionBreadcrumb: selectedInfo ? (selectedInfo.count > 1 ? 'Model · ' + selectedInfo.label : 'Model · ' + groupLabels[selectedInfo.group] + ' / ' + selectedInfo.label) : 'Model · Nothing selected',
+      dimsSummary: s.dims.width + ' × ' + s.dims.height + ' × ' + s.dims.depth + ' mm',
+      setCameraPreset: (name) => (() => this.setCameraPreset(name)),
+      presetFront: () => this.setCameraPreset('front'),
+      presetAngle: () => this.setCameraPreset('angle'),
+      presetTop: () => this.setCameraPreset('top'),
+    };
+  }
+}
+</script>
+</body>
+</html>
