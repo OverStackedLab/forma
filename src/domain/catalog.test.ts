@@ -1,0 +1,35 @@
+import { describe, expect, it } from 'vitest';
+import { findColor, findMaterial, resolveAppearance } from './catalog';
+
+describe('resolveAppearance', () => {
+  it("uses the material's own color and finish when the color is natural", () => {
+    const appearance = resolveAppearance('walnut', 'natural');
+    const walnut = findMaterial('walnut');
+    expect(appearance).toEqual({
+      color: walnut.color,
+      roughness: walnut.roughness,
+      metalness: walnut.metalness,
+    });
+  });
+
+  it("overrides the material's color and finish when a stain or paint is set", () => {
+    const appearance = resolveAppearance('walnut', 'white');
+    const white = findColor('white');
+    expect(appearance).toEqual({
+      color: white.tint,
+      roughness: white.roughness,
+      metalness: white.metalness,
+    });
+  });
+
+  it('applies the same color consistently across different materials', () => {
+    const onWalnut = resolveAppearance('walnut', 'ebony');
+    const onAsh = resolveAppearance('ash', 'ebony');
+    expect(onWalnut).toEqual(onAsh);
+  });
+
+  it('falls back to the first material or color for an unknown id', () => {
+    expect(findMaterial(undefined).id).toBe(findMaterial('bogus').id);
+    expect(findColor(undefined).id).toBe(findColor('bogus').id);
+  });
+});

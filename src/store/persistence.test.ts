@@ -6,7 +6,8 @@ describe('persistence.migrate', () => {
   it('accepts a current-schema payload', () => {
     const doc = createDefaultDocument();
     const result = migrate({ schemaVersion: SCHEMA_VERSION, doc });
-    expect(result?.defaultFinishId).toBe(doc.defaultFinishId);
+    expect(result?.defaultMaterialId).toBe(doc.defaultMaterialId);
+    expect(result?.defaultColorId).toBe(doc.defaultColorId);
   });
 
   it('rejects a payload with no schema version', () => {
@@ -39,9 +40,10 @@ describe('persistence.normalize', () => {
     expect(result.versions).toEqual([]);
   });
 
-  it('keeps a valid defaultFinishId', () => {
-    const result = normalize({ defaultFinishId: 'ebony' } as never);
-    expect(result.defaultFinishId).toBe('ebony');
+  it('keeps a valid defaultMaterialId and defaultColorId', () => {
+    const result = normalize({ defaultMaterialId: 'ash', defaultColorId: 'ebony' } as never);
+    expect(result.defaultMaterialId).toBe('ash');
+    expect(result.defaultColorId).toBe('ebony');
   });
 
   it('repairs collections stored with the wrong type', () => {

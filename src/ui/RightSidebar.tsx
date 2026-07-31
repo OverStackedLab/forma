@@ -1,10 +1,11 @@
 import { useEffect, useState } from 'react';
-import { CUSTOM_PANEL_LIMITS, FINISHES } from '@/domain/catalog';
+import { COLORS, CUSTOM_PANEL_LIMITS, MATERIALS } from '@/domain/catalog';
 import { groupMatching } from '@/domain/parts';
 import { quaternionToEulerDegrees } from '@/domain/rotation';
 import { convertRange, fromMm, toMm, type DisplayUnit } from '@/domain/units';
 import {
-  applyFinish,
+  applyColor,
+  applyMaterial,
   deleteParts,
   duplicateSelected,
   groupSelected,
@@ -207,7 +208,7 @@ function PropertiesTab() {
         </>
       )}
 
-      <FinishPicker />
+      <MaterialColorPicker />
 
       {selection.kind === 'none' ? (
         <>
@@ -268,51 +269,80 @@ function MaterialsTab() {
   return (
     <>
       <ScopeChip selection={selection} onClear={clearSelection} />
-      <FinishPicker />
+      <MaterialColorPicker />
     </>
   );
 }
 
 /**
- * Finish swatches, bound to the current selection scope (an override on the
- * selected part(s), or the document default with nothing selected — which
- * only sets the finish newly inserted panels start with). Shared by the
- * Materials tab and the Properties tab, so a finish can be changed without
- * switching tabs.
+ * Material and color swatches, kept as two independent pickers — the wood
+ * a part is milled from vs. the stain or paint applied over it, so either
+ * can change without touching the other. Both are bound to the current
+ * selection scope (an override on the selected part(s), or the document
+ * default with nothing selected — which only sets what newly inserted
+ * panels start with) and shared by the Materials tab and the Properties
+ * tab, so neither can drift between the two.
  */
-function FinishPicker() {
-  const defaultFinishId = useDocumentStore((s) => s.defaultFinishId);
+function MaterialColorPicker() {
+  const defaultMaterialId = useDocumentStore((s) => s.defaultMaterialId);
+  const defaultColorId = useDocumentStore((s) => s.defaultColorId);
   const overrides = useDocumentStore((s) => s.overrides);
   const selectedPartIds = useUiStore((s) => s.selectedPartIds);
 
   const first = selectedPartIds[0];
   const override = first ? overrides[first] : undefined;
-  const current = override?.body ?? defaultFinishId;
-  const hasOverride = selectedPartIds.some((id) => overrides[id]?.body);
+  const currentMaterial = override?.material ?? defaultMaterialId;
+  const currentColor = override?.color ?? defaultColorId;
+  const hasOverride = selectedPartIds.some((id) => overrides[id]?.material || overrides[id]?.color);
 
   return (
     <>
-      <SectionHeader>Finish</SectionHeader>
+      <SectionHeader>Material</SectionHeader>
       <div className="grid grid-cols-5 gap-1.5">
-        {FINISHES.map((f) => (
+        {MATERIALS.map((m) => (
           <button
-            key={f.id}
+            key={m.id}
             type="button"
-            aria-pressed={current === f.id}
-            aria-label={f.label}
-            onClick={() => applyFinish(f.id)}
+            aria-pressed={currentMaterial === m.id}
+            aria-label={m.label}
+            onClick={() => applyMaterial(m.id)}
             className="flex flex-col gap-1"
           >
             <span
               className={`block h-10 rounded-md border-2 ${
-                current === f.id ? 'border-select' : 'border-white/12'
+                currentMaterial === m.id ? 'border-select' : 'border-white/12'
               }`}
-              style={{ background: f.color }}
+              style={{ background: m.color }}
             />
-            <span className="text-center text-[9.5px] leading-tight text-ink/55">{f.label}</span>
+            <span className="text-center text-[9.5px] leading-tight text-ink/55">{m.label}</span>
           </button>
         ))}
       </div>
+
+      <div className="mt-3">
+        <SectionHeader>Color</SectionHeader>
+        <div className="grid grid-cols-5 gap-1.5">
+          {COLORS.map((c) => (
+            <button
+              key={c.id}
+              type="button"
+              aria-pressed={currentColor === c.id}
+              aria-label={c.label}
+              onClick={() => applyColor(c.id)}
+              className="flex flex-col gap-1"
+            >
+              <span
+                className={`block h-10 rounded-md border-2 ${
+                  currentColor === c.id ? 'border-select' : 'border-white/12'
+                }`}
+                style={{ background: c.tint ?? '#8a8a8a' }}
+              />
+              <span className="text-center text-[9.5px] leading-tight text-ink/55">{c.label}</span>
+            </button>
+          ))}
+        </div>
+      </div>
+
       {hasOverride && (
         <button
           type="button"

@@ -2,7 +2,17 @@ import { convertedValue, type DisplayUnit } from './units';
 import type { BomRow } from './types';
 
 export function csvHeaders(unit: DisplayUnit): readonly string[] {
-  return ['Part', 'Qty', 'Material', `W (${unit})`, `H (${unit})`, `D (${unit})`, 'Edge Band', 'Grain'];
+  return [
+    'Part',
+    'Qty',
+    'Material',
+    'Color',
+    `W (${unit})`,
+    `H (${unit})`,
+    `D (${unit})`,
+    'Edge Band',
+    'Grain',
+  ];
 }
 
 /**
@@ -24,6 +34,7 @@ export function toCSV(rows: readonly BomRow[], unit: DisplayUnit): string {
         r.label,
         r.qty,
         r.material,
+        r.color,
         convertedValue(r.w, unit),
         convertedValue(r.h, unit),
         convertedValue(r.d, unit),

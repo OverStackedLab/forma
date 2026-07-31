@@ -8,7 +8,7 @@ import { useUiStore } from '@/store/uiStore';
 import { downloadBlob } from './download';
 import { Icon } from './primitives/Icon';
 
-const COLUMNS = 'grid grid-cols-[2fr_.5fr_1.1fr_.7fr_.7fr_.7fr_.9fr_.9fr] gap-x-2.5';
+const COLUMNS = 'grid grid-cols-[1.8fr_.4fr_.9fr_.9fr_.6fr_.6fr_.6fr_.8fr_.8fr] gap-x-2.5';
 
 export function CutList() {
   const doc = useDocumentStore();
@@ -22,7 +22,8 @@ export function CutList() {
         customParts: doc.customParts,
         overrides: doc.overrides,
         transforms: doc.transforms,
-        defaultFinishId: doc.defaultFinishId,
+        defaultMaterialId: doc.defaultMaterialId,
+        defaultColorId: doc.defaultColorId,
       }),
     [doc],
   );
@@ -97,6 +98,7 @@ export function CutList() {
                   <span className="font-sans text-ink">{row.label}</span>
                   <span>{row.qty}</span>
                   <span className="font-sans">{row.material}</span>
+                  <span className="font-sans">{row.color}</span>
                   <span>{formatLength(row.w, unit)}</span>
                   <span>{formatLength(row.h, unit)}</span>
                   <span>{formatLength(row.d, unit)}</span>

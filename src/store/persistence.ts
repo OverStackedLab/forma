@@ -7,13 +7,14 @@ const STORAGE_KEY = 'forma:doc';
 /** A display preference, not document data — its own key, no schema versioning. */
 const DISPLAY_UNIT_KEY = 'forma:displayUnit';
 /**
- * Schema 2 is the empty-scene / library-panels-only document shape. Schema 1
- * was the parametric-sideboard shape (dims, leg/handle/base style, deleted
- * fixed parts) — there's no sensible mapping from a sideboard's doors and legs
- * onto a scene that only has library panels, so schema 1 saves aren't
- * migrated; they fall back to a fresh empty document.
+ * Schema 3 splits the single "finish" (defaultFinishId / an override's
+ * `body`) into an independent material and color, and adds a `shape` to each
+ * custom part. Schema 2 was the empty-scene / library-panels-only shape with
+ * one combined finish; schema 1 was the parametric-sideboard shape. Neither
+ * maps sensibly onto the new fields, so only the current schema is accepted —
+ * older saves fall back to a fresh empty document.
  */
-const SCHEMA_VERSION = 2;
+const SCHEMA_VERSION = 3;
 const DEBOUNCE_MS = 600;
 
 type Envelope = { schemaVersion: number; doc: FormaDocument };
@@ -102,7 +103,8 @@ export function startAutosave(): () => void {
 /** The store carries its own action functions; only the data is persisted. */
 function stripActions(state: FormaDocument & Record<string, unknown>): FormaDocument {
   return {
-    defaultFinishId: state.defaultFinishId,
+    defaultMaterialId: state.defaultMaterialId,
+    defaultColorId: state.defaultColorId,
     overrides: state.overrides,
     customParts: state.customParts,
     hiddenIds: state.hiddenIds,

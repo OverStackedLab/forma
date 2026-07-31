@@ -2,10 +2,16 @@ import { describe, expect, it } from 'vitest';
 import { computeBOM } from './bom';
 import type { CustomPart } from './types';
 
-const shelf: CustomPart = { id: 'custom-1', label: 'Shelf', w: 800, h: 300, d: 18 };
-const divider: CustomPart = { id: 'custom-2', label: 'Divider', w: 400, h: 700, d: 18 };
+const shelf: CustomPart = { id: 'custom-1', label: 'Shelf', w: 800, h: 300, d: 18, shape: 'box' };
+const divider: CustomPart = { id: 'custom-2', label: 'Divider', w: 400, h: 700, d: 18, shape: 'box' };
+const knob: CustomPart = { id: 'custom-3', label: 'Knob', w: 50, h: 45, d: 50, shape: 'cylinder' };
 
-const baseInput = { overrides: {}, transforms: {}, defaultFinishId: 'walnut' as const };
+const baseInput = {
+  overrides: {},
+  transforms: {},
+  defaultMaterialId: 'walnut' as const,
+  defaultColorId: 'natural' as const,
+};
 
 describe('computeBOM', () => {
   it('produces no rows and zeroed totals for an empty scene', () => {
@@ -21,18 +27,26 @@ describe('computeBOM', () => {
     expect(bom.rows.map((r) => r.label)).toEqual(['Shelf', 'Divider']);
   });
 
-  it('uses the document default finish when a panel has no override', () => {
+  it('uses the document default material and color when a panel has no override', () => {
     const bom = computeBOM({ ...baseInput, customParts: [shelf] });
     expect(bom.rows[0]?.material).toBe('Walnut');
+    expect(bom.rows[0]?.color).toBe('Natural');
   });
 
-  it('uses a per-panel override finish over the document default', () => {
+  it('uses a per-panel override material and color over the document default', () => {
     const bom = computeBOM({
       ...baseInput,
       customParts: [shelf],
-      overrides: { 'custom-1': { body: 'ebony' } },
+      overrides: { 'custom-1': { material: 'oak', color: 'ebony' } },
     });
-    expect(bom.rows[0]?.material).toBe('Ebony Stain');
+    expect(bom.rows[0]?.material).toBe('White Oak');
+    expect(bom.rows[0]?.color).toBe('Ebony Stain');
+  });
+
+  it('excludes round hardware from edge banding and the sheet-area total', () => {
+    const bom = computeBOM({ ...baseInput, customParts: [shelf, knob] });
+    expect(bom.rows.find((r) => r.label === 'Knob')).toMatchObject({ edge: false, grain: '—' });
+    expect(bom.totals.sheetAreaM2).toBeCloseTo(0.8 * 0.3, 5);
   });
 
   it('scales reported dimensions by the gizmo transform', () => {

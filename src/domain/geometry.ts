@@ -1,4 +1,4 @@
-import { findFinish } from './catalog';
+import { resolveAppearance } from './catalog';
 import type { PartSpec } from './types';
 
 /**
@@ -15,31 +15,40 @@ type TMaterial = import('three').MeshStandardMaterial;
 const MM = 1 / 1000;
 
 /**
- * Every part is a library panel — a plain box — sharing one unit geometry
- * scaled per instance, so changing a dimension is a scale write rather than a
- * geometry allocation. The cache owns the geometry; never dispose it from a
- * rebuild loop.
+ * Every part is either a box (panels) or a cylinder (round hardware like
+ * knobs), sharing one unit geometry per shape scaled per instance, so
+ * changing a dimension is a scale write rather than a geometry allocation.
+ * The cache owns the geometry; never dispose it from a rebuild loop.
  */
 export class GeometryCache {
   private box: TBufferGeometry | null = null;
+  private cylinder: TBufferGeometry | null = null;
 
   constructor(private readonly THREE: ThreeModule) {}
 
-  /** 1×1×1 box centred on the origin, shared by every part. */
+  /** 1×1×1 box centred on the origin, shared by every box-shaped part. */
   unitBox(): TBufferGeometry {
     if (!this.box) this.box = new this.THREE.BoxGeometry(1, 1, 1);
     return this.box;
   }
 
+  /** Unit cylinder centred on the origin, axis along Y, shared by every round part. */
+  unitCylinder(): TBufferGeometry {
+    if (!this.cylinder) this.cylinder = new this.THREE.CylinderGeometry(0.5, 0.5, 1, 24);
+    return this.cylinder;
+  }
+
   dispose(): void {
     this.box?.dispose();
     this.box = null;
+    this.cylinder?.dispose();
+    this.cylinder = null;
   }
 }
 
 /**
- * Shared PBR materials keyed by finish id. The prototype allocated one
- * material per mesh; these are owned here and must be exempt from any
+ * Shared PBR materials keyed by material + color id. The prototype allocated
+ * one material per mesh; these are owned here and must be exempt from any
  * traverse-and-dispose loop.
  */
 export class MaterialCache {
@@ -47,16 +56,17 @@ export class MaterialCache {
 
   constructor(private readonly THREE: ThreeModule) {}
 
-  body(finishId: string | undefined): TMaterial {
-    const f = findFinish(finishId);
-    let m = this.cache.get(f.id);
+  body(materialId: string | undefined, colorId: string | undefined): TMaterial {
+    const appearance = resolveAppearance(materialId, colorId);
+    const key = `${materialId ?? ''}:${colorId ?? ''}`;
+    let m = this.cache.get(key);
     if (!m) {
       m = new this.THREE.MeshStandardMaterial({
-        color: f.color,
-        roughness: f.roughness,
-        metalness: f.metalness,
+        color: appearance.color,
+        roughness: appearance.roughness,
+        metalness: appearance.metalness,
       });
-      this.cache.set(f.id, m);
+      this.cache.set(key, m);
     }
     return m;
   }
@@ -89,7 +99,8 @@ export function createPartNode(
   material: TMaterial,
 ): PartNode {
   const root = new THREE.Group();
-  const mesh = new THREE.Mesh(geometries.unitBox(), material);
+  const geometry = spec.shape === 'cylinder' ? geometries.unitCylinder() : geometries.unitBox();
+  const mesh = new THREE.Mesh(geometry, material);
   mesh.castShadow = true;
   mesh.receiveShadow = true;
   root.add(mesh);

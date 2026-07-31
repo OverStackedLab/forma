@@ -7,6 +7,7 @@ const row = (overrides: Partial<BomRow> = {}): BomRow => ({
   label: 'Shelf',
   qty: 1,
   material: 'Walnut',
+  color: 'Natural',
   w: 800,
   h: 300,
   d: 18,
@@ -21,13 +22,14 @@ describe('csvHeaders', () => {
       'Part',
       'Qty',
       'Material',
+      'Color',
       'W (mm)',
       'H (mm)',
       'D (mm)',
       'Edge Band',
       'Grain',
     ]);
-    expect(csvHeaders('cm')[3]).toBe('W (cm)');
+    expect(csvHeaders('cm')[4]).toBe('W (cm)');
   });
 });
 
@@ -35,14 +37,14 @@ describe('toCSV', () => {
   it('emits a header row followed by one line per row', () => {
     const lines = toCSV([row(), row()], 'mm').split('\r\n');
     expect(lines).toHaveLength(3);
-    expect(lines[0]).toBe('Part,Qty,Material,W (mm),H (mm),D (mm),Edge Band,Grain');
-    expect(lines[1]).toBe('Shelf,1,Walnut,800,300,18,Y,Horizontal');
+    expect(lines[0]).toBe('Part,Qty,Material,Color,W (mm),H (mm),D (mm),Edge Band,Grain');
+    expect(lines[1]).toBe('Shelf,1,Walnut,Natural,800,300,18,Y,Horizontal');
   });
 
   it('converts W/H/D into the given display unit as plain numbers', () => {
     const lines = toCSV([row({ w: 800, h: 300, d: 18 })], 'cm').split('\r\n');
-    expect(lines[0]).toBe('Part,Qty,Material,W (cm),H (cm),D (cm),Edge Band,Grain');
-    expect(lines[1]).toBe('Shelf,1,Walnut,80,30,1.8,Y,Horizontal');
+    expect(lines[0]).toBe('Part,Qty,Material,Color,W (cm),H (cm),D (cm),Edge Band,Grain');
+    expect(lines[1]).toBe('Shelf,1,Walnut,Natural,80,30,1.8,Y,Horizontal');
   });
 
   // A bare join corrupts the file the moment a user-editable label has a comma.
@@ -66,12 +68,15 @@ describe('toCSV', () => {
   });
 
   it('serializes exactly the rows the cut list displays', () => {
-    const customParts: CustomPart[] = [{ id: 'custom-1', label: 'Shelf', w: 800, h: 300, d: 18 }];
+    const customParts: CustomPart[] = [
+      { id: 'custom-1', label: 'Shelf', w: 800, h: 300, d: 18, shape: 'box' },
+    ];
     const bom = computeBOM({
       customParts,
       overrides: {},
       transforms: {},
-      defaultFinishId: 'walnut',
+      defaultMaterialId: 'walnut',
+      defaultColorId: 'natural',
     });
     const dataLines = toCSV(bom.rows, 'mm').split('\r\n').slice(1);
     expect(dataLines).toHaveLength(bom.rows.length);

@@ -4,15 +4,31 @@
 
 export type Vec3Mm = { x: number; y: number; z: number };
 
-export type FinishId = 'walnut' | 'oak' | 'ash' | 'ebony' | 'lacquer';
-export type PanelPresetId = 'flat' | 'shelf' | 'divider' | 'back';
+/** The wood/substrate a part is made of — independent of any stain or paint applied to it. */
+export type MaterialId = 'walnut' | 'oak' | 'ash';
+/** A stain or paint applied over a material. 'natural' leaves the material's own look untouched. */
+export type ColorId = 'natural' | 'ebony' | 'white';
+export type PanelPresetId = 'flat' | 'shelf' | 'divider' | 'back' | 'door' | 'knob';
+/** Every part renders as one of two shared unit geometries, scaled per instance. */
+export type PanelShape = 'box' | 'cylinder';
 
-export type Finish = {
-  id: FinishId;
+export type Material = {
+  id: MaterialId;
   label: string;
+  /** The material's own natural appearance — used when its color is 'natural'. */
   color: string;
   roughness: number;
   metalness: number;
+};
+
+export type Color = {
+  id: ColorId;
+  label: string;
+  /** Overrides the material's own color. null (Natural) leaves it untouched. */
+  tint: string | null;
+  /** A stain keeps the material's own surface finish; a paint overrides it. */
+  roughness?: number;
+  metalness?: number;
 };
 
 export type PanelPreset = {
@@ -22,6 +38,7 @@ export type PanelPreset = {
   h: number;
   d: number;
   icon: string;
+  shape: PanelShape;
 };
 
 /** A user-inserted library panel. Placement lives in Transforms, not here. */
@@ -31,9 +48,10 @@ export type CustomPart = {
   w: number;
   h: number;
   d: number;
+  shape: PanelShape;
 };
 
-export type PartOverride = { body?: FinishId };
+export type PartOverride = { material?: MaterialId; color?: ColorId };
 export type Overrides = Record<string, PartOverride | undefined>;
 
 /**
@@ -59,6 +77,7 @@ export type PartSpec = {
   label: string;
   /** Millimetres — the panel's own nominal size, before any gizmo scale. */
   size: Vec3Mm;
+  shape: PanelShape;
 };
 
 export type SavedVersion = {
@@ -83,8 +102,9 @@ export type Group = {
 
 /** The undoable, persisted portion of application state. */
 export type DocumentSnapshot = {
-  /** Default finish applied to newly inserted panels. */
-  defaultFinishId: FinishId;
+  /** Default material and color applied to newly inserted panels. */
+  defaultMaterialId: MaterialId;
+  defaultColorId: ColorId;
   overrides: Overrides;
   customParts: CustomPart[];
   hiddenIds: string[];
@@ -102,6 +122,7 @@ export type BomRow = {
   label: string;
   qty: number;
   material: string;
+  color: string;
   w: number;
   h: number;
   d: number;

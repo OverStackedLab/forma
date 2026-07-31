@@ -2,6 +2,7 @@ import {
   Box,
   Circle,
   Columns2,
+  DoorClosed,
   Download,
   Eye,
   EyeOff,
@@ -9,11 +10,9 @@ import {
   Hand,
   History,
   Magnet,
-  Minus,
   MousePointer2,
   Move,
   PanelLeft,
-  RectangleEllipsis,
   RectangleHorizontal,
   Redo2,
   RotateCw,
@@ -21,12 +20,8 @@ import {
   Ruler,
   Scaling,
   Scissors,
-  SeparatorVertical,
   Sparkles,
-  Table2,
-  Triangle,
   Undo2,
-  Waypoints,
   X,
   type LucideIcon,
 } from 'lucide-react';
@@ -64,25 +59,13 @@ const ICONS: Record<string, LucideIcon> = {
   visibility: Eye,
   visibility_off: EyeOff,
 
-  // Leg styles
-  leg_tapered: Triangle,
-  leg_straight: SeparatorVertical,
-  leg_hairpin: Waypoints,
-
-  // Handle styles
-  handle_bar: Minus,
-  handle_knob: Circle,
-  handle_recessed: RectangleEllipsis,
-
-  // Base styles
-  base_legs: Table2,
-  base_plinth: RectangleHorizontal,
-
   // Library panels
   panel_shelf: Rows3,
   panel_flat: PanelLeft,
   panel_back: RectangleHorizontal,
   panel_divider: Columns2,
+  panel_door: DoorClosed,
+  panel_knob: Circle,
 };
 
 export type IconProps = {

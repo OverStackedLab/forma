@@ -1,7 +1,7 @@
 import { PANEL_PRESETS } from '@/domain/catalog';
 import { groupMatching, livePartIds } from '@/domain/parts';
 import { eulerDegreesToQuaternion, quaternionToEulerDegrees } from '@/domain/rotation';
-import type { CustomPart, FinishId, Group, SavedVersion, Transform } from '@/domain/types';
+import type { ColorId, CustomPart, Group, MaterialId, SavedVersion, Transform } from '@/domain/types';
 import { viewportApi } from '@/viewport/viewportApi';
 import { IDENTITY_TRANSFORM, snapshotDocument, useDocumentStore } from './documentStore';
 import { commit } from './history';
@@ -24,20 +24,36 @@ export function liveIds(): string[] {
   return livePartIds(doc().customParts);
 }
 
-// ─── Finish ──────────────────────────────────────────────────────────────────
+// ─── Material & Color ────────────────────────────────────────────────────────
 
 /** Applies to the current selection as a per-part override, or the document default with nothing selected. */
-export function applyFinish(id: FinishId): void {
+export function applyMaterial(id: MaterialId): void {
   const selected = ui().selectedPartIds;
   commit(() => {
     if (selected.length) {
       useDocumentStore.setState((s) => {
         const overrides = { ...s.overrides };
-        for (const partId of selected) overrides[partId] = { ...overrides[partId], body: id };
+        for (const partId of selected) overrides[partId] = { ...overrides[partId], material: id };
         return { overrides };
       });
     } else {
-      useDocumentStore.setState({ defaultFinishId: id });
+      useDocumentStore.setState({ defaultMaterialId: id });
+    }
+  });
+}
+
+/** Applies to the current selection as a per-part override, or the document default with nothing selected. */
+export function applyColor(id: ColorId): void {
+  const selected = ui().selectedPartIds;
+  commit(() => {
+    if (selected.length) {
+      useDocumentStore.setState((s) => {
+        const overrides = { ...s.overrides };
+        for (const partId of selected) overrides[partId] = { ...overrides[partId], color: id };
+        return { overrides };
+      });
+    } else {
+      useDocumentStore.setState({ defaultColorId: id });
     }
   });
 }
@@ -67,8 +83,14 @@ export function addCustomPanel(presetId: string, dropPoint?: { x: number; z: num
 
   commit(() => {
     useDocumentStore.setState((prev) => ({
-      customParts: [...prev.customParts, { id, label: preset.label, w: preset.w, h: preset.h, d: preset.d }],
-      overrides: { ...prev.overrides, [id]: { body: prev.defaultFinishId } },
+      customParts: [
+        ...prev.customParts,
+        { id, label: preset.label, w: preset.w, h: preset.h, d: preset.d, shape: preset.shape },
+      ],
+      overrides: {
+        ...prev.overrides,
+        [id]: { material: prev.defaultMaterialId, color: prev.defaultColorId },
+      },
       transforms: {
         ...prev.transforms,
         [id]: { position: [x, y, z], quaternion: [0, 0, 0, 1], scale: [1, 1, 1] },
@@ -132,7 +154,7 @@ export function duplicateSelected(): void {
   const transforms = { ...s.transforms };
   for (const src of sources) {
     const id = nextCustomId();
-    clones.push({ id, label: src.label, w: src.w, h: src.h, d: src.d });
+    clones.push({ id, label: src.label, w: src.w, h: src.h, d: src.d, shape: src.shape });
     const t = s.transforms[src.id];
     // Clones are offset 80 mm in X and Z, inheriting orientation and scale.
     transforms[id] = t

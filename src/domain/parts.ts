@@ -11,6 +11,7 @@ export function computePartSpecs(customParts: readonly CustomPart[]): PartSpec[]
     id: p.id,
     label: p.label,
     size: { x: p.w, y: p.h, z: p.d },
+    shape: p.shape,
   }));
 }
 

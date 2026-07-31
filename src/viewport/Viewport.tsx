@@ -132,6 +132,8 @@ export function Viewport() {
         customParts: doc.customParts,
         transforms: doc.transforms,
         hiddenIds: doc.hiddenIds,
+        defaultMaterialId: doc.defaultMaterialId,
+        defaultColorId: doc.defaultColorId,
       });
       overlay.apply(decorated());
       gizmo.sync(ui.gizmoMode, decorated());

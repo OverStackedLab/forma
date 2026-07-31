@@ -2,8 +2,8 @@ import { describe, expect, it } from 'vitest';
 import { computePartSpecs, groupContaining, groupMatching, livePartIds } from './parts';
 import type { CustomPart, Group } from './types';
 
-const shelf: CustomPart = { id: 'custom-1', label: 'Shelf', w: 800, h: 300, d: 18 };
-const divider: CustomPart = { id: 'custom-2', label: 'Divider', w: 400, h: 700, d: 18 };
+const shelf: CustomPart = { id: 'custom-1', label: 'Shelf', w: 800, h: 300, d: 18, shape: 'box' };
+const divider: CustomPart = { id: 'custom-2', label: 'Divider', w: 400, h: 700, d: 18, shape: 'box' };
 
 describe('computePartSpecs', () => {
   it('returns no parts for an empty scene', () => {
@@ -13,7 +13,12 @@ describe('computePartSpecs', () => {
   it('maps every custom part to a spec, in order', () => {
     const specs = computePartSpecs([shelf, divider]);
     expect(specs.map((s) => s.id)).toEqual(['custom-1', 'custom-2']);
-    expect(specs[0]).toEqual({ id: 'custom-1', label: 'Shelf', size: { x: 800, y: 300, z: 18 } });
+    expect(specs[0]).toEqual({
+      id: 'custom-1',
+      label: 'Shelf',
+      size: { x: 800, y: 300, z: 18 },
+      shape: 'box',
+    });
   });
 
   it('reflects a deletion by omission — the caller filters customParts directly', () => {

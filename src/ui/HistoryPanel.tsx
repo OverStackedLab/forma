@@ -1,4 +1,4 @@
-import { findFinish } from '@/domain/catalog';
+import { resolveAppearance } from '@/domain/catalog';
 import { restoreVersion } from '@/store/actions';
 import { useDocumentStore } from '@/store/documentStore';
 import { useUiStore } from '@/store/uiStore';
@@ -46,7 +46,10 @@ export function HistoryPanel() {
             >
               <span
                 className="h-2.5 w-2.5 flex-none rounded-full"
-                style={{ background: findFinish(version.doc.defaultFinishId).color }}
+                style={{
+                  background: resolveAppearance(version.doc.defaultMaterialId, version.doc.defaultColorId)
+                    .color,
+                }}
               />
               <div className="min-w-0 flex-1">
                 <div className="truncate text-[12.5px] font-semibold text-ink">{version.label}</div>
