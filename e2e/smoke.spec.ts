@@ -323,7 +323,7 @@ test('a regular group resizes its members and spacing together from exact dimens
   await expect(page.getByLabel('Group Width in centimetres')).toHaveValue('168');
 });
 
-test('clicking a grouped cabinet in the viewport selects the group and shows its properties', async ({
+test('viewport clicks select one grouped piece while the Assembly group row selects the group', async ({
   page,
 }) => {
   await page.goto('/');
@@ -335,6 +335,12 @@ test('clicking a grouped cabinet in the viewport selects the group and shows its
   if (!canvasBox) throw new Error('viewport canvas has no bounding box');
   await page.mouse.click(canvasBox.x + canvasBox.width / 2, canvasBox.y + canvasBox.height * 0.54);
 
+  await expect(page.getByLabel('Part name')).toBeVisible();
+  await expect(page.getByLabel('Cabinet Width in millimetres')).toHaveCount(0);
+
+  await page.getByRole('tab', { name: 'Assembly' }).click();
+  await expect(page.getByText('1 selected')).toBeVisible();
+  await page.getByRole('treeitem', { name: /Collapse group Base 600 6 Hide Base 600/ }).click();
   await expect(page.getByText('Editing: Base 600')).toBeVisible();
   await expect(page.getByText('Configurable cabinet · 6 pieces')).toBeVisible();
   await expect(page.getByLabel('Group X Position in millimetres')).toHaveValue('0');

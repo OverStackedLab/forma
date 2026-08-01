@@ -1,9 +1,9 @@
-import { useMemo } from 'react';
+import { useMemo, useSyncExternalStore } from 'react';
 import { computePartSpecs, groupMatching } from '@/domain/parts';
 import type { PartSpec } from '@/domain/types';
 import { useDocumentStore } from '@/store/documentStore';
 import { useUiStore } from '@/store/uiStore';
-import { viewportApi } from '@/viewport/viewportApi';
+import { subscribeViewportApi, viewportApi } from '@/viewport/viewportApi';
 
 export type SelectionInfo =
   | { kind: 'none' }
@@ -27,6 +27,7 @@ export function useSelectionInfo(): SelectionInfo {
   const selectedPartIds = useUiStore((s) => s.selectedPartIds);
   const transforms = useDocumentStore((s) => s.transforms);
   const groups = useDocumentStore((s) => s.groups);
+  const api = useSyncExternalStore(subscribeViewportApi, viewportApi, () => null);
 
   const ids = selectedPartIds.filter((id) => specs.some((s) => s.id === id));
 
@@ -36,7 +37,7 @@ export function useSelectionInfo(): SelectionInfo {
     return {
       kind: 'multi',
       count: ids.length,
-      size: viewportApi()?.selectionSize(ids) ?? null,
+      size: api?.selectionSize(ids) ?? null,
       groupLabel: groupMatching(groups, ids)?.label,
     };
   }

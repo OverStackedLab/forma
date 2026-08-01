@@ -29,11 +29,19 @@ export type ViewportApi = {
 };
 
 let current: ViewportApi | null = null;
+const listeners = new Set<() => void>();
 
 export function setViewportApi(api: ViewportApi | null): void {
   current = api;
+  listeners.forEach((listener) => listener());
 }
 
 export function viewportApi(): ViewportApi | null {
   return current;
+}
+
+/** Lets React consumers update when the lazy viewport becomes ready or unmounts. */
+export function subscribeViewportApi(listener: () => void): () => void {
+  listeners.add(listener);
+  return () => listeners.delete(listener);
 }

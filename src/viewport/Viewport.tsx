@@ -1,6 +1,5 @@
 import { useEffect, useRef } from 'react';
 import { Vector3 } from 'three';
-import { groupContaining } from '@/domain/parts';
 import {
   addCabinetPreset,
   addCustomPanel,
@@ -83,31 +82,21 @@ export function Viewport() {
       isGizmoDragging: () => gizmo.isDragging,
       onSelect: (partId, additive) => {
         const ui = useUiStore.getState();
-        const group = groupContaining(useDocumentStore.getState().groups, partId);
-        const unitIds = group?.partIds ?? [partId];
-        if (additive) {
-          const selected = new Set(ui.selectedPartIds);
-          const allSelected = unitIds.every((id) => selected.has(id));
-          ui.setSelection(
-            allSelected
-              ? ui.selectedPartIds.filter((id) => !unitIds.includes(id))
-              : [...new Set([...ui.selectedPartIds, ...unitIds])],
-          );
-        } else ui.setSelection(unitIds);
+        if (additive) ui.toggleSelection(partId);
+        else ui.setSelection([partId]);
       },
       onClearSelection: () => useUiStore.getState().clearSelection(),
       onMarqueeChange: (marquee) => useUiStore.getState().setMarquee(marquee),
       onMarqueeCommit: (ids, additive) => {
         const ui = useUiStore.getState();
-        const groups = useDocumentStore.getState().groups;
-        const expandedIds = [...new Set(ids.flatMap((id) => groupContaining(groups, id)?.partIds ?? [id]))];
-        if (!expandedIds.length) {
+        const selectedIds = [...new Set(ids)];
+        if (!selectedIds.length) {
           if (!additive) ui.clearSelection();
           return;
         }
-        const next = additive ? [...new Set([...ui.selectedPartIds, ...expandedIds])] : expandedIds;
+        const next = additive ? [...new Set([...ui.selectedPartIds, ...selectedIds])] : selectedIds;
         ui.setSelection(next);
-        ui.showToast(`${expandedIds.length} part${expandedIds.length > 1 ? 's' : ''} selected`);
+        ui.showToast(`${selectedIds.length} part${selectedIds.length > 1 ? 's' : ''} selected`);
       },
       onMeasurePoint: (point) =>
         useUiStore.getState().addMeasurePoint({ x: point.x, y: point.y, z: point.z }),
