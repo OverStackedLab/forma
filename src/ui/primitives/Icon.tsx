@@ -1,5 +1,6 @@
 import {
   Box,
+  ChevronDown,
   Circle,
   Columns2,
   DoorClosed,
@@ -40,6 +41,7 @@ const ICONS: Record<string, LucideIcon> = {
   measure: Ruler,
   history: History,
   close: X,
+  chevron_down: ChevronDown,
   download: Download,
   save_file: Download,
   open_file: Upload,
@@ -69,6 +71,7 @@ const ICONS: Record<string, LucideIcon> = {
   panel_divider: Columns2,
   panel_door: DoorClosed,
   panel_knob: Circle,
+  cabinet: Box,
 };
 
 export type IconProps = {

@@ -57,7 +57,7 @@ export function useSelectionInfo(): SelectionInfo {
   };
 }
 
-/** The scope phrase used by both the Properties and Materials "Editing: …" chips. */
+/** The scope phrase used by both the Properties and Finish "Editing: …" chips. */
 export function scopeLabel(selection: SelectionInfo): string {
   if (selection.kind === 'none') return 'Whole Piece';
   if (selection.kind === 'multi') return selection.groupLabel ?? `${selection.count} parts`;

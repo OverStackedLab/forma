@@ -73,7 +73,13 @@ export class CameraController {
 
     const centre = box.getCenter(new THREE.Vector3());
     const radius = Math.max(box.getSize(new THREE.Vector3()).length() / 2, 0.15);
-    const distance = Math.min(Math.max(radius * 3.2, 0.9), 6);
+    // Both bounds come from the orbit envelope, so the destination is always
+    // one OrbitControls will accept. A fixed 0.9 floor sat below minDistance
+    // (1.2), so framing a small part — a knob, most single panels — asked for
+    // a distance the controls clamped away every frame while `update()` lerped
+    // back toward it, and the flight never reached its arrival epsilon.
+    const scale = this.scene.viewportScale;
+    const distance = Math.min(Math.max(radius * 3.2, scale.frameMinDistance), scale.frameClamp);
     const direction = new THREE.Vector3(0.8, 0.55, 0.9).normalize();
     this.flyTo(centre.clone().add(direction.multiplyScalar(distance)), centre);
   }

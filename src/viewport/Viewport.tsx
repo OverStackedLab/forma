@@ -1,6 +1,6 @@
 import { useEffect, useRef } from 'react';
 import { Vector3 } from 'three';
-import { addCustomPanel, commitTransforms } from '@/store/actions';
+import { addCabinetPreset, addCustomPanel, commitTransforms } from '@/store/actions';
 import { useDocumentStore } from '@/store/documentStore';
 import { useUiStore } from '@/store/uiStore';
 import type { Transform } from '@/domain/types';
@@ -121,7 +121,10 @@ export function Viewport() {
       },
       onMeasurePoint: (point) =>
         useUiStore.getState().addMeasurePoint({ x: point.x, y: point.y, z: point.z }),
-      onDropPanel: (presetId, point) => addCustomPanel(presetId, point ?? undefined),
+      onDropLibraryItem: (kind, presetId, placement) => {
+        if (kind === 'cabinet') addCabinetPreset(presetId, placement ?? undefined);
+        else addCustomPanel(presetId, placement ?? undefined);
+      },
     });
 
     // Rebuild discipline: geometry first, then visibility (already applied
@@ -143,6 +146,7 @@ export function Viewport() {
         hiddenIds: doc.hiddenIds,
         defaultMaterialId: doc.defaultMaterialId,
         defaultColorId: doc.defaultColorId,
+        defaultHardwareFinishId: doc.defaultHardwareFinishId,
       });
       overlay.apply(decorated());
       gizmo.sync(ui.gizmoMode, decorated());
@@ -150,6 +154,9 @@ export function Viewport() {
 
     syncScene();
     gizmo.setSnapEnabled(useUiStore.getState().snapEnabled);
+    // Viewport is lazy-loaded, so App has normally hydrated the preference by
+    // now — but that ordering is incidental, hence the subscription below too.
+    scene.setGridSize(useUiStore.getState().gridSizeM);
     const syncPresentationVisibility = () => {
       const state = useUiStore.getState();
       const editing = state.viewMode !== 'render';
@@ -191,6 +198,10 @@ export function Viewport() {
       (s) => s.gridVisible,
       () => syncPresentationVisibility(),
     );
+    const unsubGridSize = useUiStore.subscribe(
+      (s) => s.gridSizeM,
+      (size) => scene.setGridSize(size),
+    );
     const unsubMeasure = useUiStore.subscribe(
       (s) => s.measurePoints,
       (points) => measure.setPoints(points),
@@ -222,6 +233,7 @@ export function Viewport() {
       unsubViewMode();
       unsubSnap();
       unsubGrid();
+      unsubGridSize();
       unsubMeasure();
       unsubFrame();
       pick.dispose();

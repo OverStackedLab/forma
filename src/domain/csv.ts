@@ -3,13 +3,14 @@ import type { BomRow } from './types';
 
 export function csvHeaders(unit: DisplayUnit): readonly string[] {
   return [
+    'Type',
     'Part',
     'Qty',
-    'Material',
-    'Color',
+    'Finish',
     `W (${unit})`,
     `H (${unit})`,
     `D (${unit})`,
+    `Thickness (${unit})`,
     'Edge Band',
     'Grain',
   ];
@@ -31,14 +32,15 @@ export function toCSV(rows: readonly BomRow[], unit: DisplayUnit): string {
   for (const r of rows) {
     lines.push(
       [
+        r.source === 'sheet' ? 'Sheet Good' : 'Hardware',
         r.label,
         r.qty,
-        r.material,
-        r.color,
+        r.finish,
         convertedValue(r.w, unit),
         convertedValue(r.h, unit),
         convertedValue(r.d, unit),
-        r.edge ? 'Y' : 'N',
+        r.thickness === null ? '' : convertedValue(r.thickness, unit),
+        r.edgeBand,
         r.grain,
       ]
         .map(escapeField)

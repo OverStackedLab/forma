@@ -1,5 +1,9 @@
+import { GRID_SIZES_M } from '@/domain/workspace';
 import { useUiStore, type GizmoMode } from '@/store/uiStore';
 import { Icon } from '@/ui/primitives/Icon';
+import { Select } from '@/ui/primitives/Select';
+
+const GRID_SIZE_OPTIONS = GRID_SIZES_M.map((m) => ({ value: m, label: `${m} m` }));
 
 const MODES: { mode: GizmoMode; icon: string; label: string; key: string }[] = [
   { mode: 'select', icon: 'select', label: 'Select', key: 'Q' },
@@ -19,9 +23,11 @@ function buttonClass(active: boolean): string {
 export function GizmoToolbar() {
   const gizmoMode = useUiStore((s) => s.gizmoMode);
   const gridVisible = useUiStore((s) => s.gridVisible);
+  const gridSizeM = useUiStore((s) => s.gridSizeM);
   const snapEnabled = useUiStore((s) => s.snapEnabled);
   const setGizmoMode = useUiStore((s) => s.setGizmoMode);
   const toggleGrid = useUiStore((s) => s.toggleGrid);
+  const setGridSize = useUiStore((s) => s.setGridSize);
   const toggleSnap = useUiStore((s) => s.toggleSnap);
 
   return (
@@ -52,6 +58,14 @@ export function GizmoToolbar() {
       >
         <Icon name="grid" size={18} />
       </button>
+      {/* Left enabled while the grid is hidden — the size still applies when it returns. */}
+      <Select
+        ariaLabel="Grid size"
+        title="Grid size"
+        value={gridSizeM}
+        options={GRID_SIZE_OPTIONS}
+        onChange={setGridSize}
+      />
       <button
         type="button"
         aria-pressed={snapEnabled}

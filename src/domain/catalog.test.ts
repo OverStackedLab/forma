@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { findColor, findMaterial, resolveAppearance } from './catalog';
+import { findColor, findMaterial, finishForAppearance, resolveAppearance } from './catalog';
 
 describe('resolveAppearance', () => {
   it("uses the material's own color and finish when the color is natural", () => {
@@ -31,5 +31,20 @@ describe('resolveAppearance', () => {
   it('falls back to the first material or color for an unknown id', () => {
     expect(findMaterial(undefined).id).toBe(findMaterial('bogus').id);
     expect(findColor(undefined).id).toBe(findColor('bogus').id);
+  });
+});
+
+describe('finishForAppearance', () => {
+  it('maps a natural wood pair to its matching finish', () => {
+    expect(finishForAppearance('oak', 'natural').label).toBe('White Oak');
+  });
+
+  it('maps older mixed pairs to the closest user-facing finish', () => {
+    expect(finishForAppearance('oak', 'ebony').label).toBe('Ebony Stain');
+  });
+
+  it('maps metal appearances to a single hardware finish', () => {
+    expect(finishForAppearance('metal', 'brass').label).toBe('Brushed Brass');
+    expect(finishForAppearance('metal', 'steel').label).toBe('Brushed Steel');
   });
 });

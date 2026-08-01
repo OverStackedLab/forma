@@ -1,7 +1,14 @@
 import { lazy, Suspense, useEffect } from 'react';
 import { useDocumentStore } from '@/store/documentStore';
 import { clearHistory } from '@/store/history';
-import { loadDisplayUnit, loadDocument, startAutosave, startDisplayUnitSync } from '@/store/persistence';
+import {
+  loadDisplayUnit,
+  loadDocument,
+  loadGridSize,
+  startAutosave,
+  startDisplayUnitSync,
+  startGridSizeSync,
+} from '@/store/persistence';
 import { useUiStore } from '@/store/uiStore';
 import { CutList } from '@/ui/CutList';
 import { HistoryPanel } from '@/ui/HistoryPanel';
@@ -26,14 +33,20 @@ export function App() {
       // A restored document is the baseline, not an undoable step.
       clearHistory();
     }
+    // Preferences load before their sync subscriptions start, so hydrating
+    // one doesn't immediately write it back over a value never chosen.
     const savedUnit = loadDisplayUnit();
     if (savedUnit) useUiStore.getState().setDisplayUnit(savedUnit);
+    const savedGrid = loadGridSize();
+    if (savedGrid) useUiStore.getState().setGridSize(savedGrid);
 
     const stopAutosave = startAutosave();
     const stopUnitSync = startDisplayUnitSync();
+    const stopGridSync = startGridSizeSync();
     return () => {
       stopAutosave();
       stopUnitSync();
+      stopGridSync();
     };
   }, []);
 

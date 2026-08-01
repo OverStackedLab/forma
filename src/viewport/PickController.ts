@@ -17,7 +17,8 @@ export type PickCallbacks = {
   onMarqueeChange: (marquee: Marquee | null) => void;
   onMarqueeCommit: (partIds: string[], additive: boolean) => void;
   onMeasurePoint: (point: THREE.Vector3) => void;
-  onDropPanel: (
+  onDropLibraryItem: (
+    kind: 'panel' | 'cabinet',
     presetId: string,
     placement: { point: { x: number; y: number; z: number }; normal: { x: number; y: number; z: number } } | null,
   ) => void;
@@ -191,7 +192,7 @@ export class PickController {
     const data = e.dataTransfer?.getData('text/plain');
     if (!data) return;
     const [kind, id] = data.split(':');
-    if (kind !== 'panel' || !id) return;
+    if ((kind !== 'panel' && kind !== 'cabinet') || !id) return;
 
     const rect = this.element.getBoundingClientRect();
     this.pointer.x = ((e.clientX - rect.left) / rect.width) * 2 - 1;
@@ -199,14 +200,15 @@ export class PickController {
     this.raycaster.setFromCamera(this.pointer, this.scene.camera);
     const surfaceHit = this.raycast(e);
     if (surfaceHit) {
-      this.callbacks.onDropPanel(id, {
+      this.callbacks.onDropLibraryItem(kind, id, {
         point: { x: surfaceHit.point.x, y: surfaceHit.point.y, z: surfaceHit.point.z },
         normal: { x: surfaceHit.normal.x, y: surfaceHit.normal.y, z: surfaceHit.normal.z },
       });
       return;
     }
     const groundHit = this.raycaster.intersectObject(this.scene.ground)[0];
-    this.callbacks.onDropPanel(
+    this.callbacks.onDropLibraryItem(
+      kind,
       id,
       groundHit
         ? {

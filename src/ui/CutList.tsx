@@ -8,7 +8,7 @@ import { useUiStore } from '@/store/uiStore';
 import { downloadBlob } from './download';
 import { Icon } from './primitives/Icon';
 
-const COLUMNS = 'grid grid-cols-[1.8fr_.4fr_.9fr_.9fr_.6fr_.6fr_.6fr_.8fr_.8fr] gap-x-2.5';
+const COLUMNS = 'grid grid-cols-[1.8fr_.4fr_1.1fr_.6fr_.6fr_.6fr_.7fr_1.2fr_.9fr] gap-x-2.5';
 
 export function CutList() {
   const doc = useDocumentStore();
@@ -24,6 +24,7 @@ export function CutList() {
         transforms: doc.transforms,
         defaultMaterialId: doc.defaultMaterialId,
         defaultColorId: doc.defaultColorId,
+        defaultHardwareFinishId: doc.defaultHardwareFinishId,
       }),
     [doc],
   );
@@ -38,7 +39,7 @@ export function CutList() {
 
   return (
     <div className="absolute inset-0 z-10 overflow-y-auto bg-panel">
-      <div className="mx-auto max-w-[900px] px-8 pt-9 pb-15">
+      <div className="mx-auto max-w-[1100px] px-8 pt-9 pb-15">
         <header className="mb-6 flex items-start justify-between gap-4">
           <div>
             <h1 className="font-display text-[22px] font-bold text-ink">Cut List</h1>
@@ -60,7 +61,7 @@ export function CutList() {
 
         {bom.rows.length === 0 ? (
           <p className="rounded-lg border border-hairline bg-surface px-3.5 py-6 text-center text-[12.5px] text-ink/45">
-            Nothing to cut yet. Insert a panel from the Library in Model mode.
+            Nothing to manufacture yet. Insert a panel or hardware item from the Library.
           </p>
         ) : (
           <>
@@ -82,35 +83,74 @@ export function CutList() {
               />
             </div>
 
-            <div className="overflow-hidden rounded-lg border border-hairline">
-              <div
-                className={`${COLUMNS} bg-surface px-3.5 py-2.5 text-[10.5px] font-semibold tracking-[.04em] text-ink/45 uppercase`}
-              >
-                {csvHeaders(unit).map((h) => (
-                  <span key={h}>{h}</span>
-                ))}
-              </div>
-              {bom.rows.map((row, i) => (
-                <div
-                  key={`${row.label}-${i}`}
-                  className={`${COLUMNS} border-t border-white/6 px-3.5 py-2.5 font-mono text-xs text-ink/80`}
-                >
-                  <span className="font-sans text-ink">{row.label}</span>
-                  <span>{row.qty}</span>
-                  <span className="font-sans">{row.material}</span>
-                  <span className="font-sans">{row.color}</span>
-                  <span>{formatLength(row.w, unit)}</span>
-                  <span>{formatLength(row.h, unit)}</span>
-                  <span>{formatLength(row.d, unit)}</span>
-                  <span>{row.edge ? 'Y' : 'N'}</span>
-                  <span>{row.grain}</span>
+            {bom.sheetRequirements.length > 0 && (
+              <div className="mb-6 rounded-lg border border-hairline bg-surface px-3.5 py-3">
+                <h2 className="text-[10.5px] font-semibold tracking-[.04em] text-ink/45 uppercase">
+                  Sheet breakdown
+                </h2>
+                <div className="mt-2 flex flex-wrap gap-2">
+                  {bom.sheetRequirements.map((requirement) => (
+                    <span
+                      key={`${requirement.finish}-${requirement.thickness}`}
+                      className="rounded-md bg-input px-2.5 py-1.5 font-mono text-[11px] text-ink/70"
+                    >
+                      {requirement.sheets} × {requirement.finish}, {formatLength(requirement.thickness, unit)}
+                    </span>
+                  ))}
                 </div>
-              ))}
-            </div>
+              </div>
+            )}
+
+            {bom.sheetRows.length > 0 && (
+              <ManufacturingTable title="Sheet Goods" rows={bom.sheetRows} unit={unit} />
+            )}
+            {bom.hardwareRows.length > 0 && (
+              <ManufacturingTable title="Purchased Hardware" rows={bom.hardwareRows} unit={unit} />
+            )}
           </>
         )}
       </div>
     </div>
+  );
+}
+
+function ManufacturingTable({
+  title,
+  rows,
+  unit,
+}: {
+  title: string;
+  rows: ReturnType<typeof computeBOM>['rows'];
+  unit: ReturnType<typeof useUiStore.getState>['displayUnit'];
+}) {
+  const headers = csvHeaders(unit).slice(1);
+  return (
+    <section className="mb-6">
+      <h2 className="mb-2 text-[12px] font-semibold text-ink/75">{title}</h2>
+      <div className="overflow-hidden rounded-lg border border-hairline">
+        <div
+          className={`${COLUMNS} bg-surface px-3.5 py-2.5 text-[10.5px] font-semibold tracking-[.04em] text-ink/45 uppercase`}
+        >
+          {headers.map((header) => <span key={header}>{header}</span>)}
+        </div>
+        {rows.map((row, index) => (
+          <div
+            key={`${row.label}-${index}`}
+            className={`${COLUMNS} border-t border-white/6 px-3.5 py-2.5 font-mono text-xs text-ink/80`}
+          >
+            <span className="font-sans text-ink">{row.label}</span>
+            <span>{row.qty}</span>
+            <span className="font-sans">{row.finish}</span>
+            <span>{formatLength(row.w, unit)}</span>
+            <span>{formatLength(row.h, unit)}</span>
+            <span>{formatLength(row.d, unit)}</span>
+            <span>{row.thickness === null ? '—' : formatLength(row.thickness, unit)}</span>
+            <span className="font-sans">{row.edgeBand}</span>
+            <span className="font-sans">{row.grain}</span>
+          </div>
+        ))}
+      </div>
+    </section>
   );
 }
 

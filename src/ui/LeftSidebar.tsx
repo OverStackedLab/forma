@@ -1,8 +1,9 @@
 import { useMemo, useState } from 'react';
-import { PANEL_PRESETS } from '@/domain/catalog';
+import { CABINET_PRESETS, PANEL_PRESETS } from '@/domain/catalog';
 import type { Group, PartSpec } from '@/domain/types';
 import {
   addCustomPanel,
+  addCabinetPreset,
   renameGroup,
   renamePart,
   selectAll,
@@ -62,7 +63,7 @@ function buildTreeItems(specs: readonly PartSpec[], groups: readonly Group[]): T
   return items;
 }
 
-/** Every part is a library panel, individually or gathered into a saved group. */
+/** Every part appears individually or inside a saved/generated group. */
 function AssemblyTree() {
   const specs = usePartSpecs();
   const groups = useDocumentStore((s) => s.groups);
@@ -301,24 +302,72 @@ function GroupRow({
   );
 }
 
-/** The panel library is the only way to add geometry to the scene. */
+/** Library entry point for cabinet assemblies, panels, fronts and hardware. */
 function LibraryPanel() {
+  const panels = PANEL_PRESETS.filter((preset) => preset.category !== 'hardware');
+  const hardware = PANEL_PRESETS.filter((preset) => preset.category === 'hardware');
+
   return (
     <div className="flex flex-col gap-[18px] overflow-y-auto px-3 py-3.5">
-      <div className="grid grid-cols-2 gap-1.5">
-        {PANEL_PRESETS.map((p) => (
-          <OptionCard
-            key={p.id}
-            label={p.label}
-            icon={p.icon}
-            dragPayload={`panel:${p.id}`}
-            onClick={() => addCustomPanel(p.id)}
-          />
-        ))}
+      <div>
+        <h3 className="mb-2 text-[11px] font-semibold tracking-[.04em] text-ink/45 uppercase">
+          Prebuilt Cabinets
+        </h3>
+        <div className="grid grid-cols-2 gap-1.5">
+          {CABINET_PRESETS.map((preset) => (
+            <OptionCard
+              key={preset.id}
+              label={preset.label}
+              description={`${preset.width}×${preset.height}×${preset.depth} mm`}
+              icon={preset.icon}
+              dragPayload={`cabinet:${preset.id}`}
+              onClick={() => addCabinetPreset(preset.id)}
+            />
+          ))}
+        </div>
+        <p className="mt-2 text-[10px] leading-relaxed text-ink/30">
+          Metric carcass sizes. Heights exclude legs and worktops.
+        </p>
+      </div>
+
+      <div>
+        <h3 className="mb-2 text-[11px] font-semibold tracking-[.04em] text-ink/45 uppercase">
+          Panels &amp; Fronts
+        </h3>
+        <div className="grid grid-cols-2 gap-1.5">
+          {panels.map((p) => (
+            <OptionCard
+              key={p.id}
+              label={p.label}
+              description={p.description}
+              icon={p.icon}
+              dragPayload={`panel:${p.id}`}
+              onClick={() => addCustomPanel(p.id)}
+            />
+          ))}
+        </div>
+      </div>
+
+      <div>
+        <h3 className="mb-2 text-[11px] font-semibold tracking-[.04em] text-ink/45 uppercase">
+          Hardware
+        </h3>
+        <div className="grid grid-cols-2 gap-1.5">
+          {hardware.map((item) => (
+            <OptionCard
+              key={item.id}
+              label={item.label}
+              description={item.description}
+              icon={item.icon}
+              dragPayload={`panel:${item.id}`}
+              onClick={() => addCustomPanel(item.id)}
+            />
+          ))}
+        </div>
       </div>
 
       <p className="text-[11px] leading-relaxed text-ink/35">
-        Click a panel to add it to the scene, or drag it onto the viewport.
+        Click an item to add it to the scene, or drag it onto the viewport.
       </p>
     </div>
   );

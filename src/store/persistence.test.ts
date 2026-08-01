@@ -8,6 +8,26 @@ describe('persistence.migrate', () => {
     const result = migrate({ schemaVersion: SCHEMA_VERSION, doc });
     expect(result?.defaultMaterialId).toBe(doc.defaultMaterialId);
     expect(result?.defaultColorId).toBe(doc.defaultColorId);
+    expect(result?.defaultHardwareFinishId).toBe(doc.defaultHardwareFinishId);
+  });
+
+  it('migrates schema-3 side panels and knobs into world-axis dimensions', () => {
+    const doc = {
+      ...createDefaultDocument(),
+      customParts: [
+        { id: 'side', label: 'Side Panel', w: 560, h: 720, d: 18, shape: 'box', thicknessAxis: 'd' },
+        { id: 'knob', label: 'Knob', w: 32, h: 25, d: 32, shape: 'cylinder', thicknessAxis: null },
+      ],
+      transforms: {
+        side: { position: [0, 0.36, 0], quaternion: [0, Math.SQRT1_2, 0, Math.SQRT1_2], scale: [1, 1, 1] },
+        knob: { position: [0, 0.016, 0], quaternion: [Math.SQRT1_2, 0, 0, Math.SQRT1_2], scale: [1, 1, 1] },
+      },
+    };
+    const result = migrate({ schemaVersion: 3, doc });
+    expect(result?.customParts[0]).toMatchObject({ w: 18, h: 720, d: 560, thicknessAxis: 'w' });
+    expect(result?.customParts[1]).toMatchObject({ w: 32, h: 32, d: 25, category: 'hardware' });
+    expect(result?.transforms.side?.quaternion).toEqual([0, 0, 0, 1]);
+    expect(result?.transforms.knob?.quaternion).toEqual([0, 0, 0, 1]);
   });
 
   it('rejects a payload with no schema version', () => {
@@ -38,6 +58,7 @@ describe('persistence.normalize', () => {
     expect(result.hiddenIds).toEqual([]);
     expect(result.transforms).toEqual({});
     expect(result.versions).toEqual([]);
+    expect(result.defaultHardwareFinishId).toBe('brushed-brass');
   });
 
   it('keeps a valid defaultMaterialId and defaultColorId', () => {
@@ -66,6 +87,11 @@ describe('persistence.normalize', () => {
       position: [0, 0.009, 0],
       quaternion: [0, 0, 0, 1],
       scale: [1, 1, 1],
+    });
+    expect(result.customParts[0]).toMatchObject({
+      category: 'panel',
+      grainAxis: 'w',
+      edgeBanding: [],
     });
   });
 });

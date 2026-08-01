@@ -1,7 +1,7 @@
 import type { CustomPart, Group, PartSpec } from './types';
 
 /**
- * Every part is a library panel, so this is a direct map — but it's still the
+ * Every panel, front and hardware item maps directly — but this is still the
  * one place that produces "the live parts," so the mesh builder, the assembly
  * tree, the part count, Select All and the BOM all read the same list and
  * can't drift from one another.
@@ -12,6 +12,7 @@ export function computePartSpecs(customParts: readonly CustomPart[]): PartSpec[]
     label: p.label,
     size: { x: p.w, y: p.h, z: p.d },
     shape: p.shape,
+    category: p.category,
   }));
 }
 

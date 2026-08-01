@@ -1,7 +1,16 @@
 import * as THREE from 'three';
+import { findFinish } from '@/domain/catalog';
 import { createPartNode, GeometryCache, MaterialCache, type PartNode } from '@/domain/geometry';
 import { computePartSpecs } from '@/domain/parts';
-import type { ColorId, CustomPart, MaterialId, Overrides, PartSpec, Transforms } from '@/domain/types';
+import type {
+  ColorId,
+  CustomPart,
+  HardwareFinishId,
+  MaterialId,
+  Overrides,
+  PartSpec,
+  Transforms,
+} from '@/domain/types';
 
 export type SyncInput = {
   overrides: Overrides;
@@ -10,6 +19,7 @@ export type SyncInput = {
   hiddenIds: readonly string[];
   defaultMaterialId: MaterialId;
   defaultColorId: ColorId;
+  defaultHardwareFinishId: HardwareFinishId;
 };
 
 /**
@@ -54,7 +64,14 @@ export class ModelBuilder {
   }
 
   sync(input: SyncInput): void {
-    const { overrides, transforms, hiddenIds, defaultMaterialId, defaultColorId } = input;
+    const {
+      overrides,
+      transforms,
+      hiddenIds,
+      defaultMaterialId,
+      defaultColorId,
+      defaultHardwareFinishId,
+    } = input;
     this.specs = computePartSpecs(input.customParts);
 
     const hidden = new Set(hiddenIds);
@@ -63,9 +80,12 @@ export class ModelBuilder {
     for (const spec of this.specs) {
       seen.add(spec.id);
       let node = this.nodes.get(spec.id);
+      const hardwareDefault = findFinish(defaultHardwareFinishId);
+      const baseMaterial = spec.category === 'hardware' ? hardwareDefault.materialId : defaultMaterialId;
+      const baseColor = spec.category === 'hardware' ? hardwareDefault.colorId : defaultColorId;
       const material = this.materials.body(
-        overrides[spec.id]?.material ?? defaultMaterialId,
-        overrides[spec.id]?.color ?? defaultColorId,
+        overrides[spec.id]?.material ?? baseMaterial,
+        overrides[spec.id]?.color ?? baseColor,
       );
 
       if (!node) {

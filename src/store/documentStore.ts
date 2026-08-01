@@ -1,11 +1,16 @@
 import { create } from 'zustand';
 import { subscribeWithSelector } from 'zustand/middleware';
-import { DEFAULT_COLOR_ID, DEFAULT_MATERIAL_ID } from '@/domain/catalog';
+import {
+  DEFAULT_COLOR_ID,
+  DEFAULT_HARDWARE_FINISH_ID,
+  DEFAULT_MATERIAL_ID,
+} from '@/domain/catalog';
 import type { DocumentSnapshot, FormaDocument, SavedVersion, Transform } from '@/domain/types';
 
 export const DOC_KEYS = [
   'defaultMaterialId',
   'defaultColorId',
+  'defaultHardwareFinishId',
   'overrides',
   'customParts',
   'hiddenIds',
@@ -13,11 +18,12 @@ export const DOC_KEYS = [
   'groups',
 ] as const satisfies readonly (keyof DocumentSnapshot)[];
 
-/** An empty scene — the only way to add geometry is from the panel library. */
+/** An empty scene — geometry enters through explicit library items and cabinets. */
 export function createDefaultDocument(): FormaDocument {
   return {
     defaultMaterialId: DEFAULT_MATERIAL_ID,
     defaultColorId: DEFAULT_COLOR_ID,
+    defaultHardwareFinishId: DEFAULT_HARDWARE_FINISH_ID,
     overrides: {},
     customParts: [],
     hiddenIds: [],
@@ -54,6 +60,7 @@ export function snapshotDocument(
   return {
     defaultMaterialId: state.defaultMaterialId,
     defaultColorId: state.defaultColorId,
+    defaultHardwareFinishId: state.defaultHardwareFinishId,
     overrides: structuredClone(state.overrides),
     customParts: structuredClone(state.customParts),
     hiddenIds: [...state.hiddenIds],

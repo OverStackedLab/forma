@@ -32,9 +32,23 @@ export class GeometryCache {
     return this.box;
   }
 
-  /** Unit cylinder centred on the origin, axis along Y, shared by every round part. */
+  /** Rounded unit knob centred on the origin, projecting along world Z. */
   unitCylinder(): TBufferGeometry {
-    if (!this.cylinder) this.cylinder = new this.THREE.CylinderGeometry(0.5, 0.5, 1, 24);
+    if (!this.cylinder) {
+      const profile = [
+        new this.THREE.Vector2(0, -0.5),
+        new this.THREE.Vector2(0.42, -0.5),
+        new this.THREE.Vector2(0.48, -0.45),
+        new this.THREE.Vector2(0.5, -0.35),
+        new this.THREE.Vector2(0.5, 0.35),
+        new this.THREE.Vector2(0.48, 0.45),
+        new this.THREE.Vector2(0.42, 0.5),
+        new this.THREE.Vector2(0, 0.5),
+      ];
+      this.cylinder = new this.THREE.LatheGeometry(profile, 48);
+      this.cylinder.rotateX(Math.PI / 2);
+      this.cylinder.computeVertexNormals();
+    }
     return this.cylinder;
   }
 

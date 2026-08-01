@@ -2,8 +2,14 @@ import { describe, expect, it } from 'vitest';
 import { computePartSpecs, groupContaining, groupMatching, livePartIds } from './parts';
 import type { CustomPart, Group } from './types';
 
-const shelf: CustomPart = { id: 'custom-1', label: 'Shelf', w: 800, h: 300, d: 18, shape: 'box' };
-const divider: CustomPart = { id: 'custom-2', label: 'Divider', w: 400, h: 700, d: 18, shape: 'box' };
+const shelf: CustomPart = {
+  id: 'custom-1', label: 'Shelf', w: 800, h: 18, d: 300, shape: 'box',
+  category: 'panel', thicknessAxis: 'h', grainAxis: 'w', edgeBanding: ['d-max'],
+};
+const divider: CustomPart = {
+  id: 'custom-2', label: 'Divider', w: 18, h: 700, d: 400, shape: 'box',
+  category: 'panel', thicknessAxis: 'w', grainAxis: 'h', edgeBanding: ['d-max'],
+};
 
 describe('computePartSpecs', () => {
   it('returns no parts for an empty scene', () => {
@@ -16,8 +22,9 @@ describe('computePartSpecs', () => {
     expect(specs[0]).toEqual({
       id: 'custom-1',
       label: 'Shelf',
-      size: { x: 800, y: 300, z: 18 },
+      size: { x: 800, y: 18, z: 300 },
       shape: 'box',
+      category: 'panel',
     });
   });
 

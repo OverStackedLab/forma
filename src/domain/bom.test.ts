@@ -1,56 +1,126 @@
 import { describe, expect, it } from 'vitest';
 import { computeBOM } from './bom';
-import { PANEL_PRESETS } from './catalog';
 import type { CustomPart } from './types';
 
-const shelf: CustomPart = { id: 'custom-1', label: 'Shelf', w: 800, h: 300, d: 18, shape: 'box' };
-const divider: CustomPart = { id: 'custom-2', label: 'Divider', w: 400, h: 700, d: 18, shape: 'box' };
-const knob: CustomPart = { id: 'custom-3', label: 'Knob', w: 50, h: 45, d: 50, shape: 'cylinder' };
+const shelf: CustomPart = {
+  id: 'custom-1',
+  label: 'Shelf',
+  w: 800,
+  h: 18,
+  d: 300,
+  shape: 'box',
+  category: 'panel',
+  thicknessAxis: 'h',
+  grainAxis: 'w',
+  edgeBanding: ['d-max'],
+};
+const divider: CustomPart = {
+  id: 'custom-2',
+  label: 'Divider',
+  w: 18,
+  h: 700,
+  d: 400,
+  shape: 'box',
+  category: 'panel',
+  thicknessAxis: 'w',
+  grainAxis: 'h',
+  edgeBanding: ['d-max'],
+};
+const knob: CustomPart = {
+  id: 'custom-3',
+  label: 'Knob',
+  w: 32,
+  h: 32,
+  d: 25,
+  shape: 'cylinder',
+  category: 'hardware',
+  thicknessAxis: null,
+  grainAxis: null,
+  edgeBanding: [],
+};
 
 const baseInput = {
   overrides: {},
   transforms: {},
   defaultMaterialId: 'walnut' as const,
   defaultColorId: 'natural' as const,
+  defaultHardwareFinishId: 'brushed-brass' as const,
 };
 
 describe('computeBOM', () => {
-  it('produces no rows and zeroed totals for an empty scene', () => {
+  it('produces empty manufacturing sections and zeroed totals for an empty scene', () => {
     const bom = computeBOM({ ...baseInput, customParts: [] });
     expect(bom.rows).toEqual([]);
+    expect(bom.sheetRows).toEqual([]);
+    expect(bom.hardwareRows).toEqual([]);
+    expect(bom.sheetRequirements).toEqual([]);
     expect(bom.totals).toEqual({ sheetAreaM2: 0, sheets: 0, edgeBandM: 0, partCount: 0 });
   });
 
-  it('emits one row per panel, always edge-banded', () => {
+  it('uses explicit grain and exposed-edge rules', () => {
     const bom = computeBOM({ ...baseInput, customParts: [shelf, divider] });
-    expect(bom.rows).toHaveLength(2);
-    expect(bom.rows.every((r) => r.edge)).toBe(true);
-    expect(bom.rows.map((r) => r.label)).toEqual(['Shelf', 'Divider']);
+    expect(bom.sheetRows[0]).toMatchObject({
+      edgeBand: 'Front',
+      edgeBandLengthMm: 800,
+      grain: 'Along width',
+    });
+    expect(bom.sheetRows[1]).toMatchObject({
+      edgeBand: 'Front',
+      edgeBandLengthMm: 700,
+      grain: 'Along height',
+    });
+    expect(bom.totals.edgeBandM).toBe(1.5);
   });
 
-  it('uses the document default material and color when a panel has no override', () => {
-    const bom = computeBOM({ ...baseInput, customParts: [shelf] });
-    expect(bom.rows[0]?.material).toBe('Walnut');
-    expect(bom.rows[0]?.color).toBe('Natural');
+  it('uses the appropriate design default for panels and hardware', () => {
+    const bom = computeBOM({ ...baseInput, customParts: [shelf, knob] });
+    expect(bom.sheetRows[0]?.finish).toBe('Walnut');
+    expect(bom.hardwareRows[0]).toMatchObject({
+      finish: 'Brushed Brass',
+      thickness: null,
+      edgeBand: 'None',
+      grain: '—',
+    });
   });
 
-  it('uses a per-panel override material and color over the document default', () => {
+  it('uses a per-part finish override over the category default', () => {
     const bom = computeBOM({
       ...baseInput,
       customParts: [shelf],
       overrides: { 'custom-1': { material: 'oak', color: 'ebony' } },
     });
-    expect(bom.rows[0]?.material).toBe('White Oak');
-    expect(bom.rows[0]?.color).toBe('Ebony Stain');
+    expect(bom.rows[0]?.finish).toBe('Ebony Stain');
   });
 
-  it('excludes round hardware from edge banding and the sheet-area total', () => {
-    const bom = computeBOM({ ...baseInput, customParts: [shelf, knob] });
-    expect(bom.rows.find((r) => r.label === 'Knob')).toMatchObject({ edge: false, grain: '—' });
-    expect(bom.totals.sheetAreaM2).toBeCloseTo(0.8 * 0.3, 5);
+  it('groups matching pieces into one quantity row', () => {
+    const rightSide: CustomPart = { ...divider, id: 'custom-4', label: 'Right Side', bomLabel: 'Cabinet Side' };
+    const leftSide: CustomPart = { ...divider, id: 'custom-5', label: 'Left Side', bomLabel: 'Cabinet Side' };
+    const bom = computeBOM({ ...baseInput, customParts: [leftSide, rightSide] });
+    expect(bom.rows).toHaveLength(1);
+    expect(bom.rows[0]).toMatchObject({ label: 'Cabinet Side', qty: 2 });
+    expect(bom.totals.partCount).toBe(2);
   });
 
-  it('scales reported dimensions by the gizmo transform', () => {
+  it('keeps different sheet thicknesses in separate requirements', () => {
+    const back: CustomPart = {
+      ...shelf,
+      id: 'back',
+      label: 'Back',
+      w: 800,
+      h: 700,
+      d: 8,
+      thicknessAxis: 'd',
+      grainAxis: 'h',
+      edgeBanding: [],
+    };
+    const bom = computeBOM({ ...baseInput, customParts: [shelf, back] });
+    expect(
+      bom.sheetRequirements.map((requirement) => requirement.thickness).sort((a, b) => a - b),
+    ).toEqual([8, 18]);
+    expect(bom.totals.sheets).toBe(2);
+  });
+
+  it('scales reported dimensions, area and edge length with the gizmo transform', () => {
     const bom = computeBOM({
       ...baseInput,
       customParts: [shelf],
@@ -58,33 +128,8 @@ describe('computeBOM', () => {
         'custom-1': { position: [0, 0, 0], quaternion: [0, 0, 0, 1], scale: [2, 1, 1] },
       },
     });
-    expect(bom.rows[0]).toMatchObject({ w: 1600, h: 300, d: 18 });
-  });
-
-  it('sums part count and sheet area across panels', () => {
-    const bom = computeBOM({ ...baseInput, customParts: [shelf, divider] });
-    expect(bom.totals.partCount).toBe(2);
-    expect(bom.totals.sheetAreaM2).toBeCloseTo(0.8 * 0.3 + 0.4 * 0.7, 5);
-  });
-
-  it('estimates at least one sheet once any panel exists', () => {
-    const bom = computeBOM({ ...baseInput, customParts: [shelf] });
-    expect(bom.totals.sheets).toBeGreaterThanOrEqual(1);
-  });
-
-  it('uses the two face dimensions for the production shelf preset', () => {
-    const preset = PANEL_PRESETS.find((p) => p.id === 'shelf')!;
-    const productionShelf: CustomPart = {
-      id: 'production-shelf',
-      label: preset.label,
-      w: preset.w,
-      h: preset.h,
-      d: preset.d,
-      shape: preset.shape,
-      thicknessAxis: preset.thicknessAxis,
-    };
-    const bom = computeBOM({ ...baseInput, customParts: [productionShelf] });
-    expect(bom.totals.sheetAreaM2).toBeCloseTo(0.8 * 0.3, 5);
-    expect(bom.totals.edgeBandM).toBeCloseTo(2.2, 5);
+    expect(bom.rows[0]).toMatchObject({ w: 1600, h: 18, d: 300, edgeBandLengthMm: 1600 });
+    expect(bom.totals.sheetAreaM2).toBeCloseTo(0.48, 5);
+    expect(bom.totals.edgeBandM).toBeCloseTo(1.6, 5);
   });
 });

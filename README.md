@@ -7,7 +7,9 @@ throughout.*
 
 ## Overview
 
-Forma is currently a browser-based, empty-canvas furniture panel designer. A designer inserts shelves, sides, backs, dividers, doors, and knobs from a library; positions and sizes them precisely; groups and finishes parts; and generates a cut list that stays in sync with the scene.
+Forma is currently a browser-based, empty-canvas furniture panel designer. A designer inserts standard open-front cabinet carcasses or individual shelves, sides, backs, dividers, doors, and knobs from a library; positions and sizes them precisely; groups and finishes parts; and generates a cut list that stays in sync with the scene.
+
+Parts carry explicit manufacturing metadata: panels/fronts vs. purchased hardware, sheet thickness, grain direction, and exposed edges. Prebuilt cabinets remain editable assemblies—their nominal Width/Height/Depth controls rebuild the carcass while preserving 18 mm panels and the 8 mm back.
 
 Three top-level modes: **Model** (the editor), **Cut List** (auto-generated BOM with CSV export), and **Render** (clean presentation view with camera presets and PNG export).
 
@@ -127,7 +129,7 @@ Full-bleed WebGL canvas with DOM overlays:
 
 **Purpose:** read and edit dimensions, and act on the selection.
 
-Tab strip (Properties / Materials) matching the left sidebar's underline style. Body `padding:16px`.
+Tab strip (Properties / Finish) matching the left sidebar's underline style. Body `padding:16px`.
 
 **Overall Dimensions** — always present, regardless of selection. Uppercase section header, then one control block per dimension (`padding:6px 2px 14px`): a label row with a 12.5px `rgba(238,233,226,.7)` name on the left and, on the right, a number input (58×22, `#26221D`, `border:1px solid rgba(255,255,255,.1)`, `border-radius:5px`, IBM Plex Mono 11.5px, right-aligned) plus a "mm" suffix — followed by a full-width `<input type="range">` with `accent-color:#C68A46`.
 
@@ -150,31 +152,31 @@ Action row (`display:flex; gap:8px; flex-wrap:wrap`), buttons `height:28px`, `pa
 
 With nothing selected, a divider and the hint "Click a part in the viewport or the Assembly tree to inspect it."
 
-### 6. Right sidebar — Materials tab
+### 6. Right sidebar — Finish tab
 
 **Purpose:** assign finishes to the whole piece or to individual parts.
 
 Scope chip at top: `#211E1A`, `border-radius:7px`, `border:1px solid rgba(255,255,255,.08)`, `padding:8px 10px`. Reads `Editing: {part name}` — or `Editing: Whole Piece` with no selection — plus a ✕ to drop back to whole-piece scope.
 
-**Body Finish** — 5-up swatch grid. Swatch: `height:40px`, `border-radius:6px`, `border:2px solid rgba(255,255,255,.12)`, becoming `#4FA3FF` when active. 9.5px centered caption beneath. Options: Walnut, White Oak, Ash, Ebony Stain, White Lacquer.
+**Finish** — one 2-column picker of complete appearance choices, so users never have to coordinate separate material and color controls. Options: Walnut, White Oak, Ash, Ebony Stain, White Lacquer. The underlying material/color pair remains an internal saved-file detail for backward compatibility.
 
-**Hardware Finish** — 3-up grid, same treatment: Brushed Brass, Matte Black, Brushed Steel.
+Hardware uses the same one-choice interaction with an appropriate palette: Brushed Brass, Matte Black, and Brushed Steel. Selecting hardware shows only hardware finishes; selecting panels shows only panel finishes.
 
-When a per-part override is active, a "Reset to piece default" link in `#4FA3FF` at 11px appears under the grid.
+When a per-part override is active, a "Use design finish" link in `#4FA3FF` at 11px appears under the grid. Multi-selections with different appearances show "Mixed finishes" until one finish is applied to the selection.
 
 ### 7. Cut List view
 
 **Purpose:** a shop-ready bill of materials derived from the live model.
 
-Replaces the viewport (`position:absolute; inset:0; background:#1E1B17; z-index:10; overflow-y:auto`). Content is centered at `max-width:900px`, `padding:36px 32px 60px`.
+Replaces the viewport (`position:absolute; inset:0; background:#1E1B17; z-index:10; overflow-y:auto`). Content is centered at `max-width:1100px`, `padding:36px 32px 60px`.
 
 Header: "Cut List" in Space Grotesk 22px/700, sub-line `Walnut Sideboard · {dims}` at 12.5px `rgba(238,233,226,.45)`, and an **Export CSV** button in the `#C68A46` primary treatment.
 
 Three summary cards (`flex:1`, `#211E1A`, `border-radius:8px`, `padding:12px 14px`): **Sheets Needed** (with the sub-caption "2440×1220mm ply"), **Edge Banding** (meters, one decimal), **Parts** (total pieces). Value type is IBM Plex Mono 18px.
 
-Table: `border:1px solid rgba(255,255,255,.08)`, `border-radius:8px`, `overflow:hidden`. Columns `2fr .5fr 1.1fr .7fr .7fr .7fr .9fr .9fr` with `column-gap:10px` — Part, Qty, Material, W, H, D, Edge Band, Grain. Header row on `#211E1A` at 10.5px/600 uppercase; body rows in IBM Plex Mono 12px `rgba(238,233,226,.8)` separated by `1px solid rgba(255,255,255,.06)`. The Part column reverts to the UI sans.
+Matching parts are combined into quantity rows. Sheet Goods and Purchased Hardware appear in separate tables. Columns are Part, Qty, Finish, W, H, D, Thickness, Edge Band, and Grain. Edge banding names the actual exposed faces instead of assuming every edge; grain follows the part's editable manufacturing direction.
 
-Hardware summary underneath: a flex row at `gap:24px`, IBM Plex Mono 12.5px — Hinges, Drawer Slides, Pulls, Levelers, each count in `#EEE9E2`.
+Sheet estimates are calculated separately for each finish and thickness, so an 8 mm back never shares a requirement with an 18 mm carcass panel. The sheet breakdown lists each requirement and the summary totals them.
 
 The CSV export must serialize exactly what the table shows, including custom panels and deletions.
 
@@ -376,15 +378,15 @@ Marquee hit-testing still projects each part's centre, per the spec, so a large
 panel whose centre falls outside the box is missed. Projecting the eight
 bounding-box corners instead is the obvious follow-up.
 
-## Post-launch pivot: the parametric sideboard is gone
+## Post-launch model: empty canvas with reusable assemblies
 
 The spec above — and the first several iterations of this app — modeled a
 **parametric sideboard**: fixed panels, doors and drawers computed from
 Width/Height/Depth/Leg Height/Panel Thickness, plus Leg Style, Handle Style
 and Base Style pickers that reskinned it. That whole system has since been
-removed. The app now starts from a genuinely **empty scene**; the library
-panels (Shelf, Side Panel, Back Panel, Divider) are the *only* way to add
-geometry, and every part in the document is one of them.
+removed. The app now starts from a genuinely **empty scene**. Geometry enters
+through individual library items (panels, fronts and hardware) or standard
+open-front cabinet assemblies.
 
 This was a deliberate, user-requested removal, not a regression — the leg/
 handle/base style pickers only made sense as controls *for* the parametric
@@ -392,25 +394,23 @@ piece, so once that piece was gone, showing them was actively confusing.
 Everything downstream of "there is always exactly one sideboard" came out
 with it:
 
-- `computeLayout`, `buildFurnitureModel`'s leg/handle mesh builders,
+- The old sideboard-specific `computeLayout`, leg/handle mesh builders,
   `deletedFixedIds`, `PartGroup`/tree grouping, and the Width/Height/Depth/Leg
-  Height/Panel Thickness sliders are all deleted rather than dormant —
-  nothing in `src/domain/` computes a carcass anymore.
-- **Hardware is gone entirely**, not just its counting bug. With no doors,
-  drawers, legs or handles, there's nothing hardware-class left — no Hardware
-  Finish swatches, no hinges/slides/pulls/levelers row in the Cut List.
-  `bodyMaterialId` became `defaultFinishId`: the finish newly inserted panels
-  start with, not "the piece's" finish, since there is no piece.
-- The Assembly tree is a flat list — the five-group hierarchy
-  (Carcass/Base/Fronts/Hardware/Custom Parts) doesn't apply when every part is
-  the same kind of thing.
-- Saved documents bumped from schema 1 to schema 2. A schema-1 save (sideboard
+  Height/Panel Thickness sliders for the old always-present piece are deleted
+  rather than dormant. `buildCabinetLayout` now computes only cabinets the
+  designer deliberately inserts.
+- Hardware is an explicit purchased-part category. Knobs have diameter and
+  projection controls, metal finishes, rounded geometry, and their own Cut
+  List section rather than pretending to be sheet goods.
+- The Assembly tree is flat for loose parts and hierarchical for saved groups
+  and generated cabinets.
+- Saved documents are currently schema 4. Schema-3 panel designs migrate to
+  world-aligned dimensions and explicit manufacturing metadata. A schema-1 save (sideboard
   dims, leg/handle/base style, deleted-fixed-ids) has no sensible mapping onto
-  a panels-only scene — what would you do with its doors and legs? — so
+  an empty-canvas design — what would you do with its generated doors and legs? — so
   `persistence.ts` treats it as unmigratable and falls back to a fresh empty
   document rather than guessing.
 
-If a future request wants doors, drawers or hardware back, they'd need to
-re-enter as their own library panel presets (the way Shelf/Side Panel/Back
-Panel/Divider work today), not as a revived parametric carcass — that's the
-shape the rest of the app is now built around.
+New doors, drawers, legs, or hardware should continue to enter as explicit
+library items or generated assembly members rather than reviving the old
+always-present sideboard.

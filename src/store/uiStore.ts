@@ -1,6 +1,7 @@
 import { create } from 'zustand';
 import { subscribeWithSelector } from 'zustand/middleware';
 import type { DisplayUnit } from '@/domain/units';
+import { DEFAULT_GRID_SIZE_M, type GridSizeM } from '@/domain/workspace';
 
 export type ViewMode = 'model' | 'cutlist' | 'render';
 export type GizmoMode = 'select' | 'pan' | 'translate' | 'rotate' | 'scale';
@@ -29,6 +30,8 @@ export type UiStore = {
   lastSavedAt: number | null;
   /** A display preference, not document data — not undoable, not versioned. */
   displayUnit: DisplayUnit;
+  /** Viewport grid extent in metres. A view setting, like displayUnit — not part of the design. */
+  gridSizeM: GridSizeM;
 
   setSelection: (ids: string[]) => void;
   toggleSelection: (id: string) => void;
@@ -47,6 +50,7 @@ export type UiStore = {
   dismissToast: (id: string) => void;
   setSaveStatus: (status: SaveStatus, at?: number) => void;
   setDisplayUnit: (unit: DisplayUnit) => void;
+  setGridSize: (gridSizeM: GridSizeM) => void;
 };
 
 let toastSeq = 0;
@@ -68,6 +72,7 @@ export const useUiStore = create<UiStore>()(
     saveStatus: 'idle',
     lastSavedAt: null,
     displayUnit: 'mm',
+    gridSizeM: DEFAULT_GRID_SIZE_M,
 
     setSelection: (ids) => set({ selectedPartIds: ids, rightTab: 'properties' }),
     toggleSelection: (id) =>
@@ -102,6 +107,7 @@ export const useUiStore = create<UiStore>()(
     setSaveStatus: (saveStatus, at) =>
       set((s) => ({ saveStatus, lastSavedAt: at ?? s.lastSavedAt })),
     setDisplayUnit: (displayUnit) => set({ displayUnit }),
+    setGridSize: (gridSizeM) => set({ gridSizeM }),
   })),
 );
 

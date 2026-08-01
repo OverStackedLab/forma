@@ -1,9 +1,20 @@
 import { DISPLAY_UNITS, type DisplayUnit } from '@/domain/units';
-import { CUSTOM_PANEL_LIMITS, isColorId, isMaterialId } from '@/domain/catalog';
+import { isGridSizeM, type GridSizeM } from '@/domain/workspace';
+import { buildCabinetLayout } from '@/domain/cabinets';
+import {
+  CABINET_PRESETS,
+  CUSTOM_PANEL_LIMITS,
+  isColorId,
+  isHardwareFinishId,
+  isMaterialId,
+  PANEL_PRESETS,
+} from '@/domain/catalog';
 import type {
+  CabinetConfig,
   CustomPart,
   DimensionAxis,
   DocumentSnapshot,
+  EdgeBandSide,
   FormaDocument,
   Group,
   PartOverride,
@@ -16,15 +27,15 @@ import { useUiStore } from './uiStore';
 const STORAGE_KEY = 'forma:doc';
 /** A display preference, not document data — its own key, no schema versioning. */
 const DISPLAY_UNIT_KEY = 'forma:displayUnit';
+/** Likewise a view setting: which grid the viewport draws, not part of the design. */
+const GRID_SIZE_KEY = 'forma:gridSize';
 /**
- * Schema 3 splits the single "finish" (defaultFinishId / an override's
- * `body`) into an independent material and color, and adds a `shape` to each
- * custom part. Schema 2 was the empty-scene / library-panels-only shape with
- * one combined finish; schema 1 was the parametric-sideboard shape. Neither
- * maps sensibly onto the new fields, so only the current schema is accepted —
- * older saves fall back to a fresh empty document.
+ * Schema 4 gives parts explicit manufacturing metadata and world-aligned
+ * dimensions. Schema 3 saves are migrated, including their rotated side
+ * panels and Y-axis cylinders. Older parametric formats still have no safe
+ * mapping onto the empty-canvas designer.
  */
-const SCHEMA_VERSION = 3;
+const SCHEMA_VERSION = 4;
 const DEBOUNCE_MS = 600;
 
 type Envelope = { schemaVersion: number; doc: FormaDocument };
@@ -37,6 +48,8 @@ function migrate(raw: unknown): FormaDocument | null {
   switch (envelope.schemaVersion) {
     case SCHEMA_VERSION:
       return normalize(envelope.doc);
+    case 3:
+      return normalize(envelope.doc, true);
     default:
       // Older sideboard-shaped saves, or a version we no longer understand.
       return null;
@@ -57,6 +70,21 @@ function validTuple(value: unknown, length: number): number[] | null {
     : null;
 }
 
+const EDGE_BAND_SIDES: readonly EdgeBandSide[] = [
+  'w-min', 'w-max', 'h-min', 'h-max', 'd-min', 'd-max',
+];
+
+function inferredPreset(label: string) {
+  const normalized = label.toLowerCase();
+  if (normalized.includes('knob')) return PANEL_PRESETS.find((preset) => preset.id === 'knob');
+  if (normalized.includes('door')) return PANEL_PRESETS.find((preset) => preset.id === 'door');
+  if (normalized.includes('back')) return PANEL_PRESETS.find((preset) => preset.id === 'back');
+  if (normalized.includes('divider')) return PANEL_PRESETS.find((preset) => preset.id === 'divider');
+  if (normalized.includes('side')) return PANEL_PRESETS.find((preset) => preset.id === 'flat');
+  if (normalized.includes('shelf')) return PANEL_PRESETS.find((preset) => preset.id === 'shelf');
+  return undefined;
+}
+
 function normalizePart(value: unknown): CustomPart | null {
   const part = asRecord(value);
   if (!part || typeof part.id !== 'string' || !part.id || typeof part.label !== 'string') return null;
@@ -73,15 +101,78 @@ function normalizePart(value: unknown): CustomPart | null {
   if (w === null || h === null || d === null) return null;
   const thicknessAxis = part.thicknessAxis;
   const validAxis = thicknessAxis === 'w' || thicknessAxis === 'h' || thicknessAxis === 'd';
+  const label = part.label.trim() || 'Untitled Part';
+  const explicitPreset =
+    typeof part.presetId === 'string'
+      ? PANEL_PRESETS.find((preset) => preset.id === part.presetId)
+      : undefined;
+  const preset = explicitPreset ?? inferredPreset(label);
+  const category =
+    part.category === 'panel' || part.category === 'front' || part.category === 'hardware'
+      ? part.category
+      : preset?.category ?? (part.shape === 'cylinder' ? 'hardware' : 'panel');
+  const grainAxis =
+    part.grainAxis === 'w' || part.grainAxis === 'h' || part.grainAxis === 'd'
+      ? part.grainAxis
+      : category === 'hardware'
+        ? null
+        : preset?.grainAxis ?? 'w';
+  const edgeBanding = Array.isArray(part.edgeBanding)
+    ? [...new Set(part.edgeBanding.filter((edge): edge is EdgeBandSide =>
+        typeof edge === 'string' && (EDGE_BAND_SIDES as readonly string[]).includes(edge),
+      ))]
+    : [...(preset?.edgeBanding ?? [])];
   return {
     id: part.id,
-    label: part.label.trim() || 'Untitled Part',
+    label,
+    category,
+    presetId: explicitPreset?.id,
+    bomLabel: typeof part.bomLabel === 'string' && part.bomLabel.trim() ? part.bomLabel : undefined,
     w,
     h,
     d,
     shape: part.shape,
     thicknessAxis: part.shape === 'cylinder' ? null : validAxis ? thicknessAxis as DimensionAxis : undefined,
+    grainAxis,
+    edgeBanding,
   };
+}
+
+function multiplyQuaternion(
+  a: Transform['quaternion'],
+  b: Transform['quaternion'],
+): Transform['quaternion'] {
+  const [ax, ay, az, aw] = a;
+  const [bx, by, bz, bw] = b;
+  return [
+    aw * bx + ax * bw + ay * bz - az * by,
+    aw * by - ax * bz + ay * bw + az * bx,
+    aw * bz + ax * by - ay * bx + az * bw,
+    aw * bw - ax * bx - ay * by - az * bz,
+  ];
+}
+
+/** Converts schema-3 local-axis parts to the world-axis convention. */
+function normalizeLegacyAxes(part: CustomPart, transform: Transform): void {
+  if (part.shape === 'cylinder') {
+    [part.h, part.d] = [part.d, part.h];
+    [transform.scale[1], transform.scale[2]] = [transform.scale[2], transform.scale[1]];
+    transform.quaternion = multiplyQuaternion(
+      transform.quaternion,
+      [-Math.SQRT1_2, 0, 0, Math.SQRT1_2],
+    );
+    return;
+  }
+  if (!/(side|divider)/i.test(part.label)) return;
+  [part.w, part.d] = [part.d, part.w];
+  [transform.scale[0], transform.scale[2]] = [transform.scale[2], transform.scale[0]];
+  part.thicknessAxis = 'w';
+  part.grainAxis = 'h';
+  part.edgeBanding = ['d-max'];
+  transform.quaternion = multiplyQuaternion(
+    transform.quaternion,
+    [0, -Math.SQRT1_2, 0, Math.SQRT1_2],
+  );
 }
 
 function normalizeTransform(value: unknown): Transform | null {
@@ -100,7 +191,7 @@ function normalizeTransform(value: unknown): Transform | null {
   return { position, quaternion, scale };
 }
 
-function normalizeSnapshot(value: unknown): DocumentSnapshot {
+function normalizeSnapshot(value: unknown, legacyAxes = false): DocumentSnapshot {
   const base = createDefaultDocument();
   const doc = asRecord(value) ?? {};
   const seenIds = new Set<string>();
@@ -121,6 +212,7 @@ function normalizeSnapshot(value: unknown): DocumentSnapshot {
       quaternion: [0, 0, 0, 1],
       scale: [1, 1, 1],
     };
+    if (legacyAxes) normalizeLegacyAxes(part, transforms[part.id]!);
   }
 
   const overrides: DocumentSnapshot['overrides'] = {};
@@ -145,7 +237,63 @@ function normalizeSnapshot(value: unknown): DocumentSnapshot {
       : [];
     if (partIds.length < 2) continue;
     partIds.forEach((id) => occupied.add(id));
-    groups.push({ id: raw.id, label: raw.label.trim() || 'Group', partIds });
+    const label = raw.label.trim() || 'Group';
+    const rawCabinet = asRecord(raw.cabinet);
+    const memberLabels = partIds
+      .map((id) => customParts.find((part) => part.id === id)?.label ?? '')
+      .join(' ');
+    const inferredCabinet = CABINET_PRESETS.find(
+      (preset) => preset.label === label || memberLabels.includes(`${preset.label} Left Side`),
+    );
+    let cabinet: CabinetConfig | undefined;
+    const dimensionsValid = rawCabinet &&
+      typeof rawCabinet.width === 'number' && Number.isFinite(rawCabinet.width) &&
+      typeof rawCabinet.height === 'number' && Number.isFinite(rawCabinet.height) &&
+      typeof rawCabinet.depth === 'number' && Number.isFinite(rawCabinet.depth) &&
+      typeof rawCabinet.shelfCount === 'number' && Number.isInteger(rawCabinet.shelfCount);
+    if (dimensionsValid) {
+      cabinet = {
+        presetId:
+          typeof rawCabinet.presetId === 'string' &&
+          CABINET_PRESETS.some((preset) => preset.id === rawCabinet.presetId)
+            ? rawCabinet.presetId as CabinetConfig['presetId']
+            : undefined,
+        width: Math.min(3000, Math.max(100, rawCabinet.width as number)),
+        height: Math.min(3000, Math.max(100, rawCabinet.height as number)),
+        depth: Math.min(1500, Math.max(100, rawCabinet.depth as number)),
+        shelfCount: Math.min(8, Math.max(0, rawCabinet.shelfCount as number)),
+      };
+    } else if (inferredCabinet && partIds.length === 5 + inferredCabinet.shelfCount) {
+      cabinet = {
+        presetId: inferredCabinet.id,
+        width: inferredCabinet.width,
+        height: inferredCabinet.height,
+        depth: inferredCabinet.depth,
+        shelfCount: inferredCabinet.shelfCount,
+      };
+    }
+    if (cabinet) {
+      const layout = buildCabinetLayout({
+        id: cabinet.presetId ?? CABINET_PRESETS[0]!.id,
+        label,
+        width: cabinet.width,
+        height: cabinet.height,
+        depth: cabinet.depth,
+        shelfCount: cabinet.shelfCount,
+        icon: 'cabinet',
+      });
+      partIds.forEach((id, index) => {
+        const stored = customParts.find((part) => part.id === id);
+        const generated = layout[index];
+        if (!stored || !generated) return;
+        stored.category = generated.category;
+        stored.bomLabel = generated.bomLabel;
+        stored.thicknessAxis = generated.thicknessAxis;
+        stored.grainAxis = generated.grainAxis;
+        stored.edgeBanding = [...generated.edgeBanding];
+      });
+    }
+    groups.push({ id: raw.id, label, partIds, cabinet });
   }
 
   return {
@@ -157,6 +305,10 @@ function normalizeSnapshot(value: unknown): DocumentSnapshot {
       typeof doc.defaultColorId === 'string' && isColorId(doc.defaultColorId)
         ? doc.defaultColorId
         : base.defaultColorId,
+    defaultHardwareFinishId:
+      typeof doc.defaultHardwareFinishId === 'string' && isHardwareFinishId(doc.defaultHardwareFinishId)
+        ? doc.defaultHardwareFinishId
+        : base.defaultHardwareFinishId,
     overrides,
     customParts,
     hiddenIds: Array.isArray(doc.hiddenIds)
@@ -168,10 +320,10 @@ function normalizeSnapshot(value: unknown): DocumentSnapshot {
 }
 
 /** Guards against a hand-edited or partially-written payload. */
-function normalize(value: Partial<FormaDocument>): FormaDocument {
+function normalize(value: Partial<FormaDocument>, legacyAxes = false): FormaDocument {
   const base = createDefaultDocument();
   const raw = asRecord(value) ?? {};
-  const snapshot = normalizeSnapshot(raw);
+  const snapshot = normalizeSnapshot(raw, legacyAxes);
   const versions: SavedVersion[] = [];
   for (const value of Array.isArray(raw.versions) ? raw.versions : []) {
     const version = asRecord(value);
@@ -186,7 +338,7 @@ function normalize(value: Partial<FormaDocument>): FormaDocument {
       id: version.id,
       label: version.label,
       createdAt: version.createdAt,
-      doc: normalizeSnapshot(version.doc),
+      doc: normalizeSnapshot(version.doc, legacyAxes),
     });
   }
   const currentVersionId =
@@ -256,6 +408,7 @@ function stripActions(state: FormaDocument & Record<string, unknown>): FormaDocu
   return {
     defaultMaterialId: state.defaultMaterialId,
     defaultColorId: state.defaultColorId,
+    defaultHardwareFinishId: state.defaultHardwareFinishId,
     overrides: state.overrides,
     customParts: state.customParts,
     hiddenIds: state.hiddenIds,
@@ -286,6 +439,34 @@ export function startDisplayUnitSync(): () => void {
       } catch {
         // Quota exceeded or private-mode restrictions — the preference just
         // won't survive a reload; nothing else depends on it succeeding.
+      }
+    },
+  );
+}
+
+/** Null rather than the default for an unknown value, so App can skip the setter entirely. */
+export function loadGridSize(): GridSizeM | null {
+  try {
+    const raw = localStorage.getItem(GRID_SIZE_KEY);
+    if (raw === null) return null;
+    const value = Number(raw);
+    // A size retired from GRID_SIZES_M falls back to the default, not to itself.
+    return isGridSizeM(value) ? value : null;
+  } catch {
+    return null;
+  }
+}
+
+/** Saves immediately — a deliberate, rare change, like the display unit. */
+export function startGridSizeSync(): () => void {
+  return useUiStore.subscribe(
+    (s) => s.gridSizeM,
+    (size) => {
+      try {
+        localStorage.setItem(GRID_SIZE_KEY, String(size));
+      } catch {
+        // Same rationale as the display-unit sync: the preference just won't
+        // survive a reload, and nothing else depends on it succeeding.
       }
     },
   );

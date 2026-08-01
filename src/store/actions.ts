@@ -1,4 +1,12 @@
-import { CUSTOM_PANEL_LIMITS, PANEL_PRESETS } from '@/domain/catalog';
+import { buildCabinetLayout } from '@/domain/cabinets';
+import {
+  CABINET_DIM_LIMITS,
+  CABINET_PRESETS,
+  CUSTOM_PANEL_LIMITS,
+  findFinish,
+  isHardwareFinishId,
+  PANEL_PRESETS,
+} from '@/domain/catalog';
 import { groupMatching, livePartIds } from '@/domain/parts';
 import { eulerDegreesToQuaternion, quaternionToEulerDegrees } from '@/domain/rotation';
 import {
@@ -8,11 +16,13 @@ import {
   type Vector3,
 } from '@/domain/spatial';
 import type {
-  ColorId,
+  AppearanceFinishId,
+  CabinetConfig,
   CustomPart,
+  DimensionAxis,
+  EdgeBandSide,
   FormaDocument,
   Group,
-  MaterialId,
   SavedVersion,
   Transform,
 } from '@/domain/types';
@@ -40,36 +50,39 @@ export function liveIds(): string[] {
   return livePartIds(doc().customParts);
 }
 
-// ─── Material & Color ────────────────────────────────────────────────────────
-
-/** Applies to the current selection as a per-part override, or the document default with nothing selected. */
-export function applyMaterial(id: MaterialId): void {
-  const selected = ui().selectedPartIds;
-  commit(() => {
-    if (selected.length) {
-      useDocumentStore.setState((s) => {
-        const overrides = { ...s.overrides };
-        for (const partId of selected) overrides[partId] = { ...overrides[partId], material: id };
-        return { overrides };
-      });
-    } else {
-      useDocumentStore.setState({ defaultMaterialId: id });
-    }
+function invalidatePartiallyEditedCabinets(groups: readonly Group[], changedIds: readonly string[]): Group[] {
+  const changed = new Set(changedIds);
+  return groups.map((group) => {
+    if (!group.cabinet || !group.partIds.some((id) => changed.has(id))) return group;
+    return group.partIds.every((id) => changed.has(id))
+      ? group
+      : { ...group, cabinet: undefined };
   });
 }
 
-/** Applies to the current selection as a per-part override, or the document default with nothing selected. */
-export function applyColor(id: ColorId): void {
+// ─── Finish ──────────────────────────────────────────────────────────────────
+
+/** Applies one complete finish to the selection, or to the whole-design default. */
+export function applyFinish(id: AppearanceFinishId): void {
+  const finish = findFinish(id);
   const selected = ui().selectedPartIds;
   commit(() => {
     if (selected.length) {
       useDocumentStore.setState((s) => {
         const overrides = { ...s.overrides };
-        for (const partId of selected) overrides[partId] = { ...overrides[partId], color: id };
+        for (const partId of selected) {
+          overrides[partId] = { material: finish.materialId, color: finish.colorId };
+        }
         return { overrides };
       });
     } else {
-      useDocumentStore.setState({ defaultColorId: id });
+      if (isHardwareFinishId(id)) useDocumentStore.setState({ defaultHardwareFinishId: id });
+      else {
+        useDocumentStore.setState({
+          defaultMaterialId: finish.materialId,
+          defaultColorId: finish.colorId,
+        });
+      }
     }
   });
 }
@@ -83,7 +96,7 @@ export function resetOverrides(partIds: readonly string[]): void {
       return { overrides };
     });
   });
-  ui().showToast('Reset to default');
+  ui().showToast('Using design finish');
 }
 
 // ─── Panels ──────────────────────────────────────────────────────────────────
@@ -128,7 +141,11 @@ export function addCustomPanel(presetId: string, placement?: DropPlacement): voi
           h: preset.h,
           d: preset.d,
           shape: preset.shape,
+          category: preset.category,
+          presetId: preset.id,
           thicknessAxis: preset.thicknessAxis,
+          grainAxis: preset.grainAxis,
+          edgeBanding: [...preset.edgeBanding],
         },
       ],
       transforms: {
@@ -150,6 +167,84 @@ export function addCustomPanel(presetId: string, placement?: DropPlacement): voi
   u.showToast(`${preset.label} added to scene`);
 }
 
+/** Adds a complete open-front cabinet as one named, selectable group. */
+export function addCabinetPreset(presetId: string, placement?: DropPlacement): void {
+  const preset = CABINET_PRESETS.find((candidate) => candidate.id === presetId) ?? CABINET_PRESETS[0]!;
+  const state = doc();
+  const layout = buildCabinetLayout(preset);
+  const supportMm = placement
+    ? Math.abs(placement.normal.x) * preset.width / 2 +
+      Math.abs(placement.normal.y) * preset.height / 2 +
+      Math.abs(placement.normal.z) * preset.depth / 2
+    : 0;
+  const centre: [number, number, number] = placement
+    ? [
+        placement.point.x + placement.normal.x * supportMm / 1000,
+        placement.point.y + placement.normal.y * supportMm / 1000,
+        placement.point.z + placement.normal.z * supportMm / 1000,
+      ]
+    : [nextInsertionX(state, preset.width / 2), preset.height / 2000, 0];
+  const origin: [number, number, number] = [centre[0], centre[1] - preset.height / 2000, centre[2]];
+  const ids = layout.map(() => nextCustomId());
+  const newParts: CustomPart[] = layout.map((item, index) => ({
+    id: ids[index]!,
+    label: item.label,
+    w: item.w,
+    h: item.h,
+    d: item.d,
+    shape: item.shape,
+    category: item.category,
+    bomLabel: item.bomLabel,
+    thicknessAxis: item.thicknessAxis,
+    grainAxis: item.grainAxis,
+    edgeBanding: [...item.edgeBanding],
+  }));
+  const group: Group = {
+    id: nextGroupId(),
+    label: preset.label,
+    partIds: ids,
+    cabinet: {
+      presetId: preset.id,
+      width: preset.width,
+      height: preset.height,
+      depth: preset.depth,
+      shelfCount: preset.shelfCount,
+    },
+  };
+
+  commit(() => {
+    useDocumentStore.setState((previous) => {
+      const transforms = { ...previous.transforms };
+      layout.forEach((item, index) => {
+        transforms[ids[index]!] = {
+          position: [
+            origin[0] + item.positionMm[0] / 1000,
+            origin[1] + item.positionMm[1] / 1000,
+            origin[2] + item.positionMm[2] / 1000,
+          ],
+          quaternion: [...item.quaternion],
+          scale: [1, 1, 1],
+        };
+      });
+      return {
+        customParts: [...previous.customParts, ...newParts],
+        transforms,
+        groups: [...previous.groups, group],
+      };
+    });
+  });
+
+  const stateUi = ui();
+  stateUi.setSelection(ids);
+  useUiStore.setState((previous) => ({
+    gizmoMode:
+      previous.gizmoMode === 'select' || previous.gizmoMode === 'pan'
+        ? 'translate'
+        : previous.gizmoMode,
+  }));
+  stateUi.showToast(`${preset.label} cabinet added`);
+}
+
 /** Renames a part. Blank input is ignored, keeping the previous name rather than going empty. */
 export function renamePart(id: string, label: string): void {
   const trimmed = label.trim();
@@ -158,7 +253,10 @@ export function renamePart(id: string, label: string): void {
   if (!current || current.label === trimmed) return;
   commit(() => {
     useDocumentStore.setState((s) => ({
-      customParts: s.customParts.map((p) => (p.id === id ? { ...p, label: trimmed } : p)),
+      customParts: s.customParts.map((p) =>
+        p.id === id ? { ...p, label: trimmed, bomLabel: undefined } : p,
+      ),
+      groups: invalidatePartiallyEditedCabinets(s.groups, [id]),
     }));
   });
 }
@@ -200,8 +298,60 @@ export function setCustomPartDim(id: string, key: 'w' | 'h' | 'd', value: number
       return {
         customParts: s.customParts.map((p) => (p.id === id ? { ...p, [key]: clamped } : p)),
         transforms,
+        groups: invalidatePartiallyEditedCabinets(s.groups, [id]),
       };
     });
+  });
+}
+
+/** Keeps round hardware circular while exposing one Diameter control. */
+export function setHardwareDiameter(id: string, value: number): void {
+  if (!Number.isFinite(value) || value <= 0) return;
+  const limits = CUSTOM_PANEL_LIMITS.w;
+  const clamped = Math.min(limits.max, Math.max(limits.min, value));
+  commit(() => {
+    useDocumentStore.setState((state) => {
+      const transform = state.transforms[id];
+      return {
+        customParts: state.customParts.map((part) =>
+          part.id === id ? { ...part, w: clamped, h: clamped } : part,
+        ),
+        transforms: transform
+          ? {
+              ...state.transforms,
+              [id]: { ...transform, scale: [1, 1, transform.scale[2]] },
+            }
+          : state.transforms,
+      };
+    });
+  });
+}
+
+export function setPartGrainAxis(id: string, axis: DimensionAxis): void {
+  const part = doc().customParts.find((candidate) => candidate.id === id);
+  if (!part || part.category === 'hardware' || part.thicknessAxis === axis) return;
+  commit(() => {
+    useDocumentStore.setState((state) => ({
+      customParts: state.customParts.map((candidate) =>
+        candidate.id === id ? { ...candidate, grainAxis: axis } : candidate,
+      ),
+    }));
+  });
+}
+
+export function togglePartEdgeBand(id: string, edge: EdgeBandSide): void {
+  const part = doc().customParts.find((candidate) => candidate.id === id);
+  if (!part || part.category === 'hardware' || part.thicknessAxis === edge[0]) return;
+  commit(() => {
+    useDocumentStore.setState((state) => ({
+      customParts: state.customParts.map((candidate) => {
+        if (candidate.id !== id) return candidate;
+        const edgeBanding = candidate.edgeBanding.includes(edge)
+          ? candidate.edgeBanding.filter((candidateEdge) => candidateEdge !== edge)
+          : [...candidate.edgeBanding, edge];
+        return { ...candidate, edgeBanding };
+      }),
+    }));
   });
 }
 
@@ -224,7 +374,12 @@ export function duplicateSelected(): void {
       h: src.h,
       d: src.d,
       shape: src.shape,
+      category: src.category,
+      presetId: src.presetId,
+      bomLabel: src.bomLabel,
       thicknessAxis: src.thicknessAxis,
+      grainAxis: src.grainAxis,
+      edgeBanding: [...src.edgeBanding],
     });
     const t = s.transforms[src.id];
     // Clones are offset 80 mm in X and Z, inheriting orientation and scale.
@@ -267,7 +422,17 @@ export function deleteParts(ids: readonly string[]): void {
       }
       // A group with one or zero surviving members isn't a group anymore.
       const groups = prev.groups
-        .map((g) => ({ ...g, partIds: g.partIds.filter((id) => !ids.includes(id)) }))
+        .map((g) => {
+          const partIds = g.partIds.filter((id) => !ids.includes(id));
+          return {
+            ...g,
+            partIds,
+            // Once a carcass member is deliberately removed it becomes a
+            // regular editable group; parametric rebuilding would otherwise
+            // reassign the surviving ids to the wrong generated roles.
+            cabinet: partIds.length === g.partIds.length ? g.cabinet : undefined,
+          };
+        })
         .filter((g) => g.partIds.length > 1);
       return {
         customParts: prev.customParts.filter((p) => !ids.includes(p.id)),
@@ -320,9 +485,22 @@ export function renameGroup(groupId: string, label: string): void {
   if (!trimmed) return;
   const current = doc().groups.find((g) => g.id === groupId);
   if (!current || current.label === trimmed) return;
+  const cabinetLayout = current.cabinet
+    ? buildCabinetLayout(cabinetPreset({ ...current, label: trimmed }, current.cabinet))
+    : null;
+  const memberIndex = new Map(current.partIds.map((id, index) => [id, index]));
   commit(() => {
     useDocumentStore.setState((s) => ({
       groups: s.groups.map((g) => (g.id === groupId ? { ...g, label: trimmed } : g)),
+      customParts: cabinetLayout
+        ? s.customParts.map((part) => {
+            const index = memberIndex.get(part.id);
+            const generated = index === undefined ? undefined : cabinetLayout[index];
+            return generated
+              ? { ...part, label: generated.label, bomLabel: generated.bomLabel }
+              : part;
+          })
+        : s.customParts,
     }));
   });
 }
@@ -388,13 +566,164 @@ export function commitTransforms(next: Record<string, Transform>): void {
     }),
   );
   commit(() => {
-    useDocumentStore.setState((s) => ({ transforms: { ...s.transforms, ...sanitized } }));
+    useDocumentStore.setState((s) => ({
+      transforms: { ...s.transforms, ...sanitized },
+      groups: invalidatePartiallyEditedCabinets(s.groups, Object.keys(sanitized)),
+    }));
+  });
+}
+
+function cabinetPreset(group: Group, config: CabinetConfig) {
+  return {
+    id: config.presetId ?? CABINET_PRESETS[0]!.id,
+    label: group.label,
+    width: config.width,
+    height: config.height,
+    depth: config.depth,
+    shelfCount: config.shelfCount,
+    icon: 'cabinet',
+  } as const;
+}
+
+/** Finds the cabinet's bottom-centre origin and shared assembly orientation. */
+function cabinetPlacement(group: Group, config: CabinetConfig): {
+  origin: [number, number, number];
+  quaternion: Transform['quaternion'];
+} {
+  const layout = buildCabinetLayout(cabinetPreset(group, config));
+  const anchor = doc().transforms[group.partIds[0]!] ?? IDENTITY_TRANSFORM;
+  const local = layout[0]?.positionMm ?? [0, 0, 0];
+  const offset = rotateVectorByQuaternion(
+    {
+      x: local[0] * anchor.scale[0] / 1000,
+      y: local[1] * anchor.scale[1] / 1000,
+      z: local[2] * anchor.scale[2] / 1000,
+    },
+    anchor.quaternion,
+  );
+  return {
+    origin: [
+      anchor.position[0] - offset.x,
+      anchor.position[1] - offset.y,
+      anchor.position[2] - offset.z,
+    ],
+    quaternion: [...anchor.quaternion],
+  };
+}
+
+/** Rebuilds a generated cabinet while keeping its bottom-centre placement. */
+export function setCabinetDim(
+  groupId: string,
+  key: 'width' | 'height' | 'depth',
+  value: number,
+): void {
+  if (!Number.isFinite(value)) return;
+  const state = doc();
+  const group = state.groups.find((candidate) => candidate.id === groupId);
+  if (!group?.cabinet) return;
+  const limits = CABINET_DIM_LIMITS[key];
+  const nextConfig: CabinetConfig = {
+    ...group.cabinet,
+    [key]: Math.min(limits.max, Math.max(limits.min, value)),
+  };
+  const currentPreset = CABINET_PRESETS.find((preset) => preset.id === group.cabinet?.presetId);
+  const matchingPreset = CABINET_PRESETS.find(
+    (preset) =>
+      preset.width === nextConfig.width &&
+      preset.height === nextConfig.height &&
+      preset.depth === nextConfig.depth &&
+      preset.shelfCount === nextConfig.shelfCount,
+  );
+  nextConfig.presetId = matchingPreset?.id;
+  const generatedLabel = currentPreset?.label === group.label;
+  const nextLabel = generatedLabel
+    ? matchingPreset?.label ?? `${currentPreset!.label.split(' ')[0]} ${nextConfig.width}×${nextConfig.height}×${nextConfig.depth}`
+    : group.label;
+  const nextGroup = { ...group, label: nextLabel };
+  const placement = cabinetPlacement(group, group.cabinet);
+  const layout = buildCabinetLayout(cabinetPreset(nextGroup, nextConfig));
+  const indexById = new Map(group.partIds.map((id, index) => [id, index]));
+
+  commit(() => {
+    useDocumentStore.setState((previous) => {
+      const transforms = { ...previous.transforms };
+      for (const [index, id] of group.partIds.entries()) {
+        const item = layout[index];
+        if (!item) continue;
+        const offset = rotateVectorByQuaternion(
+          {
+            x: item.positionMm[0] / 1000,
+            y: item.positionMm[1] / 1000,
+            z: item.positionMm[2] / 1000,
+          },
+          placement.quaternion,
+        );
+        transforms[id] = {
+          position: [
+            placement.origin[0] + offset.x,
+            placement.origin[1] + offset.y,
+            placement.origin[2] + offset.z,
+          ],
+          quaternion: [...placement.quaternion],
+          scale: [1, 1, 1],
+        };
+      }
+      return {
+        customParts: previous.customParts.map((part) => {
+          const index = indexById.get(part.id);
+          const item = index === undefined ? undefined : layout[index];
+          if (!item) return part;
+          return {
+            ...part,
+            label: item.label,
+            bomLabel: item.bomLabel,
+            w: item.w,
+            h: item.h,
+            d: item.d,
+            category: item.category,
+            thicknessAxis: item.thicknessAxis,
+          };
+        }),
+        transforms,
+        groups: previous.groups.map((candidate) =>
+          candidate.id === groupId
+            ? { ...candidate, label: nextLabel, cabinet: nextConfig }
+            : candidate,
+        ),
+      };
+    });
   });
 }
 
 /** Placement is kept; only orientation and scale reset. */
 export function resetTransforms(ids: readonly string[]): void {
   if (!ids.length) return;
+  const cabinetGroup = groupMatching(doc().groups, ids);
+  if (cabinetGroup?.cabinet) {
+    const placement = cabinetPlacement(cabinetGroup, cabinetGroup.cabinet);
+    const layout = buildCabinetLayout(cabinetPreset(cabinetGroup, cabinetGroup.cabinet));
+    commit(() => {
+      useDocumentStore.setState((previous) => {
+        const transforms = { ...previous.transforms };
+        cabinetGroup.partIds.forEach((id, index) => {
+          const item = layout[index];
+          if (!item) return;
+          transforms[id] = {
+            position: [
+              placement.origin[0] + item.positionMm[0] / 1000,
+              placement.origin[1] + item.positionMm[1] / 1000,
+              placement.origin[2] + item.positionMm[2] / 1000,
+            ],
+            quaternion: [0, 0, 0, 1],
+            scale: [1, 1, 1],
+          };
+        });
+        return { transforms };
+      });
+    });
+    ui().showToast('Cabinet transform reset');
+    return;
+  }
   commit(() => {
     useDocumentStore.setState((prev) => {
       const transforms = { ...prev.transforms };
@@ -402,7 +731,10 @@ export function resetTransforms(ids: readonly string[]): void {
         const t = transforms[id];
         if (t) transforms[id] = { ...t, quaternion: [0, 0, 0, 1], scale: [1, 1, 1] };
       }
-      return { transforms };
+      return {
+        transforms,
+        groups: invalidatePartiallyEditedCabinets(prev.groups, ids),
+      };
     });
   });
   ui().showToast('Transform reset');
@@ -423,6 +755,7 @@ export function setPositionAxis(id: string, axis: 'x' | 'y' | 'z', millimetres: 
   commit(() => {
     useDocumentStore.setState((s) => ({
       transforms: { ...s.transforms, [id]: { ...current, position } },
+      groups: invalidatePartiallyEditedCabinets(s.groups, [id]),
     }));
   });
 }
@@ -441,6 +774,7 @@ export function setRotationAxis(id: string, axis: 'x' | 'y' | 'z', degrees: numb
   commit(() => {
     useDocumentStore.setState((s) => ({
       transforms: { ...s.transforms, [id]: { ...current, quaternion } },
+      groups: invalidatePartiallyEditedCabinets(s.groups, [id]),
     }));
   });
 }

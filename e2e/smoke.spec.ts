@@ -53,9 +53,28 @@ test('inserting a library panel adds it to the tree, count and cut list together
   await expect(page.getByText('1 selected')).toBeVisible();
 
   await page.getByRole('tab', { name: 'Cut List' }).click();
-  await expect(page.getByText('Nothing to cut yet.')).toHaveCount(0);
+  await expect(page.getByText('Nothing to manufacture yet.')).toHaveCount(0);
   await expect(page.getByText('Sheets Needed')).toBeVisible();
   await expect(page.getByText('total pieces')).toBeVisible();
+});
+
+test('inserting a prebuilt cabinet creates one grouped open carcass and six cut-list parts', async ({
+  page,
+}) => {
+  await page.goto('/');
+  await page.getByRole('tab', { name: 'Library' }).click();
+  await page.getByRole('button', { name: /Base 600/ }).click();
+  await expect(page.getByText('Base 600 cabinet added')).toBeVisible();
+
+  await page.getByRole('tab', { name: 'Assembly' }).click();
+  await expect(page.getByText('6 selected')).toBeVisible();
+  await expect(page.getByRole('treeitem', { name: /Base 600/ }).first()).toBeVisible();
+
+  await page.getByRole('tab', { name: 'Cut List' }).click();
+  await expect(page.getByText('Sheet Goods', { exact: true })).toBeVisible();
+  await expect(page.getByText('Base 600 Side', { exact: true }).last()).toBeVisible();
+  await expect(page.getByText('Base 600 Shelf', { exact: true }).last()).toBeVisible();
+  await expect(page.getByText('Base 600 Door', { exact: true })).toHaveCount(0);
 });
 
 test('deleting a panel updates the tree, the count and the cut list together', async ({ page }) => {
@@ -69,7 +88,40 @@ test('deleting a panel updates the tree, the count and the cut list together', a
   await expect(page.getByText('0 parts').first()).toBeVisible();
 
   await page.getByRole('tab', { name: 'Cut List' }).click();
-  await expect(page.getByText('Nothing to cut yet.')).toBeVisible();
+  await expect(page.getByText('Nothing to manufacture yet.')).toBeVisible();
+});
+
+test('a prebuilt cabinet resizes from nominal dimensions without changing panel thickness', async ({ page }) => {
+  await page.goto('/');
+  await page.getByRole('tab', { name: 'Library' }).click();
+  await page.getByRole('button', { name: /Base 600/ }).click();
+
+  const width = page.getByLabel('Cabinet Width in millimetres');
+  await expect(width).toHaveValue('600');
+  await width.fill('900');
+  await width.blur();
+  await expect(width).toHaveValue('900');
+
+  await page.getByRole('tab', { name: 'Cut List' }).click();
+  await expect(page.getByText('Base 900 Side', { exact: true }).last()).toBeVisible();
+  await expect(page.getByText('864', { exact: true }).first()).toBeVisible();
+  await expect(page.getByText('18', { exact: true }).first()).toBeVisible();
+});
+
+test('round hardware has purpose-built dimensions, finish and purchasing output', async ({ page }) => {
+  await page.goto('/');
+  await page.getByRole('tab', { name: 'Library' }).click();
+  await page.getByRole('button', { name: 'Knob' }).click();
+
+  await expect(page.getByLabel('Diameter in millimetres')).toHaveValue('32');
+  await expect(page.getByLabel('Projection in millimetres')).toHaveValue('25');
+  await expect(page.getByRole('button', { name: 'Brushed Brass' })).toHaveAttribute('aria-pressed', 'true');
+
+  await page.getByRole('tab', { name: 'Cut List' }).click();
+  await expect(page.getByRole('heading', { name: 'Purchased Hardware' })).toBeVisible();
+  await expect(page.getByText('Knob', { exact: true }).last()).toBeVisible();
+  await expect(page.getByText('Brushed Brass', { exact: true }).last()).toBeVisible();
+  await expect(page.getByText('Sheet Goods', { exact: true })).toHaveCount(0);
 });
 
 test('shift-click adds to the selection without triggering a marquee', async ({ page }) => {
@@ -156,21 +208,42 @@ test('inserting a library panel keeps the Library tab open', async ({ page }) =>
   await expect(page.getByRole('tab', { name: 'Properties' })).toHaveAttribute('aria-selected', 'true');
 });
 
-test('the Properties tab has its own finish picker, in sync with Materials', async ({ page }) => {
+test('the Properties tab has its own finish picker, in sync with Finish', async ({ page }) => {
   await page.goto('/');
   await insertShelf(page);
   await expect(page.getByRole('tab', { name: 'Properties' })).toHaveAttribute('aria-selected', 'true');
 
-  // Apply a finish without ever visiting the Materials tab.
+  // Apply a finish without ever visiting the Finish tab.
   await page.getByRole('button', { name: 'Ebony Stain' }).click();
   await expect(page.getByRole('button', { name: 'Ebony Stain' })).toHaveAttribute('aria-pressed', 'true');
 
-  // Materials reflects the same override for the same part — one shared
+  // Finish reflects the same override for the same part — one shared
   // FinishPicker, not two copies that could drift apart.
-  await page.getByRole('tab', { name: 'Materials' }).click();
+  await page.getByRole('tab', { name: 'Finish' }).click();
   await expect(page.getByText('Editing: Shelf')).toBeVisible();
   await expect(page.getByRole('button', { name: 'Ebony Stain' })).toHaveAttribute('aria-pressed', 'true');
-  await expect(page.getByText('Reset to default')).toBeVisible();
+  await expect(page.getByText('Use design finish')).toBeVisible();
+});
+
+test('a mixed-finish selection is clear and can be unified in one click', async ({ page }) => {
+  await page.goto('/');
+  await insertShelf(page);
+  await page.getByRole('button', { name: 'Walnut' }).click();
+  await insertShelf(page);
+  await page.getByRole('button', { name: 'Ash' }).click();
+  await page.getByRole('tab', { name: 'Assembly' }).click();
+
+  const shelves = page.getByRole('treeitem', { name: 'Shelf Hide Shelf' });
+  await shelves.nth(0).click();
+  await shelves.nth(1).click({ modifiers: ['Shift'] });
+
+  await expect(page.getByText('Mixed finishes')).toBeVisible();
+  await page.getByRole('button', { name: 'White Lacquer' }).click();
+  await expect(page.getByText('Mixed finishes')).toHaveCount(0);
+  await expect(page.getByRole('button', { name: 'White Lacquer' })).toHaveAttribute(
+    'aria-pressed',
+    'true',
+  );
 });
 
 test('render mode hides the sidebars and exposes camera presets', async ({ page }) => {
@@ -274,13 +347,13 @@ test('a saved version stops being Current after the design changes', async ({ pa
   await expect(page.getByRole('button', { name: 'Restore' })).toBeVisible();
 });
 
-test('the whole-piece material applies without creating a fake override', async ({ page }) => {
+test('the whole-piece finish applies without creating a fake override', async ({ page }) => {
   await page.goto('/');
   await expect(page.getByText('Editing: Whole Piece')).toBeVisible();
   await page.getByRole('button', { name: 'Ash' }).click();
   await insertShelf(page);
   await expect(page.getByRole('button', { name: 'Ash' })).toHaveAttribute('aria-pressed', 'true');
-  await expect(page.getByText('Reset to default')).toHaveCount(0);
+  await expect(page.getByText('Use design finish')).toHaveCount(0);
 });
 
 test('a freshly inserted Shelf lies flat, not standing upright', async ({ page }) => {
@@ -351,7 +424,7 @@ test('the cm setting carries through to the Cut List table and CSV headers', asy
   await expect(page.getByText('W (cm)')).toBeVisible();
   // 800mm wide, 18mm thick (height) shelf reads as 80 / 1.8 in cm.
   await expect(page.getByText('80', { exact: true })).toBeVisible();
-  await expect(page.getByText('1.8', { exact: true })).toBeVisible();
+  await expect(page.getByText('1.8', { exact: true }).first()).toBeVisible();
 });
 
 test('renaming a part from the Properties tab updates the tree and cut list', async ({ page }) => {
@@ -511,4 +584,47 @@ test('opening a file that is not a Forma document shows an error instead of clea
   await page.locator('input[type="file"]').setInputFiles(path);
   await expect(page.getByText('Not a Forma file, or an unsupported version')).toBeVisible();
   await expect(page.getByRole('button', { name: 'Shelf' }).first()).toBeVisible();
+});
+
+test('the grid size preference survives a reload', async ({ page }) => {
+  // The console-error assertion is the load-bearing half: resizing the grid
+  // rebuilds GL resources, and touching a disposed one surfaces here as an
+  // error rather than as anything visible in the DOM.
+  const errors = failOnConsoleErrors(page);
+  await page.goto('/');
+
+  const gridSize = page.getByLabel('Grid size');
+  await expect(gridSize).toHaveValue('4');
+
+  await gridSize.selectOption('10');
+  await expect(gridSize).toHaveValue('10');
+  await expect(page.locator('canvas')).toBeVisible();
+
+  await page.reload();
+  await expect(page.getByLabel('Grid size')).toHaveValue('10');
+  await expect(page.locator('canvas')).toBeVisible();
+
+  expect(errors).toEqual([]);
+});
+
+test('changing grid size keeps a hidden grid hidden and leaves parts alone', async ({ page }) => {
+  const errors = failOnConsoleErrors(page);
+  await page.goto('/');
+  await insertShelf(page);
+
+  // A rebuilt GridHelper defaults to visible, so the toggle state has to be
+  // carried across the rebuild rather than reset by it.
+  const gridToggle = page.getByRole('button', { name: 'Toggle grid' });
+  await gridToggle.click();
+  await expect(gridToggle).toHaveAttribute('aria-pressed', 'false');
+
+  await page.getByLabel('Grid size').selectOption('20');
+  await expect(gridToggle).toHaveAttribute('aria-pressed', 'false');
+
+  // Grid size is a view setting — it must not touch the document.
+  await page.getByRole('tab', { name: 'Assembly' }).click();
+  await expect(page.getByRole('button', { name: 'Shelf' }).first()).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Undo' })).toBeEnabled();
+
+  expect(errors).toEqual([]);
 });

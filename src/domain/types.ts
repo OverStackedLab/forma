@@ -4,12 +4,30 @@
 
 export type Vec3Mm = { x: number; y: number; z: number };
 export type DimensionAxis = 'w' | 'h' | 'd';
+export type PartCategory = 'panel' | 'front' | 'hardware';
+export type EdgeBandSide =
+  | 'w-min'
+  | 'w-max'
+  | 'h-min'
+  | 'h-max'
+  | 'd-min'
+  | 'd-max';
 
 /** The wood/substrate a part is made of — independent of any stain or paint applied to it. */
-export type MaterialId = 'walnut' | 'oak' | 'ash';
+export type MaterialId = 'walnut' | 'oak' | 'ash' | 'metal';
 /** A stain or paint applied over a material. 'natural' leaves the material's own look untouched. */
-export type ColorId = 'natural' | 'ebony' | 'white';
+export type ColorId = 'natural' | 'ebony' | 'white' | 'brass' | 'matte-black' | 'steel';
+export type FinishId = 'walnut' | 'white-oak' | 'ash' | 'ebony' | 'white-lacquer';
+export type HardwareFinishId = 'brushed-brass' | 'matte-black' | 'brushed-steel';
+export type AppearanceFinishId = FinishId | HardwareFinishId;
 export type PanelPresetId = 'flat' | 'shelf' | 'divider' | 'back' | 'door' | 'knob';
+export type CabinetPresetId =
+  | 'base-450'
+  | 'base-600'
+  | 'base-900'
+  | 'wall-600'
+  | 'wall-900'
+  | 'tall-600';
 /** Every part renders as one of two shared unit geometries, scaled per instance. */
 export type PanelShape = 'box' | 'cylinder';
 
@@ -32,6 +50,14 @@ export type Color = {
   metalness?: number;
 };
 
+/** One user-facing appearance choice; its implementation details stay internal. */
+export type Finish = {
+  id: AppearanceFinishId;
+  label: string;
+  materialId: MaterialId;
+  colorId: ColorId;
+};
+
 export type PanelPreset = {
   id: PanelPresetId;
   label: string;
@@ -40,13 +66,36 @@ export type PanelPreset = {
   d: number;
   icon: string;
   shape: PanelShape;
-  /** Local dimension that represents sheet thickness; null for non-sheet hardware. */
+  category: PartCategory;
+  description: string;
+  /** World dimension that represents sheet thickness; null for purchased hardware. */
   thicknessAxis: DimensionAxis | null;
+  grainAxis: DimensionAxis | null;
+  edgeBanding: readonly EdgeBandSide[];
   /** Orientation used when the preset first enters the scene. */
   defaultQuaternion: [number, number, number, number];
 };
 
-/** A user-inserted library panel. Placement lives in Transforms, not here. */
+/** External carcass dimensions for a standard open-front cabinet. */
+export type CabinetPreset = {
+  id: CabinetPresetId;
+  label: string;
+  width: number;
+  height: number;
+  depth: number;
+  shelfCount: number;
+  icon: string;
+};
+
+export type CabinetConfig = {
+  presetId?: CabinetPresetId;
+  width: number;
+  height: number;
+  depth: number;
+  shelfCount: number;
+};
+
+/** A user-inserted or cabinet-generated part. Placement lives in Transforms. */
 export type CustomPart = {
   id: string;
   label: string;
@@ -54,8 +103,14 @@ export type CustomPart = {
   h: number;
   d: number;
   shape: PanelShape;
+  category: PartCategory;
+  presetId?: PanelPresetId;
+  /** Optional display label used to combine matching cut-list rows. */
+  bomLabel?: string;
   /** Optional for backward compatibility; old files infer the smallest dimension. */
   thicknessAxis?: DimensionAxis | null;
+  grainAxis: DimensionAxis | null;
+  edgeBanding: EdgeBandSide[];
 };
 
 export type PartOverride = { material?: MaterialId; color?: ColorId };
@@ -73,8 +128,7 @@ export type Transform = {
 export type Transforms = Record<string, Transform | undefined>;
 
 /**
- * The flat description of one live part — every part is a library panel, so
- * this is a thin, uniform box description. It feeds the mesh builder, the
+ * The flat render description of one live part. It feeds the mesh builder, the
  * assembly tree, the BOM, the part count, Select All and the Properties
  * panel, so nothing can honour a deletion in one place and miss it in
  * another.
@@ -85,6 +139,7 @@ export type PartSpec = {
   /** Millimetres — the panel's own nominal size, before any gizmo scale. */
   size: Vec3Mm;
   shape: PanelShape;
+  category: PartCategory;
 };
 
 export type SavedVersion = {
@@ -105,6 +160,8 @@ export type Group = {
   id: string;
   label: string;
   partIds: string[];
+  /** Present only for a generated cabinet whose carcass can be rebuilt parametrically. */
+  cabinet?: CabinetConfig;
 };
 
 /** The undoable, persisted portion of application state. */
@@ -112,6 +169,7 @@ export type DocumentSnapshot = {
   /** Piece-wide defaults used by every panel without a per-part override. */
   defaultMaterialId: MaterialId;
   defaultColorId: ColorId;
+  defaultHardwareFinishId: HardwareFinishId;
   overrides: Overrides;
   customParts: CustomPart[];
   hiddenIds: string[];
@@ -126,15 +184,26 @@ export type FormaDocument = DocumentSnapshot & {
 };
 
 export type BomRow = {
+  source: 'sheet' | 'hardware';
   label: string;
   qty: number;
-  material: string;
-  color: string;
+  finish: string;
   w: number;
   h: number;
   d: number;
-  edge: boolean;
+  thickness: number | null;
+  /** Face area for one piece; zero for purchased hardware. */
+  sheetAreaM2: number;
+  edgeBand: string;
+  edgeBandLengthMm: number;
   grain: string;
+};
+
+export type SheetRequirement = {
+  finish: string;
+  thickness: number;
+  areaM2: number;
+  sheets: number;
 };
 
 export type BomTotals = {
@@ -146,5 +215,8 @@ export type BomTotals = {
 
 export type Bom = {
   rows: BomRow[];
+  sheetRows: BomRow[];
+  hardwareRows: BomRow[];
+  sheetRequirements: SheetRequirement[];
   totals: BomTotals;
 };

@@ -2,6 +2,7 @@ import { Icon } from './Icon';
 
 type OptionCardProps = {
   label: string;
+  description?: string;
   icon: string;
   active?: boolean;
   dragPayload?: string;
@@ -10,6 +11,7 @@ type OptionCardProps = {
 
 export function OptionCard({
   label,
+  description,
   icon,
   active = false,
   dragPayload,
@@ -32,6 +34,9 @@ export function OptionCard({
       <span className={`text-[11px] leading-tight ${active ? 'text-ink' : 'text-ink/65'}`}>
         {label}
       </span>
+      {description && (
+        <span className="font-mono text-[9px] leading-tight text-ink/30">{description}</span>
+      )}
     </button>
   );
 }
