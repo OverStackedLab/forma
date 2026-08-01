@@ -1,11 +1,12 @@
 import { useRef, useSyncExternalStore } from 'react';
 import { DISPLAY_UNITS, type DisplayUnit } from '@/domain/units';
-import { openFile, saveToFile, saveVersion } from '@/store/actions';
+import { openFile, renameDocument, saveToFile, saveVersion } from '@/store/actions';
 import { useDocumentStore } from '@/store/documentStore';
 import { canRedo, canUndo, historyStore, redo, undo } from '@/store/history';
 import { useUiStore, type ViewMode } from '@/store/uiStore';
 import { IconButton } from './primitives/IconButton';
 import { Icon } from './primitives/Icon';
+import { InlineRename } from './primitives/InlineRename';
 
 const MODES: { id: ViewMode; label: string; icon: string }[] = [
   { id: 'model', label: 'Model', icon: 'model' },
@@ -38,7 +39,13 @@ export function Toolbar() {
         </div>
         <div className="h-[22px] w-px flex-none bg-white/10" />
         <div className="flex min-w-0 flex-col leading-tight">
-          <span className="truncate text-[13px] font-semibold text-ink">{docTitle}</span>
+          <InlineRename
+            value={docTitle}
+            onRename={renameDocument}
+            ariaLabel="Document title"
+            className="truncate text-[13px] font-semibold text-ink"
+            inputClassName="min-w-0 rounded-[4px] border border-select bg-input px-1 text-[13px] font-semibold text-ink outline-none"
+          />
           <span className="font-mono text-[10.5px] text-ink/40">
             {partCount} {partCount === 1 ? 'part' : 'parts'} · <SaveIndicator />
           </span>

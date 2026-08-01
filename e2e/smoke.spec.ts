@@ -572,6 +572,40 @@ test('saving to a file and opening it round-trips the document', async ({ page }
   await expect(page.getByText('No parts yet.')).toBeVisible();
 });
 
+test('renaming the document updates the header and the saved filename', async ({ page }) => {
+  await page.goto('/');
+
+  const title = page.getByText('Untitled Design', { exact: true });
+  await title.dblclick();
+  const input = page.getByLabel('Document title');
+  await input.fill('Kitchen Remodel');
+  await input.blur();
+  await expect(page.getByText('Kitchen Remodel', { exact: true })).toBeVisible();
+
+  const downloadPromise = page.waitForEvent('download');
+  await page.getByRole('button', { name: 'Save to File' }).click();
+  const download = await downloadPromise;
+  expect(download.suggestedFilename()).toBe('Kitchen Remodel.forma.json');
+
+  // Not undoable — the title isn't part of the piece being designed.
+  await expect(page.getByRole('button', { name: 'Undo' })).toBeDisabled();
+
+  // Survives a reload like the rest of the document.
+  await page.reload();
+  await expect(page.getByText('Kitchen Remodel', { exact: true })).toBeVisible();
+});
+
+test('a blank document rename is discarded, keeping the previous title', async ({ page }) => {
+  await page.goto('/');
+
+  const title = page.getByText('Untitled Design', { exact: true });
+  await title.dblclick();
+  const input = page.getByLabel('Document title');
+  await input.fill('   ');
+  await input.blur();
+  await expect(page.getByText('Untitled Design', { exact: true })).toBeVisible();
+});
+
 test('opening a file that is not a Forma document shows an error instead of clearing the scene', async ({
   page,
 }) => {

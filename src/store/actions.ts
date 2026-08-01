@@ -830,6 +830,17 @@ export function restoreVersion(id: string): void {
   ui().showToast(`Restored ${version.label}`);
 }
 
+/**
+ * Renames the document. Blank input is ignored, keeping the previous title.
+ * Not wrapped in commit() — like docTitle itself, this is outside the
+ * undoable DocumentSnapshot, so it can't desync from the piece being edited.
+ */
+export function renameDocument(title: string): void {
+  const trimmed = title.trim();
+  if (!trimmed) return;
+  useDocumentStore.getState().setDocTitle(trimmed);
+}
+
 // ─── File ────────────────────────────────────────────────────────────────────
 
 function sanitizeFilename(title: string): string {
