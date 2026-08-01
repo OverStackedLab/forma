@@ -114,6 +114,7 @@ Full-bleed WebGL canvas with DOM overlays:
 - **Marquee rectangle** — `border:1px solid #4FA3FF`, `background:rgba(79,163,255,.14)`, `pointer-events:none`, `z-index:6`.
 - **Hint line** — bottom-left, 11px IBM Plex Mono `rgba(26,24,21,.5)`: "Drag to orbit · Shift-drag to box select · G/R/S transform · H pan · F frame · ⌘D duplicate · ⌘A select all · Del delete".
 - **Render bar** — bottom-center, Render mode only: `background:rgba(26,24,21,.85)`, `border-radius:12px`, `padding:8px`. Camera preset buttons (Front / 3&frasl;4 Angle / Top) at `rgba(255,255,255,.06)`, then a divider, then the `#C68A46` **Export Image** button.
+- **Grid extent** — a typed numeric field in the bottom status bar. It follows the global mm/cm preference, accepts 100 mm (10 cm) increments from 1–20 m, and is kept with the other local viewport preferences rather than presented as furniture data.
 
 **Scene configuration** (units: three.js world units are meters; all UI values are millimetres — divide by 1000 at the geometry boundary):
 

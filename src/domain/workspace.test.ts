@@ -88,8 +88,9 @@ describe('viewportScale', () => {
     expect(viewportScale(2).maxDistance).toBeLessThan(viewportScale(4).maxDistance);
   });
 
-  it('falls back to the default for a size that is not a preset', () => {
-    expect(viewportScale(3).gridSizeM).toBe(DEFAULT_GRID_SIZE_M);
+  it('accepts a typed size that was not one of the old presets', () => {
+    expect(viewportScale(5.5).gridSizeM).toBe(5.5);
+    expect(viewportScale(5.5).divisions).toBe(55);
   });
 });
 
@@ -103,12 +104,18 @@ describe('coerceGridSize', () => {
   });
 
   it('falls back to the default for anything else', () => {
-    expect(coerceGridSize(3)).toBe(DEFAULT_GRID_SIZE_M);
     expect(coerceGridSize(null)).toBe(DEFAULT_GRID_SIZE_M);
     expect(coerceGridSize(undefined)).toBe(DEFAULT_GRID_SIZE_M);
     expect(coerceGridSize(Number.NaN)).toBe(DEFAULT_GRID_SIZE_M);
     expect(coerceGridSize('huge')).toBe(DEFAULT_GRID_SIZE_M);
     expect(coerceGridSize({})).toBe(DEFAULT_GRID_SIZE_M);
+  });
+
+  it('clamps and rounds typed values to safe 100 mm increments', () => {
+    expect(coerceGridSize(0.2)).toBe(1);
+    expect(coerceGridSize(40)).toBe(20);
+    expect(coerceGridSize(5.54)).toBe(5.5);
+    expect(coerceGridSize(5.56)).toBe(5.6);
   });
 });
 

@@ -593,15 +593,28 @@ test('the grid size preference survives a reload', async ({ page }) => {
   const errors = failOnConsoleErrors(page);
   await page.goto('/');
 
-  const gridSize = page.getByLabel('Grid size');
-  await expect(gridSize).toHaveValue('4');
+  const gridSize = page.getByLabel('Grid size in millimetres');
+  await expect(gridSize).toHaveValue('4000');
 
-  await gridSize.selectOption('10');
-  await expect(gridSize).toHaveValue('10');
+  // Unlike the old preset selector, the field accepts custom grid extents.
+  await gridSize.fill('5500');
+  await gridSize.blur();
+  await expect(gridSize).toHaveValue('5500');
+
+  // It follows the same global mm/cm display preference as other dimensions.
+  await page.getByRole('tab', { name: 'cm' }).click();
+  const gridSizeCm = page.getByLabel('Grid size in centimetres');
+  await expect(gridSizeCm).toHaveValue('550');
+  await gridSizeCm.fill('600');
+  await gridSizeCm.blur();
+  await expect(gridSizeCm).toHaveValue('600');
+
+  await page.getByRole('tab', { name: 'mm' }).click();
+  await expect(page.getByLabel('Grid size in millimetres')).toHaveValue('6000');
   await expect(page.locator('canvas')).toBeVisible();
 
   await page.reload();
-  await expect(page.getByLabel('Grid size')).toHaveValue('10');
+  await expect(page.getByLabel('Grid size in millimetres')).toHaveValue('6000');
   await expect(page.locator('canvas')).toBeVisible();
 
   expect(errors).toEqual([]);
@@ -618,7 +631,9 @@ test('changing grid size keeps a hidden grid hidden and leaves parts alone', asy
   await gridToggle.click();
   await expect(gridToggle).toHaveAttribute('aria-pressed', 'false');
 
-  await page.getByLabel('Grid size').selectOption('20');
+  const gridSize = page.getByLabel('Grid size in millimetres');
+  await gridSize.fill('20000');
+  await gridSize.blur();
   await expect(gridToggle).toHaveAttribute('aria-pressed', 'false');
 
   // Grid size is a view setting — it must not touch the document.

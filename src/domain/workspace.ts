@@ -8,10 +8,13 @@
  * on the far side of the mm boundary, not document data.
  */
 
-/** Grid sizes offered in the UI, in metres. 20 m exactly covers the ±10 m part-position clamp. */
+/** Useful regression samples. The UI accepts any 100 mm increment within the limits. */
 export const GRID_SIZES_M = [2, 4, 10, 20] as const;
 
-export type GridSizeM = (typeof GRID_SIZES_M)[number];
+export type GridSizeM = number;
+
+/** 20 m exactly covers the full ±10 m part-position range. */
+export const GRID_SIZE_LIMITS_M = { min: 1, max: 20, step: 0.1 } as const;
 
 /** The size every derived number below is calibrated against: at 4 m, k = 1. */
 export const DEFAULT_GRID_SIZE_M: GridSizeM = 4;
@@ -59,13 +62,22 @@ export type ViewportScale = {
 };
 
 export function isGridSizeM(value: unknown): value is GridSizeM {
-  return (GRID_SIZES_M as readonly unknown[]).includes(value);
+  return typeof value === 'number' &&
+    Number.isFinite(value) &&
+    value >= GRID_SIZE_LIMITS_M.min &&
+    value <= GRID_SIZE_LIMITS_M.max &&
+    Math.abs(value / GRID_SIZE_LIMITS_M.step - Math.round(value / GRID_SIZE_LIMITS_M.step)) < 1e-8;
 }
 
-/** A grid size from unknown input (localStorage, a stale build), or the default. */
+/** Validates, clamps and rounds unknown input to a 100 mm grid increment. */
 export function coerceGridSize(value: unknown): GridSizeM {
   const n = typeof value === 'string' ? Number(value) : value;
-  return isGridSizeM(n) ? n : DEFAULT_GRID_SIZE_M;
+  if (typeof n !== 'number' || !Number.isFinite(n)) return DEFAULT_GRID_SIZE_M;
+  const clamped = Math.min(GRID_SIZE_LIMITS_M.max, Math.max(GRID_SIZE_LIMITS_M.min, n));
+  // Divide after rounding so values such as 5.6 do not retain a
+  // 5.6000000000000005 floating-point tail in state or localStorage.
+  const incrementsPerMetre = 1 / GRID_SIZE_LIMITS_M.step;
+  return Math.round(clamped * incrementsPerMetre) / incrementsPerMetre;
 }
 
 /**

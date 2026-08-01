@@ -1,7 +1,7 @@
 import { create } from 'zustand';
 import { subscribeWithSelector } from 'zustand/middleware';
 import type { DisplayUnit } from '@/domain/units';
-import { DEFAULT_GRID_SIZE_M, type GridSizeM } from '@/domain/workspace';
+import { coerceGridSize, DEFAULT_GRID_SIZE_M, type GridSizeM } from '@/domain/workspace';
 
 export type ViewMode = 'model' | 'cutlist' | 'render';
 export type GizmoMode = 'select' | 'pan' | 'translate' | 'rotate' | 'scale';
@@ -107,7 +107,7 @@ export const useUiStore = create<UiStore>()(
     setSaveStatus: (saveStatus, at) =>
       set((s) => ({ saveStatus, lastSavedAt: at ?? s.lastSavedAt })),
     setDisplayUnit: (displayUnit) => set({ displayUnit }),
-    setGridSize: (gridSizeM) => set({ gridSizeM }),
+    setGridSize: (gridSizeM) => set({ gridSizeM: coerceGridSize(gridSizeM) }),
   })),
 );
 

@@ -450,7 +450,7 @@ export function loadGridSize(): GridSizeM | null {
     const raw = localStorage.getItem(GRID_SIZE_KEY);
     if (raw === null) return null;
     const value = Number(raw);
-    // A size retired from GRID_SIZES_M falls back to the default, not to itself.
+    // Reject corrupt or out-of-range preferences rather than loading them unchecked.
     return isGridSizeM(value) ? value : null;
   } catch {
     return null;
