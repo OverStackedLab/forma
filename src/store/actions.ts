@@ -1,10 +1,20 @@
 import { PANEL_PRESETS } from '@/domain/catalog';
 import { groupMatching, livePartIds } from '@/domain/parts';
 import { eulerDegreesToQuaternion, quaternionToEulerDegrees } from '@/domain/rotation';
-import type { ColorId, CustomPart, Group, MaterialId, SavedVersion, Transform } from '@/domain/types';
+import type {
+  ColorId,
+  CustomPart,
+  FormaDocument,
+  Group,
+  MaterialId,
+  SavedVersion,
+  Transform,
+} from '@/domain/types';
+import { downloadBlob } from '@/ui/download';
 import { viewportApi } from '@/viewport/viewportApi';
 import { IDENTITY_TRANSFORM, snapshotDocument, useDocumentStore } from './documentStore';
 import { commit } from './history';
+import { migrate, SCHEMA_VERSION } from './persistence';
 import { useUiStore } from './uiStore';
 
 const doc = () => useDocumentStore.getState();
@@ -385,4 +395,62 @@ export function restoreVersion(id: string): void {
   ui().clearSelection();
   useUiStore.setState({ historyOpen: false });
   ui().showToast(`Restored ${version.label}`);
+}
+
+// ─── File ────────────────────────────────────────────────────────────────────
+
+function sanitizeFilename(title: string): string {
+  const trimmed = title.trim().replace(/[\\/:*?"<>|]+/g, '-');
+  return trimmed || 'Untitled Design';
+}
+
+/**
+ * Downloads the whole document — geometry, materials, groups and version
+ * history — as a .forma.json file, using the same schema-versioned envelope
+ * as localStorage autosave. This is a separate file on disk, distinct from a
+ * Save Version snapshot, which stays inside this one document.
+ */
+export function saveToFile(): void {
+  const s = doc();
+  const document: FormaDocument = {
+    ...snapshotDocument(s),
+    docTitle: s.docTitle,
+    versions: s.versions,
+    currentVersionId: s.currentVersionId,
+  };
+  const envelope = { schemaVersion: SCHEMA_VERSION, doc: document };
+  downloadBlob(
+    new Blob([JSON.stringify(envelope, null, 2)], { type: 'application/json' }),
+    `${sanitizeFilename(s.docTitle)}.forma.json`,
+  );
+  ui().showToast('Saved to file');
+}
+
+/** Reads a .forma.json file and replaces the current document with it, as one undo step. */
+export async function openFile(file: File): Promise<void> {
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(await file.text());
+  } catch {
+    ui().showToast('Could not read that file');
+    return;
+  }
+
+  const next: FormaDocument | null = migrate(parsed);
+  if (!next) {
+    ui().showToast('Not a Forma file, or an unsupported version');
+    return;
+  }
+
+  commit(() => {
+    useDocumentStore.getState().replaceSnapshot(structuredClone(next));
+    useDocumentStore.setState({
+      docTitle: next.docTitle,
+      versions: next.versions,
+      currentVersionId: next.currentVersionId,
+    });
+  });
+  ui().clearSelection();
+  useUiStore.setState({ historyOpen: false });
+  ui().showToast(`Opened ${next.docTitle}`);
 }

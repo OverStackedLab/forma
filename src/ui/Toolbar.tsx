@@ -1,6 +1,6 @@
-import { useSyncExternalStore } from 'react';
+import { useRef, useSyncExternalStore } from 'react';
 import { DISPLAY_UNITS, type DisplayUnit } from '@/domain/units';
-import { saveVersion } from '@/store/actions';
+import { openFile, saveToFile, saveVersion } from '@/store/actions';
 import { useDocumentStore } from '@/store/documentStore';
 import { canRedo, canUndo, historyStore, redo, undo } from '@/store/history';
 import { useUiStore, type ViewMode } from '@/store/uiStore';
@@ -91,6 +91,9 @@ export function Toolbar() {
           onClick={toggleHistory}
         />
         <div className="h-5 w-px flex-none bg-white/10" />
+        <IconButton icon="save_file" label="Save to File" onClick={saveToFile} />
+        <OpenFileButton />
+        <div className="h-5 w-px flex-none bg-white/10" />
         <button
           type="button"
           onClick={saveVersion}
@@ -100,6 +103,28 @@ export function Toolbar() {
         </button>
       </div>
     </header>
+  );
+}
+
+/** A hidden file input driven by an icon button, so it matches the other toolbar controls. */
+function OpenFileButton() {
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  return (
+    <>
+      <IconButton icon="open_file" label="Open File" onClick={() => inputRef.current?.click()} />
+      <input
+        ref={inputRef}
+        type="file"
+        accept="application/json,.json"
+        className="hidden"
+        onChange={(e) => {
+          const file = e.target.files?.[0];
+          e.target.value = '';
+          if (file) void openFile(file);
+        }}
+      />
+    </>
   );
 }
 

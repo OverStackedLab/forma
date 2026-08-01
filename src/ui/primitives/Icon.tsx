@@ -22,6 +22,7 @@ import {
   Scissors,
   Sparkles,
   Undo2,
+  Upload,
   X,
   type LucideIcon,
 } from 'lucide-react';
@@ -40,6 +41,8 @@ const ICONS: Record<string, LucideIcon> = {
   history: History,
   close: X,
   download: Download,
+  save_file: Download,
+  open_file: Upload,
 
   // View mode tabs
   model: Box,

@@ -1,3 +1,4 @@
+import { writeFile } from 'node:fs/promises';
 import { expect, test, type Page } from '@playwright/test';
 
 /** Fails the test on any console error or page exception. */
@@ -431,4 +432,46 @@ test('resizing with the scale gizmo updates the Dimensions fields to match', asy
   await expect(widthInput).toHaveValue('800');
   await page.getByRole('button', { name: 'Redo' }).click();
   await expect(widthInput).toHaveValue(String(widthAfter));
+});
+
+test('saving to a file and opening it round-trips the document', async ({ page }) => {
+  await page.goto('/');
+  await insertShelf(page);
+  await page.getByLabel('Part name').fill('Kitchen Shelf');
+  await page.getByLabel('Part name').blur();
+
+  const downloadPromise = page.waitForEvent('download');
+  await page.getByRole('button', { name: 'Save to File' }).click();
+  const download = await downloadPromise;
+  expect(download.suggestedFilename()).toBe('Untitled Design.forma.json');
+  const path = await download.path();
+  if (!path) throw new Error('download did not save to disk');
+
+  // Clear the scene before opening the saved file back in, so re-appearing
+  // proves the open actually loaded the file rather than nothing changing.
+  await page.getByRole('tab', { name: 'Assembly' }).click();
+  await page.getByRole('button', { name: 'Select All' }).click();
+  await page.getByRole('button', { name: 'Delete', exact: true }).click();
+  await expect(page.getByText('No parts yet.')).toBeVisible();
+
+  await page.locator('input[type="file"]').setInputFiles(path);
+  await expect(page.getByRole('button', { name: 'Kitchen Shelf' })).toBeVisible();
+
+  // The open is one undo step, so the just-cleared empty scene comes straight back.
+  await page.getByRole('button', { name: 'Undo' }).click();
+  await expect(page.getByText('No parts yet.')).toBeVisible();
+});
+
+test('opening a file that is not a Forma document shows an error instead of clearing the scene', async ({
+  page,
+}) => {
+  await page.goto('/');
+  await insertShelf(page);
+
+  const path = test.info().outputPath('not-a-forma-file.json');
+  await writeFile(path, JSON.stringify({ hello: 'world' }));
+
+  await page.locator('input[type="file"]').setInputFiles(path);
+  await expect(page.getByText('Not a Forma file, or an unsupported version')).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Shelf' }).first()).toBeVisible();
 });
