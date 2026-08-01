@@ -4,19 +4,32 @@ import {
   addCabinetPreset,
   addCustomPanel,
   commitTransforms,
+  duplicateSelected,
+  newDocument,
+  renameDocument,
   resetTransforms,
+  saveVersion,
   setCabinetDim,
   setCustomPartDim,
   setHardwareDiameter,
 } from './actions';
 import { createDefaultDocument, useDocumentStore } from './documentStore';
-import { clearHistory } from './history';
+import { canUndo, clearHistory, redo, undo } from './history';
 import { useUiStore } from './uiStore';
 
 describe('library construction actions', () => {
   beforeEach(() => {
     useDocumentStore.getState().hydrate(createDefaultDocument());
-    useUiStore.setState({ selectedPartIds: [], gizmoMode: 'select', toast: null });
+    useUiStore.setState({
+      selectedPartIds: [],
+      gizmoMode: 'select',
+      viewMode: 'model',
+      historyOpen: false,
+      measureActive: false,
+      displayUnit: 'mm',
+      gridSizeM: 4,
+      toast: null,
+    });
     clearHistory();
   });
 
@@ -86,5 +99,75 @@ describe('library construction actions', () => {
     const group = useDocumentStore.getState().groups[0]!;
     setCustomPartDim(group.partIds[0]!, 'h', 700);
     expect(useDocumentStore.getState().groups[0]?.cabinet).toBeUndefined();
+  });
+
+  it('duplicates a cabinet as an independent, undoable group', () => {
+    addCabinetPreset('base-600');
+    const source = useDocumentStore.getState().groups[0]!;
+    const sourceAnchor = useDocumentStore.getState().transforms[source.partIds[0]!]!;
+
+    duplicateSelected();
+
+    let state = useDocumentStore.getState();
+    const copy = state.groups[1]!;
+    expect(state.customParts).toHaveLength(12);
+    expect(state.groups).toHaveLength(2);
+    expect(copy.id).not.toBe(source.id);
+    expect(copy.label).toBe(source.label);
+    expect(copy.partIds).toHaveLength(source.partIds.length);
+    expect(copy.partIds).not.toEqual(source.partIds);
+    expect(copy.cabinet).toEqual(source.cabinet);
+    expect(state.transforms[copy.partIds[0]!]!.position).toEqual([
+      sourceAnchor.position[0] + 0.08,
+      sourceAnchor.position[1],
+      sourceAnchor.position[2] + 0.08,
+    ]);
+    expect(useUiStore.getState().selectedPartIds).toEqual(copy.partIds);
+
+    expect(undo()).toBe(true);
+    expect(useDocumentStore.getState().groups).toHaveLength(1);
+    expect(useDocumentStore.getState().customParts).toHaveLength(6);
+    expect(redo()).toBe(true);
+    expect(useDocumentStore.getState().groups).toHaveLength(2);
+
+    // Parametric changes to the copy must not rebuild the original cabinet.
+    setCabinetDim(copy.id, 'width', 900);
+    state = useDocumentStore.getState();
+    expect(state.groups.find((group) => group.id === source.id)?.cabinet?.width).toBe(600);
+    expect(state.groups.find((group) => group.id === copy.id)?.cabinet?.width).toBe(900);
+  });
+
+  it('starts a clean document without resetting workspace preferences', () => {
+    addCustomPanel('shelf');
+    renameDocument('Kitchen');
+    saveVersion();
+    useUiStore.setState({
+      displayUnit: 'cm',
+      gridSizeM: 6,
+      viewMode: 'cutlist',
+      historyOpen: true,
+      measureActive: true,
+    });
+    expect(canUndo()).toBe(true);
+
+    newDocument();
+
+    const state = useDocumentStore.getState();
+    expect(state.customParts).toEqual([]);
+    expect(state.groups).toEqual([]);
+    expect(state.docTitle).toBe('Untitled Design');
+    expect(state.versions).toEqual([]);
+    expect(state.currentVersionId).toBeNull();
+    expect(canUndo()).toBe(false);
+    expect(useUiStore.getState()).toMatchObject({
+      selectedPartIds: [],
+      displayUnit: 'cm',
+      gridSizeM: 6,
+      viewMode: 'model',
+      leftTab: 'assembly',
+      rightTab: 'properties',
+      historyOpen: false,
+      measureActive: false,
+    });
   });
 });

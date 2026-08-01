@@ -1,6 +1,6 @@
 import { useRef, useSyncExternalStore } from 'react';
 import { DISPLAY_UNITS, type DisplayUnit } from '@/domain/units';
-import { openFile, renameDocument, saveToFile, saveVersion } from '@/store/actions';
+import { newDocument, openFile, renameDocument, saveToFile, saveVersion } from '@/store/actions';
 import { useDocumentStore } from '@/store/documentStore';
 import { canRedo, canUndo, historyStore, redo, undo } from '@/store/history';
 import { useUiStore, type ViewMode } from '@/store/uiStore';
@@ -23,6 +23,21 @@ export function Toolbar() {
   const toggleMeasure = useUiStore((s) => s.toggleMeasure);
   const historyOpen = useUiStore((s) => s.historyOpen);
   const toggleHistory = useUiStore((s) => s.toggleHistory);
+  const hasDocumentContent = useDocumentStore(
+    (s) => s.customParts.length > 0 || s.versions.length > 0 || s.docTitle !== 'Untitled Design',
+  );
+
+  const createNewFile = () => {
+    if (
+      hasDocumentContent &&
+      !window.confirm(
+        'Create a new design? The current design will be cleared. Save it to a file first if you want to keep a copy.',
+      )
+    ) {
+      return;
+    }
+    newDocument();
+  };
 
   // The undo stacks live outside the reactive stores; this subscribes to their
   // revision counter so the buttons enable and disable correctly.
@@ -99,6 +114,7 @@ export function Toolbar() {
           onClick={toggleHistory}
         />
         <div className="h-5 w-px flex-none bg-white/10" />
+        <IconButton icon="new_file" label="New File" onClick={createNewFile} />
         <IconButton icon="save_file" label="Save to File" onClick={saveToFile} />
         <OpenFileButton />
         <div className="h-5 w-px flex-none bg-white/10" />

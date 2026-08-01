@@ -392,7 +392,9 @@ function PropertiesTab() {
           <Button onClick={clearSelection}>Clear</Button>
           <Button onClick={() => resetTransforms(selectedPartIds)}>Reset transform</Button>
           <Button onClick={() => snapToFloor(selectedPartIds)}>Snap to Floor</Button>
-          {selection.kind === 'single' && <Button onClick={duplicateSelected}>Duplicate</Button>}
+          {(selection.kind === 'single' || matchedGroup) && (
+            <Button onClick={duplicateSelected}>Duplicate</Button>
+          )}
           {selection.kind === 'multi' && !matchedGroup && (
             <Button onClick={groupSelected}>Group</Button>
           )}

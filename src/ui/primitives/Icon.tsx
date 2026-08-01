@@ -7,6 +7,7 @@ import {
   Download,
   Eye,
   EyeOff,
+  FilePlus2,
   Grid3x3,
   Hand,
   History,
@@ -45,6 +46,7 @@ const ICONS: Record<string, LucideIcon> = {
   download: Download,
   save_file: Download,
   open_file: Upload,
+  new_file: FilePlus2,
 
   // View mode tabs
   model: Box,

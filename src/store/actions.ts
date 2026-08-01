@@ -28,8 +28,13 @@ import type {
 } from '@/domain/types';
 import { downloadBlob } from '@/ui/download';
 import { viewportApi } from '@/viewport/viewportApi';
-import { IDENTITY_TRANSFORM, snapshotDocument, useDocumentStore } from './documentStore';
-import { commit } from './history';
+import {
+  createDefaultDocument,
+  IDENTITY_TRANSFORM,
+  snapshotDocument,
+  useDocumentStore,
+} from './documentStore';
+import { clearHistory, commit } from './history';
 import { migrate, SCHEMA_VERSION } from './persistence';
 import { useUiStore } from './uiStore';
 
@@ -357,16 +362,20 @@ export function togglePartEdgeBand(id: string, edge: EdgeBandSide): void {
 
 export function duplicateSelected(): void {
   const s = doc();
-  const sources = ui()
-    .selectedPartIds.map((id) => s.customParts.find((p) => p.id === id))
+  const selectedIds = ui().selectedPartIds;
+  const sourceGroup = groupMatching(s.groups, selectedIds);
+  const sources = selectedIds
+    .map((id) => s.customParts.find((p) => p.id === id))
     .filter((p): p is CustomPart => Boolean(p));
 
   if (!sources.length) return;
 
   const clones: CustomPart[] = [];
+  const cloneIdBySource = new Map<string, string>();
   const transforms = { ...s.transforms };
   for (const src of sources) {
     const id = nextCustomId();
+    cloneIdBySource.set(src.id, id);
     clones.push({
       id,
       label: src.label,
@@ -392,6 +401,17 @@ export function duplicateSelected(): void {
       : { position: [0.08, src.h / 2000, 0.08], quaternion: [0, 0, 0, 1], scale: [1, 1, 1] };
   }
 
+  // Group member order is structural for generated cabinets, so rebuild the
+  // membership from the source group's order rather than selection order.
+  const clonedGroup: Group | undefined = sourceGroup
+    ? {
+        id: nextGroupId(),
+        label: sourceGroup.label,
+        partIds: sourceGroup.partIds.map((id) => cloneIdBySource.get(id)!),
+        cabinet: sourceGroup.cabinet ? { ...sourceGroup.cabinet } : undefined,
+      }
+    : undefined;
+
   commit(() => {
     useDocumentStore.setState((prev) => {
       const overrides = { ...prev.overrides };
@@ -399,12 +419,23 @@ export function duplicateSelected(): void {
         const ov = prev.overrides[src.id];
         if (ov) overrides[clones[i]!.id] = { ...ov };
       });
-      return { customParts: [...prev.customParts, ...clones], overrides, transforms };
+      return {
+        customParts: [...prev.customParts, ...clones],
+        overrides,
+        transforms,
+        groups: clonedGroup ? [...prev.groups, clonedGroup] : prev.groups,
+      };
     });
   });
 
   ui().setSelection(clones.map((c) => c.id));
-  ui().showToast(clones.length > 1 ? `${clones.length} parts duplicated` : 'Part duplicated');
+  ui().showToast(
+    clonedGroup
+      ? `${clonedGroup.label} group duplicated`
+      : clones.length > 1
+        ? `${clones.length} parts duplicated`
+        : 'Part duplicated',
+  );
 }
 
 // ─── Deletion and visibility ─────────────────────────────────────────────────
@@ -842,6 +873,26 @@ export function renameDocument(title: string): void {
 }
 
 // ─── File ────────────────────────────────────────────────────────────────────
+
+/** Starts a clean local document while keeping workspace display preferences. */
+export function newDocument(): void {
+  useDocumentStore.getState().hydrate(createDefaultDocument());
+  // A new file is a fresh history boundary: Undo must never reach back into a
+  // different design after the user confirmed that they wanted to replace it.
+  clearHistory();
+  useUiStore.setState({
+    selectedPartIds: [],
+    gizmoMode: 'select',
+    viewMode: 'model',
+    leftTab: 'assembly',
+    rightTab: 'properties',
+    measureActive: false,
+    measurePoints: [],
+    marquee: null,
+    historyOpen: false,
+  });
+  ui().showToast('New design created');
+}
 
 function sanitizeFilename(title: string): string {
   const trimmed = title.trim().replace(/[\\/:*?"<>|]+/g, '-');

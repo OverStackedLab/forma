@@ -287,6 +287,32 @@ test('grouping two panels lets you reselect and ungroup them as one unit', async
   await expect(shelves).toHaveCount(2);
 });
 
+test('duplicating a group creates an independently editable grouped copy', async ({ page }) => {
+  await page.goto('/');
+  await page.getByRole('tab', { name: 'Library' }).click();
+  await page.getByRole('button', { name: /Base 600/ }).click();
+
+  await page.getByRole('button', { name: 'Duplicate' }).click();
+  await expect(page.getByText('Base 600 group duplicated')).toBeVisible();
+  await expect(page.getByText('12 parts').first()).toBeVisible();
+  await page.getByRole('tab', { name: 'Assembly' }).click();
+  await expect(page.getByText('6 selected')).toBeVisible();
+
+  // The copied cabinet keeps its parametric controls and can change without
+  // rebuilding the original group.
+  const width = page.getByLabel('Cabinet Width in millimetres');
+  await width.fill('900');
+  await width.blur();
+  await expect(page.getByRole('treeitem', { name: /Base 600/ }).first()).toBeVisible();
+  await expect(page.getByRole('treeitem', { name: /Base 900/ }).first()).toBeVisible();
+
+  // One undo restores the copy's dimensions; a second removes the duplicate.
+  await page.getByRole('button', { name: 'Undo' }).click();
+  await expect(width).toHaveValue('600');
+  await page.getByRole('button', { name: 'Undo' }).click();
+  await expect(page.getByText('6 parts').first()).toBeVisible();
+});
+
 test('snap to floor reports nothing to do when a panel is already grounded', async ({ page }) => {
   await page.goto('/');
   await insertShelf(page);
@@ -569,6 +595,42 @@ test('saving to a file and opening it round-trips the document', async ({ page }
 
   // The open is one undo step, so the just-cleared empty scene comes straight back.
   await page.getByRole('button', { name: 'Undo' }).click();
+  await expect(page.getByText('No parts yet.')).toBeVisible();
+});
+
+test('creating a new file can be cancelled and then starts a clean persisted design', async ({
+  page,
+}) => {
+  await page.goto('/');
+  await insertShelf(page);
+  await page.getByRole('tab', { name: 'cm' }).click();
+  const gridSize = page.getByLabel('Grid size in centimetres');
+  await expect(gridSize).toHaveValue('400');
+  await gridSize.fill('600');
+  await gridSize.blur();
+  await expect(gridSize).toHaveValue('600');
+
+  page.once('dialog', async (dialog) => {
+    expect(dialog.type()).toBe('confirm');
+    expect(dialog.message()).toContain('current design will be cleared');
+    await dialog.dismiss();
+  });
+  await page.getByRole('button', { name: 'New File' }).click();
+  await expect(page.getByText('1 part').first()).toBeVisible();
+
+  page.once('dialog', async (dialog) => dialog.accept());
+  await page.getByRole('button', { name: 'New File' }).click();
+  await expect(page.getByText('New design created')).toBeVisible();
+  await expect(page.getByText('Untitled Design', { exact: true })).toBeVisible();
+  await expect(page.getByText('No parts yet.')).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Undo' })).toBeDisabled();
+
+  // New resets document state, not the user's workspace preferences.
+  await expect(page.getByRole('tab', { name: 'cm' })).toHaveAttribute('aria-selected', 'true');
+  await expect(page.getByLabel('Grid size in centimetres')).toHaveValue('600');
+
+  await expect(page.getByText('Autosaved')).toBeVisible();
+  await page.reload();
   await expect(page.getByText('No parts yet.')).toBeVisible();
 });
 
