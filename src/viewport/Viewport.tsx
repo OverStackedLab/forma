@@ -1,10 +1,15 @@
 import { useEffect, useRef } from 'react';
 import { Vector3 } from 'three';
-import { addCabinetPreset, addCustomPanel, commitTransforms } from '@/store/actions';
+import { groupContaining } from '@/domain/parts';
+import {
+  addCabinetPreset,
+  addCustomPanel,
+  commitTransforms,
+  resizeCabinetFromGizmo,
+} from '@/store/actions';
 import { useDocumentStore } from '@/store/documentStore';
 import { useUiStore } from '@/store/uiStore';
-import type { Transform } from '@/domain/types';
-import { combinedWorldBounds, worldBoundsExcludingHalos } from './bounds';
+import { combinedWorldBounds } from './bounds';
 import { CameraController } from './CameraController';
 import { GizmoController } from './GizmoController';
 import { MeasureController } from './MeasureController';
@@ -13,6 +18,9 @@ import { PickController } from './PickController';
 import { SceneManager } from './SceneManager';
 import { SelectionOverlay } from './SelectionOverlay';
 import { snapSelectionToNearbyFaces } from './faceSnap';
+import { computeFloorSnapTransforms } from './floorSnap';
+import { computeGroupResizeTransforms } from './groupResize';
+import { computeSnapTogetherTransforms } from './snapTogether';
 import { setViewportApi } from './viewportApi';
 import { MarqueeRect } from './overlays/MarqueeRect';
 import { MeasureBanner } from './overlays/MeasureBanner';
@@ -36,40 +44,6 @@ function measureBounds(builder: ModelBuilder, ids: readonly string[]) {
   };
 }
 
-/**
- * Drops each part straight down (or up) so its own world-space bounding box
- * rests on y=0, independent of the others — mirroring how a gizmo drag
- * mutates the live object first and is committed after. Parts already on the
- * floor (within a hair) are left out of the result.
- */
-function computeFloorSnapTransforms(
-  builder: ModelBuilder,
-  ids: readonly string[],
-): Record<string, Transform> | null {
-  const EPSILON = 1e-6;
-  const next: Record<string, Transform> = {};
-
-  for (const id of ids) {
-    const root = builder.getRoot(id);
-    if (!root) continue;
-
-    const box = worldBoundsExcludingHalos(root);
-    if (!box) continue;
-
-    const dy = -box.min.y;
-    if (Math.abs(dy) < EPSILON) continue;
-
-    root.position.y += dy;
-    next[id] = {
-      position: root.position.toArray() as [number, number, number],
-      quaternion: root.quaternion.toArray() as [number, number, number, number],
-      scale: root.scale.toArray() as [number, number, number],
-    };
-  }
-
-  return Object.keys(next).length ? next : null;
-}
-
 export function Viewport() {
   const containerRef = useRef<HTMLDivElement>(null);
   const measureLabelRef = useRef<HTMLDivElement>(null);
@@ -86,8 +60,13 @@ export function Viewport() {
     const measure = new MeasureController(scene);
     measure.setLabelElement(measureLabelRef.current);
 
-    const gizmo = new GizmoController(scene, builder, (transforms) => {
+    const gizmo = new GizmoController(scene, builder, (transforms, context) => {
       const state = useUiStore.getState();
+      if (
+        context.mode === 'scale' &&
+        context.groupScale &&
+        resizeCabinetFromGizmo(Object.keys(transforms), context.groupScale)
+      ) return;
       const next =
         state.snapEnabled && state.gizmoMode === 'translate'
           ? snapSelectionToNearbyFaces(builder, Object.keys(transforms), transforms)
@@ -104,20 +83,31 @@ export function Viewport() {
       isGizmoDragging: () => gizmo.isDragging,
       onSelect: (partId, additive) => {
         const ui = useUiStore.getState();
-        if (additive) ui.toggleSelection(partId);
-        else ui.setSelection([partId]);
+        const group = groupContaining(useDocumentStore.getState().groups, partId);
+        const unitIds = group?.partIds ?? [partId];
+        if (additive) {
+          const selected = new Set(ui.selectedPartIds);
+          const allSelected = unitIds.every((id) => selected.has(id));
+          ui.setSelection(
+            allSelected
+              ? ui.selectedPartIds.filter((id) => !unitIds.includes(id))
+              : [...new Set([...ui.selectedPartIds, ...unitIds])],
+          );
+        } else ui.setSelection(unitIds);
       },
       onClearSelection: () => useUiStore.getState().clearSelection(),
       onMarqueeChange: (marquee) => useUiStore.getState().setMarquee(marquee),
       onMarqueeCommit: (ids, additive) => {
         const ui = useUiStore.getState();
-        if (!ids.length) {
+        const groups = useDocumentStore.getState().groups;
+        const expandedIds = [...new Set(ids.flatMap((id) => groupContaining(groups, id)?.partIds ?? [id]))];
+        if (!expandedIds.length) {
           if (!additive) ui.clearSelection();
           return;
         }
-        const next = additive ? [...new Set([...ui.selectedPartIds, ...ids])] : ids;
+        const next = additive ? [...new Set([...ui.selectedPartIds, ...expandedIds])] : expandedIds;
         ui.setSelection(next);
-        ui.showToast(`${ids.length} part${ids.length > 1 ? 's' : ''} selected`);
+        ui.showToast(`${expandedIds.length} part${expandedIds.length > 1 ? 's' : ''} selected`);
       },
       onMeasurePoint: (point) =>
         useUiStore.getState().addMeasurePoint({ x: point.x, y: point.y, z: point.z }),
@@ -223,6 +213,10 @@ export function Viewport() {
       },
       selectionSize: (ids) => measureBounds(builder, ids),
       computeFloorSnap: (ids) => computeFloorSnapTransforms(builder, ids),
+      computeGroupResize: (ids, axis, targetMillimetres) =>
+        computeGroupResizeTransforms(builder, ids, axis, targetMillimetres),
+      computeSnapTogether: (targetIds, movingIds) =>
+        computeSnapTogetherTransforms(builder, targetIds, movingIds),
     });
 
     return () => {

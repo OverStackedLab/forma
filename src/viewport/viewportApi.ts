@@ -15,6 +15,17 @@ export type ViewportApi = {
   selectionSize: (ids: readonly string[]) => { w: number; h: number; d: number } | null;
   /** Mutates the live scene and returns the resulting transforms, ready to commit. */
   computeFloorSnap: (ids: readonly string[]) => Record<string, Transform> | null;
+  /** Resizes every member and its spacing around a shared group pivot. */
+  computeGroupResize: (
+    ids: readonly string[],
+    axis: 'x' | 'y' | 'z',
+    targetMillimetres: number,
+  ) => Record<string, Transform> | null;
+  /** Moves the second rigid selection unit to the nearest face of the first. */
+  computeSnapTogether: (
+    targetIds: readonly string[],
+    movingIds: readonly string[],
+  ) => Record<string, Transform> | null;
 };
 
 let current: ViewportApi | null = null;

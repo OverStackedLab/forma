@@ -268,6 +268,8 @@ test('grouping two panels lets you reselect and ungroup them as one unit', async
 
   await page.getByRole('button', { name: 'Group' }).click();
   await expect(page.getByText('Editing: Group 1')).toBeVisible();
+  await expect(page.getByText('Rigid group · 2 pieces')).toBeVisible();
+  await expect(page.getByLabel('Group X Position in millimetres')).toHaveValue('440');
   await expect(page.getByRole('treeitem', { name: /Group 1/ })).toBeVisible();
   // Members are still individually present, just nested under the group.
   await expect(shelves).toHaveCount(2);
@@ -285,6 +287,102 @@ test('grouping two panels lets you reselect and ungroup them as one unit', async
   await page.getByRole('button', { name: 'Ungroup' }).click();
   await expect(page.getByRole('treeitem', { name: /Group 1/ })).toHaveCount(0);
   await expect(shelves).toHaveCount(2);
+});
+
+test('a regular group resizes its members and spacing together from exact dimensions', async ({
+  page,
+}) => {
+  await page.goto('/');
+  await insertShelf(page);
+  await insertShelf(page);
+  await page.getByRole('tab', { name: 'Assembly' }).click();
+
+  const shelves = page.getByRole('treeitem', { name: 'Shelf Hide Shelf' });
+  await shelves.nth(0).click();
+  await shelves.nth(1).click({ modifiers: ['Shift'] });
+  await expect(page.getByText('2 selected')).toBeVisible();
+  await page.getByRole('button', { name: 'Group' }).click();
+
+  const groupWidth = page.getByLabel('Group Width in millimetres');
+  await expect(groupWidth).toHaveValue('1680');
+  await groupWidth.fill('840');
+  await groupWidth.blur();
+  await expect(groupWidth).toHaveValue('840');
+
+  // Both the member size and its offset from the shared 440 mm pivot scale by
+  // 0.5, rather than only stretching one piece or collapsing the pair.
+  await shelves.nth(1).click();
+  await expect(page.getByLabel('Width in millimetres')).toHaveValue('400');
+  await expect(page.getByLabel('X Position in millimetres')).toHaveValue('660');
+
+  await page.getByRole('treeitem', { name: /Group 1/ }).click();
+  await page.getByRole('button', { name: 'Undo' }).click();
+  await expect(groupWidth).toHaveValue('1680');
+
+  await page.getByRole('tab', { name: 'cm' }).click();
+  await expect(page.getByLabel('Group Width in centimetres')).toHaveValue('168');
+});
+
+test('clicking a grouped cabinet in the viewport selects the group and shows its properties', async ({
+  page,
+}) => {
+  await page.goto('/');
+  await page.getByRole('tab', { name: 'Library' }).click();
+  await page.getByRole('button', { name: /Base 600/ }).click();
+  await page.getByRole('button', { name: 'Clear', exact: true }).click();
+
+  const canvasBox = await page.locator('canvas').boundingBox();
+  if (!canvasBox) throw new Error('viewport canvas has no bounding box');
+  await page.mouse.click(canvasBox.x + canvasBox.width / 2, canvasBox.y + canvasBox.height * 0.54);
+
+  await expect(page.getByText('Editing: Base 600')).toBeVisible();
+  await expect(page.getByText('Configurable cabinet · 6 pieces')).toBeVisible();
+  await expect(page.getByLabel('Group X Position in millimetres')).toHaveValue('0');
+});
+
+test('Snap Together connects two pieces and is undoable', async ({ page }) => {
+  await page.goto('/');
+  await insertShelf(page);
+  await insertShelf(page);
+  await page.getByRole('tab', { name: 'Assembly' }).click();
+
+  const shelves = page.getByRole('treeitem', { name: 'Shelf Hide Shelf' });
+  await expect(shelves).toHaveCount(2);
+  await shelves.nth(0).click();
+  await shelves.nth(1).click({ modifiers: ['Shift'] });
+  // Snap Together is backed by the lazy-loaded Three.js viewport API.
+  await expect(page.locator('canvas')).toBeVisible();
+  await page.getByRole('button', { name: 'Snap Together' }).click();
+  await expect(page.getByText('Shelf snapped to Shelf')).toBeVisible();
+
+  await shelves.nth(1).click();
+  const xPosition = page.getByLabel('X Position in millimetres');
+  await expect(xPosition).toHaveValue('800');
+  await page.getByRole('button', { name: 'Undo' }).click();
+  await expect(xPosition).toHaveValue('880');
+});
+
+test('Snap Together moves a whole group without breaking its cabinet configuration', async ({
+  page,
+}) => {
+  await page.goto('/');
+  await page.getByRole('tab', { name: 'Library' }).click();
+  await page.getByRole('button', { name: /Base 600/ }).click();
+  await page.getByRole('button', { name: /Base 600/ }).click();
+  await page.getByRole('tab', { name: 'Assembly' }).click();
+
+  const cabinets = page.getByRole('treeitem', {
+    name: /Collapse group Base 600 6 Hide Base 600/,
+  });
+  await expect(cabinets).toHaveCount(2);
+  await cabinets.nth(0).click();
+  await cabinets.nth(1).click({ modifiers: ['Shift'] });
+  await page.getByRole('button', { name: 'Snap Together' }).click();
+  await expect(page.getByText('Base 600 snapped to Base 600')).toBeVisible();
+
+  await cabinets.nth(1).click();
+  await expect(page.getByLabel('Group X Position in millimetres')).toHaveValue('600');
+  await expect(page.getByLabel('Cabinet Width in millimetres')).toHaveValue('600');
 });
 
 test('duplicating a group creates an independently editable grouped copy', async ({ page }) => {
@@ -322,6 +420,23 @@ test('snap to floor reports nothing to do when a panel is already grounded', asy
   // A freshly inserted panel already rests on the floor by construction.
   await page.getByRole('button', { name: 'Snap to Floor' }).click();
   await expect(page.getByText('Already on the floor')).toBeVisible();
+});
+
+test('snap to floor preserves a fully selected cabinet structure', async ({ page }) => {
+  await page.goto('/');
+  await page.getByRole('tab', { name: 'Library' }).click();
+  await page.getByRole('button', { name: /Base 600/ }).click();
+  await page.getByRole('tab', { name: 'Assembly' }).click();
+  await page.getByRole('button', { name: 'Select All' }).click();
+  await expect(page.locator('canvas')).toBeVisible();
+
+  // The cabinet is already grounded as a whole. The old implementation moved
+  // its top and shelf down independently even though its sides touched y=0.
+  await page.getByRole('button', { name: 'Snap to Floor' }).click();
+  await expect(page.getByText('Already on the floor')).toBeVisible();
+
+  await page.getByRole('treeitem', { name: /Base 600 Top Hide/ }).click();
+  await expect(page.getByLabel('Y Position in millimetres')).toHaveValue('711');
 });
 
 test('changing a panel height keeps its grounded face anchored', async ({
@@ -568,6 +683,49 @@ test('resizing with the scale gizmo updates the Dimensions fields to match', asy
   await expect(widthInput).toHaveValue('800');
   await page.getByRole('button', { name: 'Redo' }).click();
   await expect(widthInput).toHaveValue(String(widthAfter));
+});
+
+test('resizing a cabinet with the scale gizmo updates its parametric dimensions', async ({
+  page,
+}) => {
+  await page.goto('/');
+  await page.getByRole('tab', { name: 'Library' }).click();
+  await page.getByRole('button', { name: /Base 600/ }).click();
+  await expect(page.locator('canvas')).toBeVisible();
+
+  await page.getByRole('button', { name: 'Frame' }).click();
+  await page.waitForTimeout(1500);
+  await page.getByRole('button', { name: 'Scale (S)' }).click();
+  await page.waitForTimeout(500);
+
+  const width = page.getByLabel('Cabinet Width in millimetres');
+  await expect(width).toHaveValue('600');
+  await expect(page.getByLabel('Cabinet Height in millimetres')).toHaveValue('720');
+  await expect(page.getByLabel('Cabinet Depth in millimetres')).toHaveValue('560');
+
+  const canvasBox = await page.locator('canvas').boundingBox();
+  if (!canvasBox) throw new Error('viewport canvas has no bounding box');
+  const handleX = canvasBox.x + canvasBox.width * 0.578;
+  const handleY = canvasBox.y + canvasBox.height * 0.53;
+  await page.mouse.move(handleX - 1, handleY);
+  await page.mouse.move(handleX, handleY);
+  await page.mouse.down();
+  await page.mouse.move(handleX + 55, handleY + 8, { steps: 5 });
+  await page.mouse.move(handleX + 110, handleY + 18, { steps: 5 });
+  await page.mouse.up();
+
+  await expect(page.getByText('Cabinet dimensions updated')).toBeVisible();
+  await expect(width).not.toHaveValue('600');
+  await expect(page.getByLabel('Cabinet Height in millimetres')).toHaveValue('720');
+  await expect(page.getByLabel('Cabinet Depth in millimetres')).toHaveValue('560');
+
+  // The gesture rebuilds the cabinet instead of stretching sheet thickness.
+  await page.getByRole('tab', { name: 'Cut List' }).click();
+  await expect(page.getByText('18', { exact: true }).first()).toBeVisible();
+
+  await page.getByRole('button', { name: 'Undo' }).click();
+  await page.getByRole('tab', { name: 'Model' }).click();
+  await expect(width).toHaveValue('600');
 });
 
 test('saving to a file and opening it round-trips the document', async ({ page }) => {

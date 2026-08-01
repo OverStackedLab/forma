@@ -32,3 +32,37 @@ export function groupMatching(groups: readonly Group[], selectedIds: readonly st
 export function groupContaining(groups: readonly Group[], partId: string): Group | undefined {
   return groups.find((g) => g.partIds.includes(partId));
 }
+
+export type SelectionUnit = {
+  kind: 'group' | 'part';
+  id: string;
+  partIds: string[];
+};
+
+/**
+ * Collapses a flat part selection into the rigid items it represents while
+ * preserving selection order. A fully selected group is one unit; a partial
+ * group selection remains individual parts so members can still be edited.
+ */
+export function selectionUnits(
+  groups: readonly Group[],
+  selectedIds: readonly string[],
+): SelectionUnit[] {
+  const selected = new Set(selectedIds);
+  const consumed = new Set<string>();
+  const units: SelectionUnit[] = [];
+
+  for (const partId of selectedIds) {
+    if (consumed.has(partId)) continue;
+    const group = groupContaining(groups, partId);
+    if (group && group.partIds.every((id) => selected.has(id))) {
+      units.push({ kind: 'group', id: group.id, partIds: [...group.partIds] });
+      group.partIds.forEach((id) => consumed.add(id));
+    } else {
+      units.push({ kind: 'part', id: partId, partIds: [partId] });
+      consumed.add(partId);
+    }
+  }
+
+  return units;
+}

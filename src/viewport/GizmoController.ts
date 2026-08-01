@@ -8,7 +8,16 @@ import type { SceneManager } from './SceneManager';
 /** Snap increments: 100 mm, 15°, 0.1×. */
 const SNAP = { translate: 0.1, rotate: Math.PI / 12, scale: 0.1 };
 
-export type GizmoCommit = (transforms: Record<string, Transform>) => void;
+export type GizmoCommitContext = {
+  mode: GizmoMode;
+  /** Multi-selection scale applied at the shared pivot during this gesture. */
+  groupScale?: Transform['scale'];
+};
+
+export type GizmoCommit = (
+  transforms: Record<string, Transform>,
+  context: GizmoCommitContext,
+) => void;
 
 function sameArray(a: readonly number[], b: readonly number[]): boolean {
   return a.length === b.length && a.every((v, i) => v === b[i]);
@@ -36,6 +45,7 @@ export class GizmoController {
   private pivotAttached = false;
   private relatives = new Map<string, THREE.Matrix4>();
   private ids: string[] = [];
+  private mode: GizmoMode = 'select';
   private dragging = false;
   private dragStart: Record<string, Transform> | null = null;
 
@@ -76,6 +86,7 @@ export class GizmoController {
   sync(mode: GizmoMode, selectedIds: readonly string[]): void {
     const ids = selectedIds.filter((id) => this.builder.getRoot(id));
     this.ids = ids;
+    this.mode = mode;
 
     if (!ids.length || mode === 'select' || mode === 'pan') {
       this.controls.detach();
@@ -172,7 +183,13 @@ export class GizmoController {
       if (!prev || !sameTransform(prev, t)) changed[id] = t;
     }
 
-    if (Object.keys(changed).length) this.onCommit(changed);
+    if (Object.keys(changed).length) {
+      const groupScale =
+        this.mode === 'scale' && this.pivotAttached
+          ? this.pivot.scale.toArray() as Transform['scale']
+          : undefined;
+      this.onCommit(changed, { mode: this.mode, groupScale });
+    }
     // Re-seat the pivot so the next drag starts from the committed state.
     if (this.pivotAttached && this.ids.length > 1) this.attachPivot(this.ids);
   }

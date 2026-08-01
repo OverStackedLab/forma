@@ -7,7 +7,7 @@ import {
   isHardwareFinishId,
   PANEL_PRESETS,
 } from '@/domain/catalog';
-import { groupMatching, livePartIds } from '@/domain/parts';
+import { groupMatching, livePartIds, selectionUnits } from '@/domain/parts';
 import { eulerDegreesToQuaternion, quaternionToEulerDegrees } from '@/domain/rotation';
 import {
   halfExtentAlongNormalMm,
@@ -642,37 +642,64 @@ function cabinetPlacement(group: Group, config: CabinetConfig): {
   };
 }
 
-/** Rebuilds a generated cabinet while keeping its bottom-centre placement. */
-export function setCabinetDim(
-  groupId: string,
-  key: 'width' | 'height' | 'depth',
-  value: number,
-): void {
-  if (!Number.isFinite(value)) return;
-  const state = doc();
-  const group = state.groups.find((candidate) => candidate.id === groupId);
-  if (!group?.cabinet) return;
-  const limits = CABINET_DIM_LIMITS[key];
-  const nextConfig: CabinetConfig = {
-    ...group.cabinet,
-    [key]: Math.min(limits.max, Math.max(limits.min, value)),
+/** Keeps the gizmo's shared member-centroid fixed while a cabinet is rebuilt. */
+function cabinetPivotPlacement(group: Group, config: CabinetConfig): {
+  origin: [number, number, number];
+  quaternion: Transform['quaternion'];
+} {
+  const transforms = group.partIds.map((id) => doc().transforms[id] ?? IDENTITY_TRANSFORM);
+  const pivot = [0, 1, 2].map(
+    (index) => transforms.reduce((sum, transform) => sum + transform.position[index]!, 0) /
+      transforms.length,
+  ) as [number, number, number];
+  const quaternion = [...transforms[0]!.quaternion] as Transform['quaternion'];
+  const layout = buildCabinetLayout(cabinetPreset(group, config));
+  const localPivot = [0, 1, 2].map(
+    (index) => layout.reduce((sum, item) => sum + item.positionMm[index]!, 0) /
+      layout.length / 1000,
+  );
+  const offset = rotateVectorByQuaternion(
+    { x: localPivot[0]!, y: localPivot[1]!, z: localPivot[2]! },
+    quaternion,
+  );
+  return {
+    origin: [pivot[0] - offset.x, pivot[1] - offset.y, pivot[2] - offset.z],
+    quaternion,
   };
+}
+
+function cabinetResizeMetadata(group: Group, requested: CabinetConfig): {
+  config: CabinetConfig;
+  label: string;
+} {
+  const config = { ...requested };
   const currentPreset = CABINET_PRESETS.find((preset) => preset.id === group.cabinet?.presetId);
   const matchingPreset = CABINET_PRESETS.find(
     (preset) =>
-      preset.width === nextConfig.width &&
-      preset.height === nextConfig.height &&
-      preset.depth === nextConfig.depth &&
-      preset.shelfCount === nextConfig.shelfCount,
+      preset.width === config.width &&
+      preset.height === config.height &&
+      preset.depth === config.depth &&
+      preset.shelfCount === config.shelfCount,
   );
-  nextConfig.presetId = matchingPreset?.id;
-  const generatedLabel = currentPreset?.label === group.label;
-  const nextLabel = generatedLabel
-    ? matchingPreset?.label ?? `${currentPreset!.label.split(' ')[0]} ${nextConfig.width}×${nextConfig.height}×${nextConfig.depth}`
+  config.presetId = matchingPreset?.id;
+  const generatedLabel =
+    currentPreset?.label === group.label || /^(Base|Wall|Tall) \d+×\d+×\d+$/.test(group.label);
+  const family = currentPreset?.label.split(' ')[0] ?? group.label.split(' ')[0] ?? 'Cabinet';
+  const label = generatedLabel
+    ? matchingPreset?.label ??
+      `${family} ${config.width}×${config.height}×${config.depth}`
     : group.label;
-  const nextGroup = { ...group, label: nextLabel };
-  const placement = cabinetPlacement(group, group.cabinet);
-  const layout = buildCabinetLayout(cabinetPreset(nextGroup, nextConfig));
+  return { config, label };
+}
+
+function commitCabinetResize(
+  group: Group,
+  requested: CabinetConfig,
+  placement: { origin: [number, number, number]; quaternion: Transform['quaternion'] },
+): void {
+  const { config, label } = cabinetResizeMetadata(group, requested);
+  const nextGroup = { ...group, label };
+  const layout = buildCabinetLayout(cabinetPreset(nextGroup, config));
   const indexById = new Map(group.partIds.map((id, index) => [id, index]));
 
   commit(() => {
@@ -717,13 +744,59 @@ export function setCabinetDim(
         }),
         transforms,
         groups: previous.groups.map((candidate) =>
-          candidate.id === groupId
-            ? { ...candidate, label: nextLabel, cabinet: nextConfig }
+          candidate.id === group.id
+            ? { ...candidate, label, cabinet: config }
             : candidate,
         ),
       };
     });
   });
+}
+
+/** Rebuilds a generated cabinet while keeping its bottom-centre placement. */
+export function setCabinetDim(
+  groupId: string,
+  key: 'width' | 'height' | 'depth',
+  value: number,
+): void {
+  if (!Number.isFinite(value)) return;
+  const state = doc();
+  const group = state.groups.find((candidate) => candidate.id === groupId);
+  if (!group?.cabinet) return;
+  const limits = CABINET_DIM_LIMITS[key];
+  const nextConfig: CabinetConfig = {
+    ...group.cabinet,
+    [key]: Math.min(limits.max, Math.max(limits.min, value)),
+  };
+  const placement = cabinetPlacement(group, group.cabinet);
+  commitCabinetResize(group, nextConfig, placement);
+}
+
+/**
+ * Converts a complete cabinet's shared-pivot scale gesture into one parametric
+ * rebuild. Returns true when the gesture was handled and raw mesh transforms
+ * must not be committed.
+ */
+export function resizeCabinetFromGizmo(
+  ids: readonly string[],
+  scale: Transform['scale'],
+): boolean {
+  const group = groupMatching(doc().groups, ids);
+  if (!group?.cabinet || scale.some((value) => !Number.isFinite(value) || value <= 0)) return false;
+
+  const dimensions = ['width', 'height', 'depth'] as const;
+  const nextConfig = { ...group.cabinet };
+  dimensions.forEach((key, index) => {
+    const limits = CABINET_DIM_LIMITS[key];
+    nextConfig[key] = Math.min(
+      limits.max,
+      Math.max(limits.min, Math.round(group.cabinet![key] * scale[index]!)),
+    );
+  });
+  const placement = cabinetPivotPlacement(group, nextConfig);
+  commitCabinetResize(group, nextConfig, placement);
+  ui().showToast('Cabinet dimensions updated');
+  return true;
 }
 
 /** Placement is kept; only orientation and scale reset. */
@@ -791,6 +864,53 @@ export function setPositionAxis(id: string, axis: 'x' | 'y' | 'z', millimetres: 
   });
 }
 
+/** Sets the multi-select pivot position by translating every group member equally. */
+export function setGroupPositionAxis(
+  groupId: string,
+  axis: 'x' | 'y' | 'z',
+  millimetres: number,
+): void {
+  if (!Number.isFinite(millimetres)) return;
+  const group = doc().groups.find((candidate) => candidate.id === groupId);
+  if (!group?.partIds.length) return;
+  const index = POSITION_AXIS_INDEX[axis];
+  const transforms = group.partIds.map((id) => ({ id, transform: transformOf(id) }));
+  const current = transforms.reduce((sum, item) => sum + item.transform.position[index], 0) /
+    transforms.length;
+  const requested = millimetres / 1000 - current;
+  const minDelta = Math.max(...transforms.map((item) => -10 - item.transform.position[index]));
+  const maxDelta = Math.min(...transforms.map((item) => 10 - item.transform.position[index]));
+  const delta = Math.min(maxDelta, Math.max(minDelta, requested));
+  if (Math.abs(delta) < 1e-10) return;
+
+  const next: Record<string, Transform> = {};
+  for (const { id, transform } of transforms) {
+    const position = [...transform.position] as Transform['position'];
+    position[index] += delta;
+    next[id] = { ...transform, position };
+  }
+  commitTransforms(next);
+}
+
+/** Sets one exact overall dimension of a regular group as one rigid resize. */
+export function setGroupSizeAxis(
+  groupId: string,
+  axis: 'x' | 'y' | 'z',
+  millimetres: number,
+): void {
+  if (!Number.isFinite(millimetres)) return;
+  const group = doc().groups.find((candidate) => candidate.id === groupId);
+  // Generated cabinets have dimensional rules such as fixed panel thickness;
+  // their dedicated cabinet controls must rebuild them parametrically instead.
+  if (!group?.partIds.length || group.cabinet) return;
+  const api = viewportApi();
+  if (!api) return;
+  const target = Math.min(20_000, Math.max(1, millimetres));
+  const next = api.computeGroupResize(group.partIds, axis, target);
+  if (!next) return;
+  commitTransforms(next);
+}
+
 /**
  * Sets one axis of a part's rotation directly, in degrees — the numeric
  * counterpart to dragging the rotate gizmo. The other two axes keep their
@@ -810,7 +930,7 @@ export function setRotationAxis(id: string, axis: 'x' | 'y' | 'z', degrees: numb
   });
 }
 
-/** Drops each selected part straight down (or up) until its bottom face touches the floor. */
+/** Moves the complete selection vertically until its shared lowest point touches the floor. */
 export function snapToFloor(ids: readonly string[]): void {
   if (!ids.length) return;
   const api = viewportApi();
@@ -826,6 +946,31 @@ export function snapToFloor(ids: readonly string[]): void {
   }
   commitTransforms(next);
   ui().showToast(ids.length > 1 ? `${ids.length} parts snapped to floor` : 'Snapped to floor');
+}
+
+/** Keeps the first selected piece/group fixed and snaps the second one to it. */
+export function snapSelectedTogether(): void {
+  const state = doc();
+  const units = selectionUnits(state.groups, ui().selectedPartIds);
+  if (units.length !== 2) {
+    ui().showToast('Select a target, then Shift-select one piece or group to move');
+    return;
+  }
+  const api = viewportApi();
+  if (!api) return;
+  const [target, moving] = units;
+  const next = api.computeSnapTogether(target!.partIds, moving!.partIds);
+  if (!next) {
+    ui().showToast('The selected items are already touching');
+    return;
+  }
+  commitTransforms(next);
+
+  const unitLabel = (unit: (typeof units)[number]) =>
+    unit.kind === 'group'
+      ? state.groups.find((group) => group.id === unit.id)?.label ?? 'Group'
+      : state.customParts.find((part) => part.id === unit.id)?.label ?? 'Piece';
+  ui().showToast(`${unitLabel(moving!)} snapped to ${unitLabel(target!)}`);
 }
 
 // ─── Selection helpers ───────────────────────────────────────────────────────

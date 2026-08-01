@@ -8,9 +8,10 @@ import {
   finishForAppearance,
   resolveAppearance,
 } from '@/domain/catalog';
-import { groupMatching } from '@/domain/parts';
+import { groupMatching, selectionUnits } from '@/domain/parts';
 import { quaternionToEulerDegrees } from '@/domain/rotation';
-import { convertRange, fromMm, toMm, type DisplayUnit } from '@/domain/units';
+import type { Group } from '@/domain/types';
+import { convertedValue, convertRange, fromMm, toMm, type DisplayUnit } from '@/domain/units';
 import {
   applyFinish,
   deleteParts,
@@ -23,10 +24,13 @@ import {
   setCabinetDim,
   setCustomPartDim,
   setHardwareDiameter,
+  setGroupPositionAxis,
+  setGroupSizeAxis,
   setPartGrainAxis,
   setPositionAxis,
   setRotationAxis,
   snapToFloor,
+  snapSelectedTogether,
   togglePartEdgeBand,
   ungroupSelected,
 } from '@/store/actions';
@@ -87,6 +91,17 @@ const ROTATION_AXES: { axis: 'x' | 'y' | 'z'; label: string }[] = [
 ];
 const ROTATION_LIMITS = { min: -180, max: 180, step: 1 } as const;
 const POSITION_LIMITS = { min: -10_000, max: 10_000, step: 1 } as const;
+const GROUP_SIZE_LIMITS = { min: 1, max: 20_000, step: 1 } as const;
+const GROUP_SIZE_AXES = [
+  { axis: 'x', key: 'w', label: 'Group Width' },
+  { axis: 'y', key: 'h', label: 'Group Height' },
+  { axis: 'z', key: 'd', label: 'Group Depth' },
+] as const;
+const POSITION_AXES = [
+  { axis: 'x', label: 'X Position', index: 0 },
+  { axis: 'y', label: 'Y Position', index: 1 },
+  { axis: 'z', label: 'Z Position', index: 2 },
+] as const;
 const EDGE_OPTIONS = [
   { id: 'w-min', label: 'Left' },
   { id: 'w-max', label: 'Right' },
@@ -100,20 +115,14 @@ function PositionFields({ partId }: { partId: string }) {
   const transform = useDocumentStore((s) => s.transforms[partId]) ?? IDENTITY_TRANSFORM;
   const unit = useUiStore((s) => s.displayUnit);
   const range = convertRange(POSITION_LIMITS, unit);
-  const axes = [
-    { axis: 'x', label: 'X Position', index: 0 },
-    { axis: 'y', label: 'Y Position', index: 1 },
-    { axis: 'z', label: 'Z Position', index: 2 },
-  ] as const;
-
   return (
     <>
       <SectionHeader>Position</SectionHeader>
-      {axes.map(({ axis, label, index }) => (
+      {POSITION_AXES.map(({ axis, label, index }) => (
         <SliderField
           key={axis}
           label={label}
-          value={fromMm(transform.position[index] * 1000, unit)}
+          value={convertedValue(transform.position[index] * 1000, unit)}
           min={range.min}
           max={range.max}
           step={range.step}
@@ -122,6 +131,74 @@ function PositionFields({ partId }: { partId: string }) {
           onChange={(v) => setPositionAxis(partId, axis, toMm(v, unit))}
         />
       ))}
+      <hr className="my-4 border-hairline" />
+    </>
+  );
+}
+
+function GroupPositionFields({ group }: { group: Group }) {
+  const transforms = useDocumentStore((state) => state.transforms);
+  const unit = useUiStore((state) => state.displayUnit);
+  const range = convertRange(POSITION_LIMITS, unit);
+  const members = group.partIds.map((id) => transforms[id] ?? IDENTITY_TRANSFORM);
+  const pivot = POSITION_AXES.map(({ index }) =>
+    members.reduce((sum, transform) => sum + transform.position[index], 0) /
+    Math.max(members.length, 1),
+  );
+
+  return (
+    <>
+      <SectionHeader>Group Position</SectionHeader>
+      {POSITION_AXES.map(({ axis, label, index }) => (
+        <SliderField
+          key={axis}
+          label={`Group ${label}`}
+          value={convertedValue(pivot[index]! * 1000, unit)}
+          min={range.min}
+          max={range.max}
+          step={range.step}
+          unit={unit}
+          unitName={UNIT_NAMES[unit]}
+          onChange={(value) => setGroupPositionAxis(group.id, axis, toMm(value, unit))}
+        />
+      ))}
+      <p className="mb-4 text-[10.5px] leading-relaxed text-ink/35">
+        Position uses the shared group pivot; every member moves by the same amount.
+      </p>
+      <hr className="my-4 border-hairline" />
+    </>
+  );
+}
+
+function GroupSizeFields({
+  group,
+  size,
+}: {
+  group: Group;
+  size: { w: number; h: number; d: number };
+}) {
+  const unit = useUiStore((state) => state.displayUnit);
+  const range = convertRange(GROUP_SIZE_LIMITS, unit);
+
+  return (
+    <>
+      <SectionHeader>Group Dimensions</SectionHeader>
+      {GROUP_SIZE_AXES.map(({ axis, key, label }) => (
+        <SliderField
+          key={axis}
+          label={label}
+          value={fromMm(size[key], unit)}
+          min={range.min}
+          max={range.max}
+          step={range.step}
+          unit={unit}
+          unitName={UNIT_NAMES[unit]}
+          onChange={(value) => setGroupSizeAxis(group.id, axis, toMm(value, unit))}
+        />
+      ))}
+      <p className="mb-4 text-[10.5px] leading-relaxed text-ink/35">
+        Resizing uses the shared group pivot; every member and the spacing between members scale together.
+      </p>
       <hr className="my-4 border-hairline" />
     </>
   );
@@ -269,6 +346,9 @@ function PropertiesTab() {
   const selectedPartIds = useUiStore((s) => s.selectedPartIds);
   const groups = useDocumentStore((s) => s.groups);
   const matchedGroup = groupMatching(groups, selectedPartIds);
+  const units = selectionUnits(groups, selectedPartIds);
+  const canSnapTogether = units.length === 2;
+  const containsSavedGroup = units.some((selectionUnit) => selectionUnit.kind === 'group');
   const unit = useUiStore((s) => s.displayUnit);
 
   return (
@@ -283,11 +363,17 @@ function PropertiesTab() {
         />
       )}
       {matchedGroup && (
-        <NameField
-          value={matchedGroup.label}
-          onRename={(v) => renameGroup(matchedGroup.id, v)}
-          ariaLabel="Group name"
-        />
+        <>
+          <NameField
+            value={matchedGroup.label}
+            onRename={(v) => renameGroup(matchedGroup.id, v)}
+            ariaLabel="Group name"
+          />
+          <div className="mb-4 rounded-[7px] border border-hairline bg-surface px-2.5 py-2 text-[11px] text-ink/55">
+            {matchedGroup.cabinet ? 'Configurable cabinet' : 'Rigid group'} ·{' '}
+            {matchedGroup.partIds.length} {matchedGroup.partIds.length === 1 ? 'piece' : 'pieces'}
+          </div>
+        </>
       )}
 
       {selection.kind === 'single' && (
@@ -365,7 +451,11 @@ function PropertiesTab() {
         </>
       )}
 
-      {selection.kind === 'multi' && !matchedGroup?.cabinet && selection.size && (
+      {selection.kind === 'multi' && matchedGroup && !matchedGroup.cabinet && selection.size && (
+        <GroupSizeFields group={matchedGroup} size={selection.size} />
+      )}
+
+      {selection.kind === 'multi' && !matchedGroup && selection.size && (
         <>
           <SectionHeader>Dimensions</SectionHeader>
           <div className="flex gap-2">
@@ -376,6 +466,8 @@ function PropertiesTab() {
           <hr className="my-4 border-hairline" />
         </>
       )}
+
+      {matchedGroup && <GroupPositionFields group={matchedGroup} />}
 
       <FinishPicker />
 
@@ -388,21 +480,29 @@ function PropertiesTab() {
           </p>
         </>
       ) : (
-        <div className="mt-3.5 flex flex-wrap gap-2">
-          <Button onClick={clearSelection}>Clear</Button>
-          <Button onClick={() => resetTransforms(selectedPartIds)}>Reset transform</Button>
-          <Button onClick={() => snapToFloor(selectedPartIds)}>Snap to Floor</Button>
-          {(selection.kind === 'single' || matchedGroup) && (
-            <Button onClick={duplicateSelected}>Duplicate</Button>
+        <>
+          {canSnapTogether && (
+            <p className="mt-3 text-[10.5px] leading-relaxed text-ink/40">
+              Snap Together keeps the first selected item fixed and moves the second to its nearest face.
+            </p>
           )}
-          {selection.kind === 'multi' && !matchedGroup && (
-            <Button onClick={groupSelected}>Group</Button>
-          )}
-          {matchedGroup && <Button onClick={ungroupSelected}>Ungroup</Button>}
-          <Button variant="danger" onClick={() => deleteParts(selectedPartIds)}>
-            Delete
-          </Button>
-        </div>
+          <div className="mt-3.5 flex flex-wrap gap-2">
+            <Button onClick={clearSelection}>Clear</Button>
+            <Button onClick={() => resetTransforms(selectedPartIds)}>Reset transform</Button>
+            <Button onClick={() => snapToFloor(selectedPartIds)}>Snap to Floor</Button>
+            {canSnapTogether && <Button onClick={snapSelectedTogether}>Snap Together</Button>}
+            {(selection.kind === 'single' || matchedGroup) && (
+              <Button onClick={duplicateSelected}>Duplicate</Button>
+            )}
+            {selection.kind === 'multi' && !matchedGroup && !containsSavedGroup && (
+              <Button onClick={groupSelected}>Group</Button>
+            )}
+            {matchedGroup && <Button onClick={ungroupSelected}>Ungroup</Button>}
+            <Button variant="danger" onClick={() => deleteParts(selectedPartIds)}>
+              Delete
+            </Button>
+          </div>
+        </>
       )}
     </>
   );

@@ -7,10 +7,12 @@ import {
   duplicateSelected,
   newDocument,
   renameDocument,
+  resizeCabinetFromGizmo,
   resetTransforms,
   saveVersion,
   setCabinetDim,
   setCustomPartDim,
+  setGroupPositionAxis,
   setHardwareDiameter,
 } from './actions';
 import { createDefaultDocument, useDocumentStore } from './documentStore';
@@ -66,6 +68,38 @@ describe('library construction actions', () => {
     expect(members[4]).toMatchObject({ w: 864, h: 684, d: 8 });
     expect(state.transforms[resized.partIds[0]!]!.position[0]).toBeCloseTo(-0.441, 8);
     expect(state.transforms[resized.partIds[1]!]!.position[0]).toBeCloseTo(0.441, 8);
+  });
+
+  it('turns a full-cabinet gizmo scale into one parametric resize around the shared pivot', () => {
+    addCabinetPreset('base-600');
+    const group = useDocumentStore.getState().groups[0]!;
+    const pivotBefore = [0, 1, 2].map((axis) =>
+      group.partIds.reduce(
+        (sum, id) => sum + useDocumentStore.getState().transforms[id]!.position[axis]!,
+        0,
+      ) / group.partIds.length,
+    );
+
+    expect(resizeCabinetFromGizmo(group.partIds, [1.5, 1.25, 1.2])).toBe(true);
+
+    let state = useDocumentStore.getState();
+    const resized = state.groups[0]!;
+    const members = resized.partIds.map((id) => state.customParts.find((part) => part.id === id)!);
+    const pivotAfter = [0, 1, 2].map((axis) =>
+      resized.partIds.reduce((sum, id) => sum + state.transforms[id]!.position[axis]!, 0) /
+      resized.partIds.length,
+    );
+    expect(resized.cabinet).toMatchObject({ width: 900, height: 900, depth: 672 });
+    expect(members[0]).toMatchObject({ w: 18, h: 900, d: 672 });
+    expect(members[2]).toMatchObject({ w: 864, h: 18, d: 664 });
+    expect(members[4]).toMatchObject({ w: 864, h: 864, d: 8 });
+    expect(resized.partIds.every((id) => state.transforms[id]!.scale.every((value) => value === 1)))
+      .toBe(true);
+    pivotAfter.forEach((value, axis) => expect(value).toBeCloseTo(pivotBefore[axis]!, 8));
+
+    expect(undo()).toBe(true);
+    state = useDocumentStore.getState();
+    expect(state.groups[0]?.cabinet).toMatchObject({ width: 600, height: 720, depth: 560 });
   });
 
   it('resets a rotated cabinet as one coherent carcass', () => {
@@ -169,5 +203,21 @@ describe('library construction actions', () => {
       historyOpen: false,
       measureActive: false,
     });
+  });
+
+  it('moves a group pivot without changing member spacing or cabinet metadata', () => {
+    addCabinetPreset('base-600');
+    const group = useDocumentStore.getState().groups[0]!;
+    const before = group.partIds.map((id) => useDocumentStore.getState().transforms[id]!.position[0]);
+
+    setGroupPositionAxis(group.id, 'x', 500);
+
+    const state = useDocumentStore.getState();
+    const after = group.partIds.map((id) => state.transforms[id]!.position[0]);
+    expect(after.reduce((sum, value) => sum + value, 0) / after.length).toBeCloseTo(0.5, 8);
+    after.forEach((value, index) => {
+      expect(value - after[0]!).toBeCloseTo(before[index]! - before[0]!, 8);
+    });
+    expect(state.groups[0]?.cabinet?.width).toBe(600);
   });
 });

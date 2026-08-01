@@ -1,5 +1,11 @@
 import { describe, expect, it } from 'vitest';
-import { computePartSpecs, groupContaining, groupMatching, livePartIds } from './parts';
+import {
+  computePartSpecs,
+  groupContaining,
+  groupMatching,
+  livePartIds,
+  selectionUnits,
+} from './parts';
 import type { CustomPart, Group } from './types';
 
 const shelf: CustomPart = {
@@ -76,5 +82,24 @@ describe('groupContaining', () => {
 
   it('returns undefined for an ungrouped part', () => {
     expect(groupContaining([group], 'custom-3')).toBeUndefined();
+  });
+});
+
+describe('selectionUnits', () => {
+  const first: Group = { id: 'group-1', label: 'First', partIds: ['a', 'b'] };
+  const second: Group = { id: 'group-2', label: 'Second', partIds: ['c', 'd'] };
+
+  it('treats complete groups as rigid units in selection order', () => {
+    expect(selectionUnits([first, second], ['a', 'b', 'c', 'd'])).toEqual([
+      { kind: 'group', id: 'group-1', partIds: ['a', 'b'] },
+      { kind: 'group', id: 'group-2', partIds: ['c', 'd'] },
+    ]);
+  });
+
+  it('keeps partial groups and loose pieces individually selectable', () => {
+    expect(selectionUnits([first], ['a', 'loose'])).toEqual([
+      { kind: 'part', id: 'a', partIds: ['a'] },
+      { kind: 'part', id: 'loose', partIds: ['loose'] },
+    ]);
   });
 });
