@@ -3,6 +3,7 @@
 // the domain stays unit-testable in Node and three.js stays code-splittable.
 
 export type Vec3Mm = { x: number; y: number; z: number };
+export type DimensionAxis = 'w' | 'h' | 'd';
 
 /** The wood/substrate a part is made of — independent of any stain or paint applied to it. */
 export type MaterialId = 'walnut' | 'oak' | 'ash';
@@ -39,6 +40,10 @@ export type PanelPreset = {
   d: number;
   icon: string;
   shape: PanelShape;
+  /** Local dimension that represents sheet thickness; null for non-sheet hardware. */
+  thicknessAxis: DimensionAxis | null;
+  /** Orientation used when the preset first enters the scene. */
+  defaultQuaternion: [number, number, number, number];
 };
 
 /** A user-inserted library panel. Placement lives in Transforms, not here. */
@@ -49,6 +54,8 @@ export type CustomPart = {
   h: number;
   d: number;
   shape: PanelShape;
+  /** Optional for backward compatibility; old files infer the smallest dimension. */
+  thicknessAxis?: DimensionAxis | null;
 };
 
 export type PartOverride = { material?: MaterialId; color?: ColorId };
@@ -102,7 +109,7 @@ export type Group = {
 
 /** The undoable, persisted portion of application state. */
 export type DocumentSnapshot = {
-  /** Default material and color applied to newly inserted panels. */
+  /** Piece-wide defaults used by every panel without a per-part override. */
   defaultMaterialId: MaterialId;
   defaultColorId: ColorId;
   overrides: Overrides;

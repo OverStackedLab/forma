@@ -59,9 +59,7 @@ export function useSelectionInfo(): SelectionInfo {
 
 /** The scope phrase used by both the Properties and Materials "Editing: …" chips. */
 export function scopeLabel(selection: SelectionInfo): string {
-  // Nothing selected doesn't edit an existing piece — there isn't one — it
-  // just sets the finish newly inserted panels will start with.
-  if (selection.kind === 'none') return 'New Panels';
+  if (selection.kind === 'none') return 'Whole Piece';
   if (selection.kind === 'multi') return selection.groupLabel ?? `${selection.count} parts`;
   return selection.spec.label;
 }

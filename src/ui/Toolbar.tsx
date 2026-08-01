@@ -81,6 +81,7 @@ export function Toolbar() {
           label="Measure"
           toggle
           active={measureActive}
+          disabled={viewMode !== 'model'}
           onClick={toggleMeasure}
         />
         <IconButton

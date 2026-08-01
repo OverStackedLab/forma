@@ -14,6 +14,7 @@ import {
   resetOverrides,
   resetTransforms,
   setCustomPartDim,
+  setPositionAxis,
   setRotationAxis,
   snapToFloor,
   ungroupSelected,
@@ -68,6 +69,38 @@ const ROTATION_AXES: { axis: 'x' | 'y' | 'z'; label: string }[] = [
   { axis: 'z', label: 'Z Angle' },
 ];
 const ROTATION_LIMITS = { min: -180, max: 180, step: 1 } as const;
+const POSITION_LIMITS = { min: -10_000, max: 10_000, step: 1 } as const;
+
+function PositionFields({ partId }: { partId: string }) {
+  const transform = useDocumentStore((s) => s.transforms[partId]) ?? IDENTITY_TRANSFORM;
+  const unit = useUiStore((s) => s.displayUnit);
+  const range = convertRange(POSITION_LIMITS, unit);
+  const axes = [
+    { axis: 'x', label: 'X Position', index: 0 },
+    { axis: 'y', label: 'Y Position', index: 1 },
+    { axis: 'z', label: 'Z Position', index: 2 },
+  ] as const;
+
+  return (
+    <>
+      <SectionHeader>Position</SectionHeader>
+      {axes.map(({ axis, label, index }) => (
+        <SliderField
+          key={axis}
+          label={label}
+          value={fromMm(transform.position[index] * 1000, unit)}
+          min={range.min}
+          max={range.max}
+          step={range.step}
+          unit={unit}
+          unitName={UNIT_NAMES[unit]}
+          onChange={(v) => setPositionAxis(partId, axis, toMm(v, unit))}
+        />
+      ))}
+      <hr className="my-4 border-hairline" />
+    </>
+  );
+}
 
 /**
  * Numeric counterpart to the rotate gizmo — set an exact angle per axis
@@ -192,6 +225,7 @@ function PropertiesTab() {
             );
           })}
           <hr className="my-4 border-hairline" />
+          <PositionFields partId={selection.spec.id} />
           <RotationFields partId={selection.spec.id} />
         </>
       )}
@@ -279,8 +313,7 @@ function MaterialsTab() {
  * a part is milled from vs. the stain or paint applied over it, so either
  * can change without touching the other. Both are bound to the current
  * selection scope (an override on the selected part(s), or the document
- * default with nothing selected — which only sets what newly inserted
- * panels start with) and shared by the Materials tab and the Properties
+ * piece-wide default with nothing selected) and shared by the Materials tab and the Properties
  * tab, so neither can drift between the two.
  */
 function MaterialColorPicker() {

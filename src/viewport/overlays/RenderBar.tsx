@@ -1,4 +1,5 @@
 import { useUiStore } from '@/store/uiStore';
+import { useDocumentStore } from '@/store/documentStore';
 import { downloadDataUrl } from '@/ui/download';
 import type { CameraPreset } from '../CameraController';
 import { viewportApi } from '../viewportApi';
@@ -11,11 +12,13 @@ const PRESETS: { id: CameraPreset; label: string }[] = [
 
 export function RenderBar() {
   const showToast = useUiStore((s) => s.showToast);
+  const docTitle = useDocumentStore((s) => s.docTitle);
 
   const handleExport = () => {
     const url = viewportApi()?.exportImage();
     if (!url) return;
-    downloadDataUrl(url, 'sideboard-render.png');
+    const safeTitle = docTitle.trim().replace(/[\\/:*?"<>|]+/g, '-') || 'furniture';
+    downloadDataUrl(url, `${safeTitle}-render.png`);
     showToast('Image exported');
   };
 

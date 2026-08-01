@@ -1,4 +1,4 @@
-# Handoff: Forma — Parametric 3D Furniture Designer
+# Forma — 3D Furniture Panel Designer
 
 *The app was originally named "Kerf" during design; it has since been renamed to
 Forma. The prototype under `reference/` still shows the old name and wordmark —
@@ -7,9 +7,11 @@ throughout.*
 
 ## Overview
 
-Forma is a browser-based 3D furniture design tool for professional furniture designers and makers. A designer parametrically configures a case piece (the demo model is a walnut sideboard), assembles custom pieces from a panel library, manipulates parts with move/rotate/scale gizmos in a live 3D viewport, and generates a cut list / bill of materials that stays in sync with the model.
+Forma is currently a browser-based, empty-canvas furniture panel designer. A designer inserts shelves, sides, backs, dividers, doors, and knobs from a library; positions and sizes them precisely; groups and finishes parts; and generates a cut list that stays in sync with the scene.
 
 Three top-level modes: **Model** (the editor), **Cut List** (auto-generated BOM with CSV export), and **Render** (clean presentation view with camera presets and PNG export).
+
+The current implementation is a general panel assembly tool rather than the original parametric sideboard configurator. The detailed sideboard specification below is retained as historical design context; its overall-dimension drivers, generated carcass, leg styles, and handle styles are not current application behavior.
 
 ## About the Design Files
 
@@ -29,6 +31,8 @@ Everything else — the panel chrome, sidebars, toolbars, typography, the DOM ov
 **High-fidelity, and functionally complete.** All colors, typography, spacing, and icons are final. The interactions are not simulated — the 3D viewport genuinely renders, the gizmos genuinely transform geometry, the cut list genuinely recomputes from the model, and both exports produce real files. Recreate the UI pixel-perfectly using the codebase's existing libraries and patterns.
 
 ---
+
+## Historical Parametric Sideboard Reference
 
 ## Application Shell
 

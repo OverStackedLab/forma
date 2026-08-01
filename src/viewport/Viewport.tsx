@@ -12,6 +12,7 @@ import { ModelBuilder } from './ModelBuilder';
 import { PickController } from './PickController';
 import { SceneManager } from './SceneManager';
 import { SelectionOverlay } from './SelectionOverlay';
+import { snapSelectionToNearbyFaces } from './faceSnap';
 import { setViewportApi } from './viewportApi';
 import { MarqueeRect } from './overlays/MarqueeRect';
 import { MeasureBanner } from './overlays/MeasureBanner';
@@ -86,11 +87,19 @@ export function Viewport() {
     measure.setLabelElement(measureLabelRef.current);
 
     const gizmo = new GizmoController(scene, builder, (transforms) => {
-      commitTransforms(transforms);
+      const state = useUiStore.getState();
+      const next =
+        state.snapEnabled && state.gizmoMode === 'translate'
+          ? snapSelectionToNearbyFaces(builder, Object.keys(transforms), transforms)
+          : transforms;
+      commitTransforms(next);
     });
 
     const pick = new PickController(scene, builder, {
-      isMeasureActive: () => useUiStore.getState().measureActive,
+      isMeasureActive: () => {
+        const state = useUiStore.getState();
+        return state.viewMode === 'model' && state.measureActive;
+      },
       isPanMode: () => useUiStore.getState().gizmoMode === 'pan',
       isGizmoDragging: () => gizmo.isDragging,
       onSelect: (partId, additive) => {
@@ -141,7 +150,13 @@ export function Viewport() {
 
     syncScene();
     gizmo.setSnapEnabled(useUiStore.getState().snapEnabled);
-    scene.setGridVisible(useUiStore.getState().gridVisible);
+    const syncPresentationVisibility = () => {
+      const state = useUiStore.getState();
+      const editing = state.viewMode !== 'render';
+      scene.setGridVisible(editing && state.gridVisible);
+      measure.setVisible(editing);
+    };
+    syncPresentationVisibility();
 
     const unsubDoc = useDocumentStore.subscribe(syncScene);
 
@@ -164,6 +179,7 @@ export function Viewport() {
       () => {
         overlay.apply(decorated());
         gizmo.sync(useUiStore.getState().gizmoMode, decorated());
+        syncPresentationVisibility();
         scene.resize();
       },
     );
@@ -173,7 +189,7 @@ export function Viewport() {
     );
     const unsubGrid = useUiStore.subscribe(
       (s) => s.gridVisible,
-      (visible) => scene.setGridVisible(visible),
+      () => syncPresentationVisibility(),
     );
     const unsubMeasure = useUiStore.subscribe(
       (s) => s.measurePoints,
@@ -212,6 +228,7 @@ export function Viewport() {
       gizmo.dispose();
       measure.dispose();
       overlay.dispose();
+      camera.dispose();
       builder.dispose();
       scene.dispose();
     };

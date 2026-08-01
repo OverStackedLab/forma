@@ -225,7 +225,7 @@ test('snap to floor reports nothing to do when a panel is already grounded', asy
   await expect(page.getByText('Already on the floor')).toBeVisible();
 });
 
-test('reducing a panel height lifts it off the floor, and Snap to Floor drops it back', async ({
+test('changing a panel height keeps its grounded face anchored', async ({
   page,
 }) => {
   await page.goto('/');
@@ -234,20 +234,53 @@ test('reducing a panel height lifts it off the floor, and Snap to Floor drops it
   // depends on the live three.js scene (like Snap to Floor).
   await expect(page.locator('canvas')).toBeVisible();
 
-  // Height shrinks around the same centre, so the panel's bottom face lifts
-  // off the floor without touching its position directly. Wait for the value
-  // to settle before snapping, so the click can't race the store update.
+  // Exact dimension edits preserve the negative/local face, so a grounded
+  // shelf remains grounded instead of drifting or cutting through the floor.
   const heightInput = page.getByLabel('Height in millimetres');
   await heightInput.fill('100');
   await heightInput.blur();
   await expect(heightInput).toHaveValue('100');
 
   await page.getByRole('button', { name: 'Snap to Floor' }).click();
-  await expect(page.getByText('Snapped to floor')).toBeVisible();
-
-  // It's grounded again — a second snap has nothing left to do.
-  await page.getByRole('button', { name: 'Snap to Floor' }).click();
   await expect(page.getByText('Already on the floor')).toBeVisible();
+});
+
+test('exact position fields accept furniture-scale offsets', async ({ page }) => {
+  await page.goto('/');
+  await insertShelf(page);
+
+  const xPosition = page.getByLabel('X Position in millimetres');
+  await xPosition.fill('409');
+  await xPosition.blur();
+  await expect(xPosition).toHaveValue('409');
+
+  await page.getByRole('button', { name: 'Undo' }).click();
+  await expect(xPosition).toHaveValue('0');
+});
+
+test('a saved version stops being Current after the design changes', async ({ page }) => {
+  await page.goto('/');
+  await insertShelf(page);
+  await page.getByRole('button', { name: 'Save Version' }).click();
+  await page.getByRole('button', { name: 'Version history' }).click();
+  await expect(page.getByText('Current', { exact: true })).toBeVisible();
+  await page.getByRole('button', { name: 'Close version history' }).click();
+
+  const width = page.getByLabel('Width in millimetres');
+  await width.fill('900');
+  await width.blur();
+  await page.getByRole('button', { name: 'Version history' }).click();
+  await expect(page.getByText('Current', { exact: true })).toHaveCount(0);
+  await expect(page.getByRole('button', { name: 'Restore' })).toBeVisible();
+});
+
+test('the whole-piece material applies without creating a fake override', async ({ page }) => {
+  await page.goto('/');
+  await expect(page.getByText('Editing: Whole Piece')).toBeVisible();
+  await page.getByRole('button', { name: 'Ash' }).click();
+  await insertShelf(page);
+  await expect(page.getByRole('button', { name: 'Ash' })).toHaveAttribute('aria-pressed', 'true');
+  await expect(page.getByText('Reset to default')).toHaveCount(0);
 });
 
 test('a freshly inserted Shelf lies flat, not standing upright', async ({ page }) => {
@@ -404,14 +437,18 @@ test('resizing with the scale gizmo updates the Dimensions fields to match', asy
   const widthInput = page.getByLabel('Width in millimetres');
   await expect(widthInput).toHaveValue('800');
 
-  // Drag the X-axis (red) scale handle outward. A couple of no-op moves
-  // first give TransformControls a moment to finish attaching to the gizmo
-  // mode change before the drag that matters.
-  await page.mouse.move(698, 508);
-  await page.mouse.move(699, 508);
+  // Drag the X-axis (red) scale handle outward. Locate it relative to the
+  // viewport rather than the page so sidebar/property layout changes do not
+  // silently move the target out from under this interaction test.
+  const canvasBox = await page.locator('canvas').boundingBox();
+  if (!canvasBox) throw new Error('viewport canvas has no bounding box');
+  const handleX = canvasBox.x + canvasBox.width * 0.578;
+  const handleY = canvasBox.y + canvasBox.height * 0.53;
+  await page.mouse.move(handleX - 1, handleY);
+  await page.mouse.move(handleX, handleY);
   await page.mouse.down();
-  await page.mouse.move(740, 515, { steps: 5 });
-  await page.mouse.move(800, 525, { steps: 5 });
+  await page.mouse.move(handleX + 45, handleY + 8, { steps: 5 });
+  await page.mouse.move(handleX + 105, handleY + 18, { steps: 5 });
   await page.mouse.up();
 
   // The drag-end commit flows through a store update and a React re-render

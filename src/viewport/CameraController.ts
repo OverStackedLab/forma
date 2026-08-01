@@ -13,26 +13,39 @@ const PRESETS: Record<CameraPreset, { pos: [number, number, number]; target: [nu
 
 /** Fraction of the remaining distance covered per frame. */
 const EASE = 0.08;
-/** Frames-worth of progress per step, so a flight always terminates. */
-const STEP = 0.035;
+const ARRIVAL_EPSILON = 0.002;
 
 /** Eases the camera between viewpoints rather than snapping. */
 export class CameraController {
-  private flight: { pos: THREE.Vector3; target: THREE.Vector3; t: number } | null = null;
+  private flight: { pos: THREE.Vector3; target: THREE.Vector3 } | null = null;
+  private readonly cancelFlight = () => {
+    this.flight = null;
+  };
 
   constructor(
     private readonly scene: SceneManager,
     private readonly builder: ModelBuilder,
-  ) {}
+  ) {
+    // OrbitControls emits `start` for mouse, touch and wheel gestures. A user
+    // gesture takes ownership immediately so an eased Frame flight cannot
+    // keep pulling the camera back after the user scrolls to zoom.
+    scene.controls.addEventListener('start', this.cancelFlight);
+  }
 
   /** Called once per frame from the render loop. */
   update(): void {
     const f = this.flight;
     if (!f) return;
-    f.t = Math.min(1, f.t + STEP);
     this.scene.camera.position.lerp(f.pos, EASE);
     this.scene.controls.target.lerp(f.target, EASE);
-    if (f.t >= 1) this.flight = null;
+    if (
+      this.scene.camera.position.distanceTo(f.pos) < ARRIVAL_EPSILON &&
+      this.scene.controls.target.distanceTo(f.target) < ARRIVAL_EPSILON
+    ) {
+      this.scene.camera.position.copy(f.pos);
+      this.scene.controls.target.copy(f.target);
+      this.flight = null;
+    }
   }
 
   goTo(preset: CameraPreset): void {
@@ -40,9 +53,11 @@ export class CameraController {
     this.flyTo(new THREE.Vector3(...p.pos), new THREE.Vector3(...p.target));
   }
 
-  /** The default three-quarter view. */
+  /** Fits every live part, falling back to the default view for an empty scene. */
   frameAll(): void {
-    this.goTo('angle');
+    const ids = this.builder.partSpecs.map((part) => part.id);
+    if (ids.length) this.frameSelection(ids);
+    else this.goTo('angle');
   }
 
   /**
@@ -52,7 +67,7 @@ export class CameraController {
   frameSelection(selectedIds: readonly string[]): void {
     const box = combinedWorldBounds(selectedIds.map((id) => this.builder.getRoot(id)));
     if (!box) {
-      this.frameAll();
+      this.goTo('angle');
       return;
     }
 
@@ -64,6 +79,11 @@ export class CameraController {
   }
 
   private flyTo(pos: THREE.Vector3, target: THREE.Vector3): void {
-    this.flight = { pos, target, t: 0 };
+    this.flight = { pos, target };
+  }
+
+  dispose(): void {
+    this.scene.controls.removeEventListener('start', this.cancelFlight);
+    this.flight = null;
   }
 }

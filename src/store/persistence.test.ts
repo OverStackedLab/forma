@@ -51,4 +51,21 @@ describe('persistence.normalize', () => {
     expect(result.customParts).toEqual([]);
     expect(result.hiddenIds).toEqual([]);
   });
+
+  it('drops malformed parts and repairs a missing transform for a valid part', () => {
+    const result = normalize({
+      customParts: [
+        null,
+        { id: 'bad', label: 'Bad', w: -1, h: 20, d: 20, shape: 'box' },
+        { id: 'good', label: 'Good', w: 800, h: 18, d: 300, shape: 'box' },
+      ],
+      transforms: {},
+    } as never);
+    expect(result.customParts.map((part) => part.id)).toEqual(['good']);
+    expect(result.transforms.good).toEqual({
+      position: [0, 0.009, 0],
+      quaternion: [0, 0, 0, 1],
+      scale: [1, 1, 1],
+    });
+  });
 });

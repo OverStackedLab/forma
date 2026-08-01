@@ -1,6 +1,12 @@
-import { PANEL_PRESETS } from '@/domain/catalog';
+import { CUSTOM_PANEL_LIMITS, PANEL_PRESETS } from '@/domain/catalog';
 import { groupMatching, livePartIds } from '@/domain/parts';
 import { eulerDegreesToQuaternion, quaternionToEulerDegrees } from '@/domain/rotation';
+import {
+  halfExtentAlongNormalMm,
+  orientedHalfExtentsMm,
+  rotateVectorByQuaternion,
+  type Vector3,
+} from '@/domain/spatial';
 import type {
   ColorId,
   CustomPart,
@@ -82,28 +88,56 @@ export function resetOverrides(partIds: readonly string[]): void {
 
 // ─── Panels ──────────────────────────────────────────────────────────────────
 
-export function addCustomPanel(presetId: string, dropPoint?: { x: number; z: number }): void {
+export type DropPlacement = { point: Vector3; normal: Vector3 };
+
+function nextInsertionX(state: FormaDocument, newHalfWidthMm: number): number {
+  if (!state.customParts.length) return 0;
+  let rightmostMm = -Infinity;
+  for (const part of state.customParts) {
+    const t = state.transforms[part.id] ?? IDENTITY_TRANSFORM;
+    const extent = orientedHalfExtentsMm(part, t.quaternion, t.scale);
+    rightmostMm = Math.max(rightmostMm, t.position[0] * 1000 + extent.x);
+  }
+  return (rightmostMm + 80 + newHalfWidthMm) / 1000;
+}
+
+export function addCustomPanel(presetId: string, placement?: DropPlacement): void {
   const preset = PANEL_PRESETS.find((p) => p.id === presetId) ?? PANEL_PRESETS[0]!;
   const s = doc();
   const id = nextCustomId();
-  const n = s.customParts.length;
-  const x = dropPoint ? dropPoint.x : ((n % 4) - 1.5) * 0.5;
-  const z = dropPoint ? dropPoint.z : 0.4;
-  const y = preset.h / 2000;
+  const halfExtents = orientedHalfExtentsMm(preset, preset.defaultQuaternion);
+  const supportMm = placement
+    ? halfExtentAlongNormalMm(preset, preset.defaultQuaternion, placement.normal)
+    : halfExtents.y;
+  const position: [number, number, number] = placement
+    ? [
+        placement.point.x + placement.normal.x * supportMm / 1000,
+        placement.point.y + placement.normal.y * supportMm / 1000,
+        placement.point.z + placement.normal.z * supportMm / 1000,
+      ]
+    : [nextInsertionX(s, halfExtents.x), halfExtents.y / 1000, 0];
 
   commit(() => {
     useDocumentStore.setState((prev) => ({
       customParts: [
         ...prev.customParts,
-        { id, label: preset.label, w: preset.w, h: preset.h, d: preset.d, shape: preset.shape },
+        {
+          id,
+          label: preset.label,
+          w: preset.w,
+          h: preset.h,
+          d: preset.d,
+          shape: preset.shape,
+          thicknessAxis: preset.thicknessAxis,
+        },
       ],
-      overrides: {
-        ...prev.overrides,
-        [id]: { material: prev.defaultMaterialId, color: prev.defaultColorId },
-      },
       transforms: {
         ...prev.transforms,
-        [id]: { position: [x, y, z], quaternion: [0, 0, 0, 1], scale: [1, 1, 1] },
+        [id]: {
+          position,
+          quaternion: [...preset.defaultQuaternion],
+          scale: [1, 1, 1],
+        },
       },
     }));
   });
@@ -133,19 +167,38 @@ const DIM_AXIS_INDEX = { w: 0, h: 1, d: 2 } as const;
 
 export function setCustomPartDim(id: string, key: 'w' | 'h' | 'd', value: number): void {
   if (!Number.isFinite(value) || value <= 0) return;
+  const limits = CUSTOM_PANEL_LIMITS[key];
+  const clamped = Math.min(limits.max, Math.max(limits.min, value));
   commit(() => {
     useDocumentStore.setState((s) => {
       const t = s.transforms[id];
       let transforms = s.transforms;
+      const part = s.customParts.find((p) => p.id === id);
       if (t) {
         // The typed value becomes the new absolute size on this axis only —
         // other axes keep whatever the gizmo scaled them to.
         const scale = [...t.scale] as [number, number, number];
+        const oldSize = part ? part[key] * Math.max(scale[DIM_AXIS_INDEX[key]], 0.001) : clamped;
         scale[DIM_AXIS_INDEX[key]] = 1;
-        transforms = { ...s.transforms, [id]: { ...t, scale } };
+        const localDelta = { x: 0, y: 0, z: 0 };
+        const component = key === 'w' ? 'x' : key === 'h' ? 'y' : 'z';
+        localDelta[component] = (clamped - oldSize) / 2000;
+        const worldDelta = rotateVectorByQuaternion(localDelta, t.quaternion);
+        transforms = {
+          ...s.transforms,
+          [id]: {
+            ...t,
+            position: [
+              t.position[0] + worldDelta.x,
+              t.position[1] + worldDelta.y,
+              t.position[2] + worldDelta.z,
+            ],
+            scale,
+          },
+        };
       }
       return {
-        customParts: s.customParts.map((p) => (p.id === id ? { ...p, [key]: value } : p)),
+        customParts: s.customParts.map((p) => (p.id === id ? { ...p, [key]: clamped } : p)),
         transforms,
       };
     });
@@ -164,7 +217,15 @@ export function duplicateSelected(): void {
   const transforms = { ...s.transforms };
   for (const src of sources) {
     const id = nextCustomId();
-    clones.push({ id, label: src.label, w: src.w, h: src.h, d: src.d, shape: src.shape });
+    clones.push({
+      id,
+      label: src.label,
+      w: src.w,
+      h: src.h,
+      d: src.d,
+      shape: src.shape,
+      thicknessAxis: src.thicknessAxis,
+    });
     const t = s.transforms[src.id];
     // Clones are offset 80 mm in X and Z, inheriting orientation and scale.
     transforms[id] = t
@@ -230,6 +291,11 @@ export function deleteParts(ids: readonly string[]): void {
 export function groupSelected(): void {
   const selected = ui().selectedPartIds;
   if (selected.length < 2) return;
+  const alreadyGrouped = new Set(doc().groups.flatMap((group) => group.partIds));
+  if (selected.some((id) => alreadyGrouped.has(id))) {
+    ui().showToast('Ungroup existing parts before creating a new group');
+    return;
+  }
   const label = `Group ${doc().groups.length + 1}`;
   const group: Group = { id: nextGroupId(), label, partIds: [...selected] };
   commit(() => {
@@ -267,7 +333,7 @@ export function selectGroup(groupId: string): void {
   if (group) ui().setSelection(group.partIds);
 }
 
-/** Shows the group if any member is hidden; otherwise hides the whole group. */
+/** Hides the whole group if any member is visible; otherwise shows every member. */
 export function toggleGroupVisibility(groupId: string): void {
   const s = doc();
   const group = s.groups.find((g) => g.id === groupId);
@@ -303,8 +369,26 @@ export function togglePartVisibility(id: string): void {
  */
 export function commitTransforms(next: Record<string, Transform>): void {
   if (!Object.keys(next).length) return;
+  const sanitized = Object.fromEntries(
+    Object.entries(next).map(([id, transform]) => {
+      const finite = (value: number, fallback: number) => (Number.isFinite(value) ? value : fallback);
+      const position = transform.position.map((value) =>
+        Math.min(10, Math.max(-10, finite(value, 0))),
+      ) as Transform['position'];
+      const rawQuaternion = transform.quaternion.map((value) => finite(value, 0)) as Transform['quaternion'];
+      const length = Math.hypot(...rawQuaternion);
+      const quaternion: Transform['quaternion'] =
+        length > 1e-8
+          ? rawQuaternion.map((value) => value / length) as Transform['quaternion']
+          : [0, 0, 0, 1];
+      const scale = transform.scale.map((value) =>
+        Math.min(100, Math.max(0.001, finite(value, 1))),
+      ) as Transform['scale'];
+      return [id, { position, quaternion, scale } satisfies Transform];
+    }),
+  );
   commit(() => {
-    useDocumentStore.setState((s) => ({ transforms: { ...s.transforms, ...next } }));
+    useDocumentStore.setState((s) => ({ transforms: { ...s.transforms, ...sanitized } }));
   });
 }
 
@@ -326,6 +410,21 @@ export function resetTransforms(ids: readonly string[]): void {
 
 export function transformOf(id: string): Transform {
   return doc().transforms[id] ?? IDENTITY_TRANSFORM;
+}
+
+const POSITION_AXIS_INDEX = { x: 0, y: 1, z: 2 } as const;
+
+/** Sets an exact part-centre position from a millimetre UI value. */
+export function setPositionAxis(id: string, axis: 'x' | 'y' | 'z', millimetres: number): void {
+  if (!Number.isFinite(millimetres)) return;
+  const current = transformOf(id);
+  const position = [...current.position] as [number, number, number];
+  position[POSITION_AXIS_INDEX[axis]] = Math.min(10, Math.max(-10, millimetres / 1000));
+  commit(() => {
+    useDocumentStore.setState((s) => ({
+      transforms: { ...s.transforms, [id]: { ...current, position } },
+    }));
+  });
 }
 
 /**

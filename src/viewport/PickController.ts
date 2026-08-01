@@ -17,7 +17,10 @@ export type PickCallbacks = {
   onMarqueeChange: (marquee: Marquee | null) => void;
   onMarqueeCommit: (partIds: string[], additive: boolean) => void;
   onMeasurePoint: (point: THREE.Vector3) => void;
-  onDropPanel: (presetId: string, point: { x: number; z: number } | null) => void;
+  onDropPanel: (
+    presetId: string,
+    placement: { point: { x: number; y: number; z: number }; normal: { x: number; y: number; z: number } } | null,
+  ) => void;
 };
 
 export class PickController {
@@ -132,7 +135,9 @@ export class PickController {
     else this.marqueePending = null;
   }
 
-  private raycast(e: PointerEvent | DragEvent): { partId?: string; point: THREE.Vector3 } | null {
+  private raycast(
+    e: PointerEvent | DragEvent,
+  ): { partId?: string; point: THREE.Vector3; normal: THREE.Vector3 } | null {
     const rect = this.element.getBoundingClientRect();
     this.pointer.x = ((e.clientX - rect.left) / rect.width) * 2 - 1;
     this.pointer.y = -((e.clientY - rect.top) / rect.height) * 2 + 1;
@@ -140,7 +145,10 @@ export class PickController {
     const hits = this.raycaster.intersectObjects(this.builder.pickables, true);
     for (const h of hits) {
       const partId = h.object.userData.partId as string | undefined;
-      if (partId) return { partId, point: h.point };
+      if (partId && h.face) {
+        const normal = h.face.normal.clone().transformDirection(h.object.matrixWorld).normalize();
+        return { partId, point: h.point, normal };
+      }
     }
     return null;
   }
@@ -189,10 +197,23 @@ export class PickController {
     this.pointer.x = ((e.clientX - rect.left) / rect.width) * 2 - 1;
     this.pointer.y = -((e.clientY - rect.top) / rect.height) * 2 + 1;
     this.raycaster.setFromCamera(this.pointer, this.scene.camera);
+    const surfaceHit = this.raycast(e);
+    if (surfaceHit) {
+      this.callbacks.onDropPanel(id, {
+        point: { x: surfaceHit.point.x, y: surfaceHit.point.y, z: surfaceHit.point.z },
+        normal: { x: surfaceHit.normal.x, y: surfaceHit.normal.y, z: surfaceHit.normal.z },
+      });
+      return;
+    }
     const groundHit = this.raycaster.intersectObject(this.scene.ground)[0];
     this.callbacks.onDropPanel(
       id,
-      groundHit ? { x: groundHit.point.x, z: groundHit.point.z } : null,
+      groundHit
+        ? {
+            point: { x: groundHit.point.x, y: groundHit.point.y, z: groundHit.point.z },
+            normal: { x: 0, y: 1, z: 0 },
+          }
+        : null,
     );
   }
 

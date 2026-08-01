@@ -23,12 +23,30 @@ export const COLORS: readonly Color[] = [
  * and `d` are its diameter (X and Z radii) and `h` is how far it projects.
  */
 export const PANEL_PRESETS: readonly PanelPreset[] = [
-  { id: 'shelf', label: 'Shelf', w: 800, h: 18, d: 300, icon: 'panel_shelf', shape: 'box' },
-  { id: 'flat', label: 'Side Panel', w: 600, h: 400, d: 18, icon: 'panel_flat', shape: 'box' },
-  { id: 'back', label: 'Back Panel', w: 800, h: 700, d: 8, icon: 'panel_back', shape: 'box' },
-  { id: 'divider', label: 'Divider', w: 400, h: 700, d: 18, icon: 'panel_divider', shape: 'box' },
-  { id: 'door', label: 'Door', w: 400, h: 700, d: 18, icon: 'panel_door', shape: 'box' },
-  { id: 'knob', label: 'Knob', w: 50, h: 45, d: 50, icon: 'panel_knob', shape: 'cylinder' },
+  {
+    id: 'shelf', label: 'Shelf', w: 800, h: 18, d: 300, icon: 'panel_shelf', shape: 'box',
+    thicknessAxis: 'h', defaultQuaternion: [0, 0, 0, 1],
+  },
+  {
+    id: 'flat', label: 'Side Panel', w: 600, h: 400, d: 18, icon: 'panel_flat', shape: 'box',
+    thicknessAxis: 'd', defaultQuaternion: [0, Math.SQRT1_2, 0, Math.SQRT1_2],
+  },
+  {
+    id: 'back', label: 'Back Panel', w: 800, h: 700, d: 8, icon: 'panel_back', shape: 'box',
+    thicknessAxis: 'd', defaultQuaternion: [0, 0, 0, 1],
+  },
+  {
+    id: 'divider', label: 'Divider', w: 400, h: 700, d: 18, icon: 'panel_divider', shape: 'box',
+    thicknessAxis: 'd', defaultQuaternion: [0, Math.SQRT1_2, 0, Math.SQRT1_2],
+  },
+  {
+    id: 'door', label: 'Door', w: 400, h: 700, d: 18, icon: 'panel_door', shape: 'box',
+    thicknessAxis: 'd', defaultQuaternion: [0, 0, 0, 1],
+  },
+  {
+    id: 'knob', label: 'Knob', w: 50, h: 45, d: 50, icon: 'panel_knob', shape: 'cylinder',
+    thicknessAxis: null, defaultQuaternion: [Math.SQRT1_2, 0, 0, Math.SQRT1_2],
+  },
 ];
 
 export const DEFAULT_MATERIAL_ID: MaterialId = 'oak';

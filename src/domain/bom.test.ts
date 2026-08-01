@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { computeBOM } from './bom';
+import { PANEL_PRESETS } from './catalog';
 import type { CustomPart } from './types';
 
 const shelf: CustomPart = { id: 'custom-1', label: 'Shelf', w: 800, h: 300, d: 18, shape: 'box' };
@@ -69,5 +70,21 @@ describe('computeBOM', () => {
   it('estimates at least one sheet once any panel exists', () => {
     const bom = computeBOM({ ...baseInput, customParts: [shelf] });
     expect(bom.totals.sheets).toBeGreaterThanOrEqual(1);
+  });
+
+  it('uses the two face dimensions for the production shelf preset', () => {
+    const preset = PANEL_PRESETS.find((p) => p.id === 'shelf')!;
+    const productionShelf: CustomPart = {
+      id: 'production-shelf',
+      label: preset.label,
+      w: preset.w,
+      h: preset.h,
+      d: preset.d,
+      shape: preset.shape,
+      thicknessAxis: preset.thicknessAxis,
+    };
+    const bom = computeBOM({ ...baseInput, customParts: [productionShelf] });
+    expect(bom.totals.sheetAreaM2).toBeCloseTo(0.8 * 0.3, 5);
+    expect(bom.totals.edgeBandM).toBeCloseTo(2.2, 5);
   });
 });

@@ -35,6 +35,11 @@ export class MeasureController {
     this.labelEl = el;
   }
 
+  setVisible(visible: boolean): void {
+    this.group.visible = visible;
+    if (!visible && this.labelEl) this.labelEl.style.display = 'none';
+  }
+
   setPoints(points: readonly MeasurePoint[]): void {
     this.clearChildren();
     this.points = points.map((p) => new THREE.Vector3(p.x, p.y, p.z));
@@ -57,7 +62,7 @@ export class MeasureController {
   updateLabel(): void {
     const el = this.labelEl;
     if (!el) return;
-    if (this.points.length !== 2) {
+    if (!this.group.visible || this.points.length !== 2) {
       el.style.display = 'none';
       return;
     }

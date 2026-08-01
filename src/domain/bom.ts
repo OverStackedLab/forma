@@ -1,5 +1,14 @@
 import { findColor, findMaterial, SHEET } from './catalog';
-import type { Bom, BomRow, ColorId, CustomPart, MaterialId, Overrides, Transforms } from './types';
+import type {
+  Bom,
+  BomRow,
+  ColorId,
+  CustomPart,
+  DimensionAxis,
+  MaterialId,
+  Overrides,
+  Transforms,
+} from './types';
 
 export type BomInput = {
   customParts: readonly CustomPart[];
@@ -8,6 +17,15 @@ export type BomInput = {
   defaultMaterialId: MaterialId;
   defaultColorId: ColorId;
 };
+
+const AXES: readonly DimensionAxis[] = ['w', 'h', 'd'];
+
+/** Old documents did not store a thickness axis, so infer it from the smallest nominal dimension. */
+export function thicknessAxisOf(part: CustomPart): DimensionAxis | null {
+  if (part.shape === 'cylinder') return null;
+  if (part.thicknessAxis) return part.thicknessAxis;
+  return AXES.reduce((smallest, axis) => (part[axis] < part[smallest] ? axis : smallest), 'w');
+}
 
 /**
  * The one BOM function. The table, the summary cards and the CSV all read
@@ -37,11 +55,16 @@ export function computeBOM(input: BomInput): Bom {
 
   let sheetAreaM2 = 0;
   let edgeBandM = 0;
-  for (const r of rows) {
-    if (!r.edge) continue;
-    sheetAreaM2 += ((r.w * r.h) / 1e6) * r.qty;
-    edgeBandM += ((2 * (r.w + r.h)) / 1000) * r.qty;
-  }
+  rows.forEach((r, index) => {
+    if (!r.edge) return;
+    const part = input.customParts[index]!;
+    const thicknessAxis = thicknessAxisOf(part);
+    const faceAxes = AXES.filter((axis) => axis !== thicknessAxis);
+    const faceA = r[faceAxes[0]!];
+    const faceB = r[faceAxes[1]!];
+    sheetAreaM2 += ((faceA * faceB) / 1e6) * r.qty;
+    edgeBandM += ((2 * (faceA + faceB)) / 1000) * r.qty;
+  });
   sheetAreaM2 = Math.round(sheetAreaM2 * 100) / 100;
   edgeBandM = Math.round(edgeBandM * 10) / 10;
 
