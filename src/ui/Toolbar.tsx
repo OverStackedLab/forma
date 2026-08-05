@@ -142,7 +142,7 @@ export function Toolbar() {
         <button
           type="button"
           onClick={saveVersion}
-          className="h-8 rounded-[7px] bg-accent px-3.5 text-[12.5px] font-bold text-canvas"
+          className="flex h-8 shrink-0 items-center whitespace-nowrap rounded-[7px] bg-accent px-3.5 text-[12.5px] font-bold text-canvas"
         >
           Save Version
         </button>
