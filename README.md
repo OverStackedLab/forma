@@ -345,11 +345,16 @@ The spec above is implemented in `src/` as a React + Vite + TypeScript app.
 
 ## Running it
 
+Requires **Node 20.19+ or 22.12+** (Vite 7). An `.nvmrc` is provided — `nvm use` picks the right version.
+
 ```bash
 npm install
 npm run dev        # http://localhost:5199
 npm run build      # typecheck + production bundle
+npm run preview    # serve the production bundle
+npm run typecheck  # tsc --noEmit only
 npm run test       # domain unit tests (vitest)
+npm run test:watch # vitest in watch mode
 npm run test:e2e   # browser smoke tests (Playwright)
 ```
 
@@ -366,9 +371,11 @@ npm run test:e2e   # browser smoke tests (Playwright)
 
 Three deliberate departures, each fixing a defect the spec's approach caused:
 
-1. **`manualTransforms` lives in the document store**, not outside reactive state.
-   That is what puts gizmo moves on the undo stack, into autosave and into
-   version snapshots. Transforms commit once on gizmo release, not per frame.
+1. **Gizmo transforms live in the document store** (the `transforms` map on
+   `DocumentSnapshot`), not outside reactive state as the spec's
+   `manualTransforms` suggested. That is what puts gizmo moves on the undo
+   stack, into autosave and into version snapshots. Transforms commit once on
+   gizmo release, not per frame.
 2. ~~Hardware counts derive from surviving part ids, so deleting a door drops
    its hinges.~~ Superseded — see the pivot below; there's no more hardware to
    count.

@@ -24,6 +24,8 @@ const Viewport = lazy(() => import('@/viewport/Viewport').then((m) => ({ default
 
 export function App() {
   const viewMode = useUiStore((s) => s.viewMode);
+  const leftSidebarOpen = useUiStore((s) => s.leftSidebarOpen);
+  const rightSidebarOpen = useUiStore((s) => s.rightSidebarOpen);
   useKeyboardShortcuts();
 
   useEffect(() => {
@@ -57,13 +59,13 @@ export function App() {
       <Toolbar />
 
       <div className="relative flex min-h-0 flex-1">
-        {showSidebars && <LeftSidebar />}
+        {showSidebars && leftSidebarOpen && <LeftSidebar />}
 
         <Suspense fallback={<ViewportFallback />}>
           <Viewport />
         </Suspense>
 
-        {showSidebars && <RightSidebar />}
+        {showSidebars && rightSidebarOpen && <RightSidebar />}
 
         {viewMode === 'cutlist' && <CutList />}
         <HistoryPanel />

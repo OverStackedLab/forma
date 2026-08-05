@@ -23,6 +23,10 @@ export function Toolbar() {
   const toggleMeasure = useUiStore((s) => s.toggleMeasure);
   const historyOpen = useUiStore((s) => s.historyOpen);
   const toggleHistory = useUiStore((s) => s.toggleHistory);
+  const leftSidebarOpen = useUiStore((s) => s.leftSidebarOpen);
+  const toggleLeftSidebar = useUiStore((s) => s.toggleLeftSidebar);
+  const rightSidebarOpen = useUiStore((s) => s.rightSidebarOpen);
+  const toggleRightSidebar = useUiStore((s) => s.toggleRightSidebar);
   const hasDocumentContent = useDocumentStore(
     (s) => s.customParts.length > 0 || s.versions.length > 0 || s.docTitle !== 'Untitled Design',
   );
@@ -97,6 +101,23 @@ export function Toolbar() {
         <div className="h-5 w-px flex-none bg-white/10" />
         <IconButton icon="undo" label="Undo" onClick={undo} disabled={!canUndo()} />
         <IconButton icon="redo" label="Redo" onClick={redo} disabled={!canRedo()} />
+        <div className="h-5 w-px flex-none bg-white/10" />
+        <IconButton
+          icon="sidebar_left"
+          label="Toggle left sidebar"
+          toggle
+          active={leftSidebarOpen}
+          disabled={viewMode === 'render'}
+          onClick={toggleLeftSidebar}
+        />
+        <IconButton
+          icon="sidebar_right"
+          label="Toggle right sidebar"
+          toggle
+          active={rightSidebarOpen}
+          disabled={viewMode === 'render'}
+          onClick={toggleRightSidebar}
+        />
         <div className="h-5 w-px flex-none bg-white/10" />
         <IconButton
           icon="measure"
