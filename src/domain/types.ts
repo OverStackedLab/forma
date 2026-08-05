@@ -93,6 +93,11 @@ export type CabinetConfig = {
   height: number;
   depth: number;
   shelfCount: number;
+  /**
+   * Explicit shelf centreline heights in mm from the cabinet bottom, sorted
+   * ascending. Absent for the default even distribution driven by shelfCount.
+   */
+  shelfPositionsMm?: number[];
 };
 
 /** A user-inserted or cabinet-generated part. Placement lives in Transforms. */

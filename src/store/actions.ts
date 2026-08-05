@@ -1,4 +1,11 @@
-import { buildCabinetLayout } from '@/domain/cabinets';
+import {
+  buildCabinetLayout,
+  distributedShelfPositions,
+  MAX_SHELF_COUNT,
+  shelfPositionRange,
+  shelfPositions,
+  type CabinetLayoutPart,
+} from '@/domain/cabinets';
 import {
   CABINET_DIM_LIMITS,
   CABINET_PRESETS,
@@ -408,7 +415,14 @@ export function duplicateSelected(): void {
         id: nextGroupId(),
         label: sourceGroup.label,
         partIds: sourceGroup.partIds.map((id) => cloneIdBySource.get(id)!),
-        cabinet: sourceGroup.cabinet ? { ...sourceGroup.cabinet } : undefined,
+        cabinet: sourceGroup.cabinet
+          ? {
+              ...sourceGroup.cabinet,
+              shelfPositionsMm: sourceGroup.cabinet.shelfPositionsMm
+                ? [...sourceGroup.cabinet.shelfPositionsMm]
+                : undefined,
+            }
+          : undefined,
       }
     : undefined;
 
@@ -612,6 +626,7 @@ function cabinetPreset(group: Group, config: CabinetConfig) {
     height: config.height,
     depth: config.depth,
     shelfCount: config.shelfCount,
+    shelfPositionsMm: config.shelfPositionsMm,
     icon: 'cabinet',
   } as const;
 }
@@ -674,13 +689,16 @@ function cabinetResizeMetadata(group: Group, requested: CabinetConfig): {
 } {
   const config = { ...requested };
   const currentPreset = CABINET_PRESETS.find((preset) => preset.id === group.cabinet?.presetId);
-  const matchingPreset = CABINET_PRESETS.find(
-    (preset) =>
-      preset.width === config.width &&
-      preset.height === config.height &&
-      preset.depth === config.depth &&
-      preset.shelfCount === config.shelfCount,
-  );
+  // Custom shelf positions mean the cabinet is no longer any catalog preset.
+  const matchingPreset = config.shelfPositionsMm?.length
+    ? undefined
+    : CABINET_PRESETS.find(
+        (preset) =>
+          preset.width === config.width &&
+          preset.height === config.height &&
+          preset.depth === config.depth &&
+          preset.shelfCount === config.shelfCount,
+      );
   config.presetId = matchingPreset?.id;
   const generatedLabel =
     currentPreset?.label === group.label || /^(Base|Wall|Tall) \d+×\d+×\d+$/.test(group.label);
@@ -692,6 +710,12 @@ function cabinetResizeMetadata(group: Group, requested: CabinetConfig): {
   return { config, label };
 }
 
+/**
+ * Rebuilds a cabinet from its parametric config. The generated layout keeps a
+ * stable order (carcass first, shelves after), so existing member ids are
+ * reused by index; a longer layout mints ids for the added shelves and a
+ * shorter one deletes the surplus members.
+ */
 function commitCabinetResize(
   group: Group,
   requested: CabinetConfig,
@@ -700,57 +724,95 @@ function commitCabinetResize(
   const { config, label } = cabinetResizeMetadata(group, requested);
   const nextGroup = { ...group, label };
   const layout = buildCabinetLayout(cabinetPreset(nextGroup, config));
-  const indexById = new Map(group.partIds.map((id, index) => [id, index]));
+  const nextIds = layout.map((_, index) => group.partIds[index] ?? nextCustomId());
+  const removedIds = group.partIds.slice(layout.length);
+  const indexById = new Map(nextIds.map((id, index) => [id, index]));
+
+  const layoutTransform = (item: CabinetLayoutPart): Transform => {
+    const offset = rotateVectorByQuaternion(
+      {
+        x: item.positionMm[0] / 1000,
+        y: item.positionMm[1] / 1000,
+        z: item.positionMm[2] / 1000,
+      },
+      placement.quaternion,
+    );
+    return {
+      position: [
+        placement.origin[0] + offset.x,
+        placement.origin[1] + offset.y,
+        placement.origin[2] + offset.z,
+      ],
+      quaternion: [...placement.quaternion],
+      scale: [1, 1, 1],
+    };
+  };
 
   commit(() => {
     useDocumentStore.setState((previous) => {
       const transforms = { ...previous.transforms };
-      for (const [index, id] of group.partIds.entries()) {
-        const item = layout[index];
-        if (!item) continue;
-        const offset = rotateVectorByQuaternion(
-          {
-            x: item.positionMm[0] / 1000,
-            y: item.positionMm[1] / 1000,
-            z: item.positionMm[2] / 1000,
-          },
-          placement.quaternion,
-        );
-        transforms[id] = {
-          position: [
-            placement.origin[0] + offset.x,
-            placement.origin[1] + offset.y,
-            placement.origin[2] + offset.z,
-          ],
-          quaternion: [...placement.quaternion],
-          scale: [1, 1, 1],
-        };
+      const overrides = { ...previous.overrides };
+      for (const [index, id] of nextIds.entries()) transforms[id] = layoutTransform(layout[index]!);
+      for (const id of removedIds) {
+        delete transforms[id];
+        delete overrides[id];
       }
+
+      const existing = new Set(group.partIds);
+      const addedParts: CustomPart[] = nextIds
+        .map((id, index) => ({ id, item: layout[index]! }))
+        .filter(({ id }) => !existing.has(id))
+        .map(({ id, item }) => ({
+          id,
+          label: item.label,
+          w: item.w,
+          h: item.h,
+          d: item.d,
+          shape: item.shape,
+          category: item.category,
+          bomLabel: item.bomLabel,
+          thicknessAxis: item.thicknessAxis,
+          grainAxis: item.grainAxis,
+          edgeBanding: [...item.edgeBanding],
+        }));
+
       return {
-        customParts: previous.customParts.map((part) => {
-          const index = indexById.get(part.id);
-          const item = index === undefined ? undefined : layout[index];
-          if (!item) return part;
-          return {
-            ...part,
-            label: item.label,
-            bomLabel: item.bomLabel,
-            w: item.w,
-            h: item.h,
-            d: item.d,
-            category: item.category,
-            thicknessAxis: item.thicknessAxis,
-          };
-        }),
+        customParts: [
+          ...previous.customParts
+            .filter((part) => !removedIds.includes(part.id))
+            .map((part) => {
+              const index = indexById.get(part.id);
+              const item = index === undefined ? undefined : layout[index];
+              if (!item) return part;
+              return {
+                ...part,
+                label: item.label,
+                bomLabel: item.bomLabel,
+                w: item.w,
+                h: item.h,
+                d: item.d,
+                category: item.category,
+                thicknessAxis: item.thicknessAxis,
+              };
+            }),
+          ...addedParts,
+        ],
+        hiddenIds: previous.hiddenIds.filter((id) => !removedIds.includes(id)),
         transforms,
+        overrides,
         groups: previous.groups.map((candidate) =>
           candidate.id === group.id
-            ? { ...candidate, label, cabinet: config }
+            ? { ...candidate, label, partIds: nextIds, cabinet: config }
             : candidate,
         ),
       };
     });
   });
+
+  // Keep the whole cabinet selected through membership changes, so the
+  // parametric controls stay on screen and stale ids never linger.
+  const selected = new Set(ui().selectedPartIds);
+  if (group.partIds.some((id) => selected.has(id))) ui().setSelection(nextIds);
 }
 
 /** Rebuilds a generated cabinet while keeping its bottom-centre placement. */
@@ -770,6 +832,78 @@ export function setCabinetDim(
   };
   const placement = cabinetPlacement(group, group.cabinet);
   commitCabinetResize(group, nextConfig, placement);
+}
+
+/**
+ * Replaces a cabinet's shelves with explicit centreline heights (mm from the
+ * cabinet bottom). Positions are clamped into the interior, sorted, and
+ * capped at MAX_SHELF_COUNT; the carcass is rebuilt in place.
+ */
+export function setCabinetShelfPositions(groupId: string, positionsMm: readonly number[]): void {
+  const group = doc().groups.find((candidate) => candidate.id === groupId);
+  if (!group?.cabinet) return;
+  const sorted = shelfPositions({
+    height: group.cabinet.height,
+    shelfCount: positionsMm.length,
+    shelfPositionsMm: positionsMm.filter((y) => Number.isFinite(y)),
+  });
+  const nextConfig: CabinetConfig = {
+    ...group.cabinet,
+    shelfCount: sorted.length,
+    shelfPositionsMm: sorted,
+  };
+  const placement = cabinetPlacement(group, group.cabinet);
+  commitCabinetResize(group, nextConfig, placement);
+}
+
+/** Adds one shelf at the given centreline height, keeping the existing ones. */
+export function addCabinetShelf(groupId: string, positionMm: number): void {
+  const group = doc().groups.find((candidate) => candidate.id === groupId);
+  if (!group?.cabinet || !Number.isFinite(positionMm)) return;
+  const current = shelfPositions(group.cabinet);
+  if (current.length >= MAX_SHELF_COUNT) {
+    ui().showToast(`A cabinet holds at most ${MAX_SHELF_COUNT} shelves`);
+    return;
+  }
+  setCabinetShelfPositions(groupId, [...current, positionMm]);
+  const range = shelfPositionRange(group.cabinet.height);
+  const clamped = Math.min(range.max, Math.max(range.min, Math.round(positionMm)));
+  ui().showToast(
+    clamped === Math.round(positionMm)
+      ? `Shelf added at ${clamped} mm`
+      : `Shelf clamped into the cabinet at ${clamped} mm`,
+  );
+}
+
+/** Removes the shelf at the given index (bottom-up) of the effective shelf list. */
+export function removeCabinetShelf(groupId: string, index: number): void {
+  const group = doc().groups.find((candidate) => candidate.id === groupId);
+  if (!group?.cabinet) return;
+  const current = shelfPositions(group.cabinet);
+  if (index < 0 || index >= current.length) return;
+  setCabinetShelfPositions(groupId, current.filter((_, i) => i !== index));
+  ui().showToast('Shelf removed');
+}
+
+/**
+ * Replaces all shelves with `count` shelves spaced `spacingMm` apart (centre
+ * to centre, starting one spacing above the cabinet floor). Shelves that
+ * would not fit the interior are dropped.
+ */
+export function distributeCabinetShelves(groupId: string, count: number, spacingMm: number): void {
+  const group = doc().groups.find((candidate) => candidate.id === groupId);
+  if (!group?.cabinet) return;
+  const positions = distributedShelfPositions(group.cabinet, count, spacingMm);
+  if (!positions.length) {
+    ui().showToast('No shelf fits that spacing');
+    return;
+  }
+  setCabinetShelfPositions(groupId, positions);
+  ui().showToast(
+    positions.length < count
+      ? `Only ${positions.length} of ${count} shelves fit`
+      : `${positions.length} ${positions.length === 1 ? 'shelf' : 'shelves'} every ${Math.round(spacingMm)} mm`,
+  );
 }
 
 /**

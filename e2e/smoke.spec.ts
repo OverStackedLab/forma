@@ -88,6 +88,40 @@ test('inserting a prebuilt cabinet creates one grouped open carcass and six cut-
   await expect(page.getByText('Base 600 Door', { exact: true })).toHaveCount(0);
 });
 
+test('cabinet shelves can be added at a position and distributed by spacing', async ({ page }) => {
+  await page.goto('/');
+  await page.getByRole('tab', { name: 'Library' }).click();
+  await page.getByRole('button', { name: /Base 600/ }).click();
+  await expect(page.getByText('6 parts').first()).toBeVisible();
+
+  // The preset's single shelf sits at the interior centre.
+  await expect(page.getByLabel('Shelf 1 position in millimetres')).toHaveValue('360');
+
+  // "I need one panel at 30 cm."
+  await page.getByLabel('New shelf position in millimetres').fill('300');
+  await page.getByRole('button', { name: 'Add Shelf' }).click();
+  await expect(page.getByText('Shelf added at 300 mm')).toBeVisible();
+  await expect(page.getByText('7 parts').first()).toBeVisible();
+  await expect(page.getByLabel('Shelf 1 position in millimetres')).toHaveValue('300');
+  await expect(page.getByLabel('Shelf 2 position in millimetres')).toHaveValue('360');
+
+  // "I need n panels at a distance of n cm" — 3 shelves every 200 mm.
+  await page.getByLabel('Shelf count').fill('3');
+  await page.getByLabel('Shelf spacing in millimetres').fill('200');
+  await page.getByRole('button', { name: 'Apply' }).click();
+  await expect(page.getByText('3 shelves every 200 mm')).toBeVisible();
+  await expect(page.getByText('8 parts').first()).toBeVisible();
+  await expect(page.getByLabel('Shelf 3 position in millimetres')).toHaveValue('618');
+
+  // A shelf can be removed, and the whole edit history unwinds.
+  await page.getByRole('button', { name: 'Remove shelf 1' }).click();
+  await expect(page.getByText('Shelf removed')).toBeVisible();
+  await expect(page.getByText('7 parts').first()).toBeVisible();
+
+  await page.getByRole('button', { name: 'Undo' }).click();
+  await expect(page.getByText('8 parts').first()).toBeVisible();
+});
+
 test('deleting a panel updates the tree, the count and the cut list together', async ({ page }) => {
   await page.goto('/');
   await insertShelf(page);

@@ -3,17 +3,21 @@ import type { Transform } from '@/domain/types';
 import * as download from '@/ui/download';
 import {
   addCabinetPreset,
+  addCabinetShelf,
   addCustomPanel,
   commitTransforms,
+  distributeCabinetShelves,
   duplicateSelected,
   newDocument,
   openFile,
+  removeCabinetShelf,
   renameDocument,
   resizeCabinetFromGizmo,
   resetTransforms,
   saveToFile,
   saveVersion,
   setCabinetDim,
+  setCabinetShelfPositions,
   setCustomPartDim,
   setGroupPositionAxis,
   setHardwareDiameter,
@@ -174,6 +178,63 @@ describe('library construction actions', () => {
     state = useDocumentStore.getState();
     expect(state.groups.find((group) => group.id === source.id)?.cabinet?.width).toBe(600);
     expect(state.groups.find((group) => group.id === copy.id)?.cabinet?.width).toBe(900);
+  });
+
+  it('adds, moves and removes cabinet shelves by explicit position', () => {
+    addCabinetPreset('base-600');
+    let group = useDocumentStore.getState().groups[0]!;
+    expect(group.partIds).toHaveLength(6);
+
+    // One shelf at 30 cm joins the preset's existing centred shelf.
+    addCabinetShelf(group.id, 300);
+    group = useDocumentStore.getState().groups[0]!;
+    expect(group.partIds).toHaveLength(7);
+    expect(group.cabinet?.shelfPositionsMm).toEqual([300, 360]);
+    expect(group.cabinet?.presetId).toBeUndefined();
+
+    // Every member, including the new shelf, has a transform and a part.
+    const state = useDocumentStore.getState();
+    for (const id of group.partIds) {
+      expect(state.transforms[id]).toBeDefined();
+      expect(state.customParts.find((part) => part.id === id)).toBeDefined();
+    }
+    const shelfIds = group.partIds.slice(5);
+    const shelfYs = shelfIds.map((id) => Math.round(state.transforms[id]!.position[1] * 1000));
+    expect(shelfYs).toEqual([300, 360]);
+
+    // Moving a shelf keeps the count; removing one shrinks the group.
+    setCabinetShelfPositions(group.id, [250, 500]);
+    group = useDocumentStore.getState().groups[0]!;
+    expect(group.cabinet?.shelfPositionsMm).toEqual([250, 500]);
+    expect(group.partIds).toHaveLength(7);
+
+    removeCabinetShelf(group.id, 0);
+    group = useDocumentStore.getState().groups[0]!;
+    expect(group.partIds).toHaveLength(6);
+    expect(group.cabinet?.shelfPositionsMm).toEqual([500]);
+
+    // Each shelf edit is one undo step.
+    expect(undo()).toBe(true);
+    expect(useDocumentStore.getState().groups[0]!.partIds).toHaveLength(7);
+    expect(undo()).toBe(true);
+    expect(undo()).toBe(true);
+    group = useDocumentStore.getState().groups[0]!;
+    expect(group.partIds).toHaveLength(6);
+    expect(group.cabinet?.shelfPositionsMm).toBeUndefined();
+    expect(group.cabinet?.presetId).toBe('base-600');
+  });
+
+  it('distributes shelves by spacing and drops the ones that do not fit', () => {
+    addCabinetPreset('base-600');
+    const group = useDocumentStore.getState().groups[0]!;
+
+    distributeCabinetShelves(group.id, 4, 200);
+
+    const next = useDocumentStore.getState().groups[0]!;
+    // 720 high: shelves at 218/418/618; the fourth would leave the interior.
+    expect(next.cabinet?.shelfPositionsMm).toEqual([218, 418, 618]);
+    expect(next.partIds).toHaveLength(8);
+    expect(useUiStore.getState().toast?.message).toBe('Only 3 of 4 shelves fit');
   });
 
   it('starts a clean document without resetting workspace preferences', () => {

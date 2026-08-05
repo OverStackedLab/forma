@@ -10,18 +10,23 @@ import {
 } from '@/domain/catalog';
 import { groupMatching, selectionUnits } from '@/domain/parts';
 import { quaternionToEulerDegrees } from '@/domain/rotation';
-import type { Group } from '@/domain/types';
+import type { CabinetConfig, Group } from '@/domain/types';
 import { convertedValue, convertRange, fromMm, toMm, type DisplayUnit } from '@/domain/units';
+import { shelfPositions } from '@/domain/cabinets';
 import {
+  addCabinetShelf,
   applyFinish,
   deleteParts,
+  distributeCabinetShelves,
   duplicateSelected,
   groupSelected,
+  removeCabinetShelf,
   renameGroup,
   renamePart,
   resetOverrides,
   resetTransforms,
   setCabinetDim,
+  setCabinetShelfPositions,
   setCustomPartDim,
   setHardwareDiameter,
   setGroupPositionAxis,
@@ -297,6 +302,168 @@ function ManufacturingFields({ partId }: { partId: string }) {
 }
 
 /** A persistent, always-editable name field — commits on blur or Enter. */
+/**
+ * Compact number input that keeps its own draft while focused. Rows are keyed
+ * by their committed value, so a successful commit remounts with fresh state.
+ */
+function DraftNumberInput({
+  ariaLabel,
+  value,
+  onCommit,
+  widthClass = 'w-[64px]',
+}: {
+  ariaLabel: string;
+  value: number;
+  onCommit: (value: number) => void;
+  widthClass?: string;
+}) {
+  const [draft, setDraft] = useState(String(value));
+
+  const commit = () => {
+    const n = Number(draft);
+    if (draft.trim() !== '' && Number.isFinite(n)) onCommit(n);
+    else setDraft(String(value));
+  };
+
+  return (
+    <input
+      type="number"
+      aria-label={ariaLabel}
+      value={draft}
+      onChange={(e) => setDraft(e.target.value)}
+      onBlur={commit}
+      onKeyDown={(e) => {
+        if (e.key === 'Enter') e.currentTarget.blur();
+      }}
+      className={`h-[22px] ${widthClass} rounded-[5px] border border-white/10 bg-input px-1.5 text-right font-mono text-[11.5px] text-ink`}
+    />
+  );
+}
+
+/**
+ * Parametric shelf editor for a generated cabinet. Positions are measured
+ * from the cabinet bottom to each shelf's centreline; edits rebuild the
+ * carcass through the same path as the dimension sliders.
+ */
+function ShelfFields({
+  groupId,
+  cabinet,
+  unit,
+}: {
+  groupId: string;
+  cabinet: CabinetConfig;
+  unit: DisplayUnit;
+}) {
+  const positions = shelfPositions(cabinet);
+  const [addDraft, setAddDraft] = useState('');
+  const [countDraft, setCountDraft] = useState('3');
+  const [spacingDraft, setSpacingDraft] = useState('');
+
+  const parseToMm = (draft: string): number | null => {
+    const n = Number(draft);
+    return draft.trim() !== '' && Number.isFinite(n) ? toMm(n, unit) : null;
+  };
+
+  const inputClass =
+    'h-[22px] rounded-[5px] border border-white/10 bg-input px-1.5 text-right font-mono text-[11.5px] text-ink';
+
+  return (
+    <>
+      <SectionHeader>Shelves</SectionHeader>
+
+      {positions.map((positionMm, index) => (
+        <div key={`${index}-${positionMm}`} className="mb-1.5 flex items-center gap-2">
+          <span className="w-14 flex-none text-[11.5px] text-ink/55">Shelf {index + 1}</span>
+          <DraftNumberInput
+            ariaLabel={`Shelf ${index + 1} position in ${UNIT_NAMES[unit]}`}
+            value={convertedValue(positionMm, unit)}
+            onCommit={(value) =>
+              setCabinetShelfPositions(
+                groupId,
+                positions.map((p, i) => (i === index ? toMm(value, unit) : p)),
+              )
+            }
+          />
+          <span className="font-mono text-[10.5px] text-ink/35">{unit}</span>
+          <button
+            type="button"
+            aria-label={`Remove shelf ${index + 1}`}
+            onClick={() => removeCabinetShelf(groupId, index)}
+            className="flex h-5 w-5 flex-none items-center justify-center rounded text-ink/45 hover:text-danger"
+          >
+            <Icon name="close" size={13} />
+          </button>
+        </div>
+      ))}
+
+      <div className="mt-2.5 mb-1.5 flex items-center gap-2">
+        <input
+          type="number"
+          aria-label={`New shelf position in ${UNIT_NAMES[unit]}`}
+          placeholder={unit === 'mm' ? '300' : '30'}
+          value={addDraft}
+          onChange={(e) => setAddDraft(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key !== 'Enter') return;
+            const mm = parseToMm(addDraft);
+            if (mm === null) return;
+            addCabinetShelf(groupId, mm);
+            setAddDraft('');
+          }}
+          className={`${inputClass} w-[64px]`}
+        />
+        <span className="font-mono text-[10.5px] text-ink/35">{unit}</span>
+        <Button
+          onClick={() => {
+            const mm = parseToMm(addDraft);
+            if (mm === null) return;
+            addCabinetShelf(groupId, mm);
+            setAddDraft('');
+          }}
+        >
+          Add Shelf
+        </Button>
+      </div>
+
+      <div className="mb-2 flex items-center gap-2">
+        <input
+          type="number"
+          aria-label="Shelf count"
+          min={1}
+          value={countDraft}
+          onChange={(e) => setCountDraft(e.target.value)}
+          className={`${inputClass} w-[38px]`}
+        />
+        <span className="flex-none text-[11px] text-ink/45">every</span>
+        <input
+          type="number"
+          aria-label={`Shelf spacing in ${UNIT_NAMES[unit]}`}
+          placeholder={unit === 'mm' ? '200' : '20'}
+          value={spacingDraft}
+          onChange={(e) => setSpacingDraft(e.target.value)}
+          className={`${inputClass} w-[56px]`}
+        />
+        <span className="font-mono text-[10.5px] text-ink/35">{unit}</span>
+        <Button
+          onClick={() => {
+            const count = Math.floor(Number(countDraft));
+            const spacingMm = parseToMm(spacingDraft);
+            if (!Number.isFinite(count) || count < 1 || spacingMm === null) return;
+            distributeCabinetShelves(groupId, count, spacingMm);
+          }}
+        >
+          Apply
+        </Button>
+      </div>
+
+      <p className="mb-4 text-[10.5px] leading-relaxed text-ink/35">
+        Positions run from the cabinet bottom to each shelf's centreline. Spaced shelves start one
+        spacing above the cabinet floor; any that don't fit are dropped.
+      </p>
+    </>
+  );
+}
+
 function NameField({
   value,
   onRename,
@@ -447,6 +614,7 @@ function PropertiesTab() {
           <p className="mb-4 text-[10.5px] leading-relaxed text-ink/35">
             Resizing rebuilds the carcass and keeps its panels at 18 mm with an 8 mm back.
           </p>
+          <ShelfFields groupId={matchedGroup.id} cabinet={matchedGroup.cabinet} unit={unit} />
           <hr className="my-4 border-hairline" />
         </>
       )}

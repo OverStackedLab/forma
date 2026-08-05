@@ -1,6 +1,6 @@
 import { DISPLAY_UNITS, type DisplayUnit } from '@/domain/units';
 import { isGridSizeM, type GridSizeM } from '@/domain/workspace';
-import { buildCabinetLayout } from '@/domain/cabinets';
+import { buildCabinetLayout, MAX_SHELF_COUNT, shelfPositions } from '@/domain/cabinets';
 import {
   CABINET_PRESETS,
   CUSTOM_PANEL_LIMITS,
@@ -252,6 +252,16 @@ function normalizeSnapshot(value: unknown, legacyAxes = false): DocumentSnapshot
       typeof rawCabinet.depth === 'number' && Number.isFinite(rawCabinet.depth) &&
       typeof rawCabinet.shelfCount === 'number' && Number.isInteger(rawCabinet.shelfCount);
     if (dimensionsValid) {
+      const height = Math.min(3000, Math.max(100, rawCabinet.height as number));
+      const shelfPositionsMm = Array.isArray(rawCabinet.shelfPositionsMm)
+        ? shelfPositions({
+            height,
+            shelfCount: 0,
+            shelfPositionsMm: rawCabinet.shelfPositionsMm.filter(
+              (y): y is number => typeof y === 'number' && Number.isFinite(y),
+            ),
+          })
+        : undefined;
       cabinet = {
         presetId:
           typeof rawCabinet.presetId === 'string' &&
@@ -259,9 +269,12 @@ function normalizeSnapshot(value: unknown, legacyAxes = false): DocumentSnapshot
             ? rawCabinet.presetId as CabinetConfig['presetId']
             : undefined,
         width: Math.min(3000, Math.max(100, rawCabinet.width as number)),
-        height: Math.min(3000, Math.max(100, rawCabinet.height as number)),
+        height,
         depth: Math.min(1500, Math.max(100, rawCabinet.depth as number)),
-        shelfCount: Math.min(8, Math.max(0, rawCabinet.shelfCount as number)),
+        shelfCount: shelfPositionsMm?.length
+          ? shelfPositionsMm.length
+          : Math.min(MAX_SHELF_COUNT, Math.max(0, rawCabinet.shelfCount as number)),
+        shelfPositionsMm: shelfPositionsMm?.length ? shelfPositionsMm : undefined,
       };
     } else if (inferredCabinet && partIds.length === 5 + inferredCabinet.shelfCount) {
       cabinet = {
@@ -280,6 +293,7 @@ function normalizeSnapshot(value: unknown, legacyAxes = false): DocumentSnapshot
         height: cabinet.height,
         depth: cabinet.depth,
         shelfCount: cabinet.shelfCount,
+        shelfPositionsMm: cabinet.shelfPositionsMm,
         icon: 'cabinet',
       });
       partIds.forEach((id, index) => {

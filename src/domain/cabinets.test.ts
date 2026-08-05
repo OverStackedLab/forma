@@ -1,6 +1,11 @@
 import { describe, expect, it } from 'vitest';
 import { CABINET_PRESETS } from './catalog';
-import { buildCabinetLayout } from './cabinets';
+import {
+  buildCabinetLayout,
+  distributedShelfPositions,
+  shelfPositionRange,
+  shelfPositions,
+} from './cabinets';
 
 describe('buildCabinetLayout', () => {
   it('builds a standard base carcass with two sides, top, bottom, back and shelf', () => {
@@ -33,5 +38,39 @@ describe('buildCabinetLayout', () => {
     const parts = buildCabinetLayout(preset);
     expect(parts.filter((part) => part.label.includes('Shelf'))).toHaveLength(4);
     expect(parts).toHaveLength(9);
+  });
+
+  it('places shelves at explicit centreline heights instead of even spacing', () => {
+    const preset = CABINET_PRESETS.find((candidate) => candidate.id === 'base-600')!;
+    const parts = buildCabinetLayout({ ...preset, shelfPositionsMm: [500, 300] });
+    const shelves = parts.filter((part) => part.label.includes('Shelf'));
+    // Sorted ascending regardless of input order.
+    expect(shelves.map((shelf) => shelf.positionMm[1])).toEqual([300, 500]);
+    expect(parts).toHaveLength(7);
+  });
+});
+
+describe('shelfPositions', () => {
+  it('clamps explicit positions into the carcass interior and sorts them', () => {
+    // 720-high cabinet: centrelines must stay within [27, 693].
+    expect(shelfPositions({ height: 720, shelfCount: 3, shelfPositionsMm: [10_000, 0, 300] }))
+      .toEqual([27, 300, 693]);
+    expect(shelfPositionRange(720)).toEqual({ min: 27, max: 693 });
+  });
+
+  it('falls back to even spacing when no explicit positions exist', () => {
+    expect(shelfPositions({ height: 720, shelfCount: 1 })).toEqual([360]);
+  });
+});
+
+describe('distributedShelfPositions', () => {
+  it('spaces shelves from the cabinet floor and drops those that overflow', () => {
+    // 720 high → interior ceiling for a centreline is 693; the fourth shelf
+    // (18 + 4×200 = 818) does not fit.
+    expect(distributedShelfPositions({ height: 720 }, 4, 200)).toEqual([218, 418, 618]);
+  });
+
+  it('rejects a non-positive spacing', () => {
+    expect(distributedShelfPositions({ height: 720 }, 3, 0)).toEqual([]);
   });
 });
