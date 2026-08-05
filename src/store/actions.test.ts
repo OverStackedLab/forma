@@ -1,22 +1,27 @@
-import { beforeEach, describe, expect, it } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { Transform } from '@/domain/types';
+import * as download from '@/ui/download';
 import {
   addCabinetPreset,
   addCustomPanel,
   commitTransforms,
   duplicateSelected,
   newDocument,
+  openFile,
   renameDocument,
   resizeCabinetFromGizmo,
   resetTransforms,
+  saveToFile,
   saveVersion,
   setCabinetDim,
   setCustomPartDim,
   setGroupPositionAxis,
   setHardwareDiameter,
+  titleFromFilename,
 } from './actions';
 import { createDefaultDocument, useDocumentStore } from './documentStore';
 import { canUndo, clearHistory, redo, undo } from './history';
+import { SCHEMA_VERSION } from './persistence';
 import { useUiStore } from './uiStore';
 
 describe('library construction actions', () => {
@@ -219,5 +224,137 @@ describe('library construction actions', () => {
       expect(value - after[0]!).toBeCloseTo(before[index]! - before[0]!, 8);
     });
     expect(state.groups[0]?.cabinet?.width).toBe(600);
+  });
+});
+
+describe('save and open title', () => {
+  beforeEach(() => {
+    useDocumentStore.getState().hydrate(createDefaultDocument());
+    useUiStore.setState({ selectedPartIds: [], toast: null });
+    clearHistory();
+  });
+
+  it('derives a document title from common Forma filenames', () => {
+    expect(titleFromFilename('Kitchen Remodel.forma.json')).toBe('Kitchen Remodel');
+    expect(titleFromFilename('/tmp/From Disk.json')).toBe('From Disk');
+    expect(titleFromFilename('bad:name*.forma.json')).toBe('bad-name-');
+  });
+
+  it('downloads under the current title without any prompt when the picker is unavailable', async () => {
+    renameDocument('Dining Table');
+    vi.stubGlobal('window', {});
+    const prompt = vi.fn();
+    vi.stubGlobal('prompt', prompt);
+    const downloadBlob = vi.spyOn(download, 'downloadBlob').mockImplementation(() => undefined);
+
+    await saveToFile();
+
+    expect(prompt).not.toHaveBeenCalled();
+    expect(useDocumentStore.getState().docTitle).toBe('Dining Table');
+    expect(downloadBlob).toHaveBeenCalledWith(expect.any(Blob), 'Dining Table.forma.json');
+    downloadBlob.mockRestore();
+    vi.unstubAllGlobals();
+  });
+
+  it('updates the document title from the File System Access save picker', async () => {
+    const write = vi.fn(async () => undefined);
+    const close = vi.fn(async () => undefined);
+    const createWritable = vi.fn(async () => ({ write, close }));
+    const showSaveFilePicker = vi.fn(async () => ({
+      name: 'Sideboard.forma.json',
+      createWritable,
+    }));
+    vi.stubGlobal('window', { showSaveFilePicker });
+    const downloadBlob = vi.spyOn(download, 'downloadBlob').mockImplementation(() => undefined);
+
+    await saveToFile();
+
+    expect(showSaveFilePicker).toHaveBeenCalled();
+    expect(useDocumentStore.getState().docTitle).toBe('Sideboard');
+    expect(write).toHaveBeenCalledOnce();
+    expect(close).toHaveBeenCalledOnce();
+    expect(downloadBlob).not.toHaveBeenCalled();
+    downloadBlob.mockRestore();
+    vi.unstubAllGlobals();
+  });
+
+  it('leaves the title alone when the save picker is dismissed', async () => {
+    renameDocument('Keep Me');
+    const showSaveFilePicker = vi.fn(async () => {
+      throw new DOMException('The user aborted a request.', 'AbortError');
+    });
+    vi.stubGlobal('window', { showSaveFilePicker });
+    const prompt = vi.fn();
+    vi.stubGlobal('prompt', prompt);
+    const downloadBlob = vi.spyOn(download, 'downloadBlob').mockImplementation(() => undefined);
+
+    await saveToFile();
+
+    expect(useDocumentStore.getState().docTitle).toBe('Keep Me');
+    expect(prompt).not.toHaveBeenCalled();
+    expect(downloadBlob).not.toHaveBeenCalled();
+    downloadBlob.mockRestore();
+    vi.unstubAllGlobals();
+  });
+
+  it('never falls back to a download once the picker has been shown', async () => {
+    const createWritable = vi.fn(async () => {
+      throw new DOMException('Write access denied.', 'NotAllowedError');
+    });
+    const showSaveFilePicker = vi.fn(async () => ({
+      name: 'Sideboard.forma.json',
+      createWritable,
+    }));
+    vi.stubGlobal('window', { showSaveFilePicker });
+    const consoleError = vi.spyOn(console, 'error').mockImplementation(() => undefined);
+    const downloadBlob = vi.spyOn(download, 'downloadBlob').mockImplementation(() => undefined);
+
+    await saveToFile();
+
+    expect(downloadBlob).not.toHaveBeenCalled();
+    expect(useUiStore.getState().toast?.message).toBe('Could not save the file');
+    downloadBlob.mockRestore();
+    consoleError.mockRestore();
+    vi.unstubAllGlobals();
+  });
+
+  it('ignores a second save while the picker is already open', async () => {
+    let resolvePicker: (handle: { name: string; createWritable: () => Promise<unknown> }) => void =
+      () => undefined;
+    const write = vi.fn(async () => undefined);
+    const close = vi.fn(async () => undefined);
+    const showSaveFilePicker = vi.fn(
+      () =>
+        new Promise((resolve) => {
+          resolvePicker = resolve;
+        }),
+    );
+    vi.stubGlobal('window', { showSaveFilePicker });
+    const downloadBlob = vi.spyOn(download, 'downloadBlob').mockImplementation(() => undefined);
+
+    const first = saveToFile();
+    const second = saveToFile();
+    resolvePicker({ name: 'Sideboard.forma.json', createWritable: async () => ({ write, close }) });
+    await Promise.all([first, second]);
+
+    expect(showSaveFilePicker).toHaveBeenCalledOnce();
+    expect(write).toHaveBeenCalledOnce();
+    expect(downloadBlob).not.toHaveBeenCalled();
+    downloadBlob.mockRestore();
+    vi.unstubAllGlobals();
+  });
+
+  it('sets the document title from the opened file name', async () => {
+    const envelope = {
+      schemaVersion: SCHEMA_VERSION,
+      doc: { ...createDefaultDocument(), docTitle: 'Inside JSON' },
+    };
+    const file = new File([JSON.stringify(envelope)], 'From Disk.forma.json', {
+      type: 'application/json',
+    });
+
+    await openFile(file);
+
+    expect(useDocumentStore.getState().docTitle).toBe('From Disk');
   });
 });

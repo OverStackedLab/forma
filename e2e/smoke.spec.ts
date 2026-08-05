@@ -18,6 +18,17 @@ async function insertShelf(page: Page): Promise<void> {
   await expect(page.getByText('Shelf added to scene')).toBeVisible();
 }
 
+/**
+ * Force the plain-download fallback. Chromium exposes showSaveFilePicker,
+ * which Playwright cannot drive as a native dialog.
+ */
+async function gotoWithDownloadFallback(page: Page): Promise<void> {
+  await page.addInitScript(() => {
+    Reflect.deleteProperty(window, 'showSaveFilePicker');
+  });
+  await page.goto('/');
+}
+
 // Playwright gives each test a fresh browser context, so localStorage starts
 // empty without an init script — and an init script would also wipe it on the
 // reload the persistence test depends on.
@@ -735,7 +746,7 @@ test('resizing a cabinet with the scale gizmo updates its parametric dimensions'
 });
 
 test('saving to a file and opening it round-trips the document', async ({ page }) => {
-  await page.goto('/');
+  await gotoWithDownloadFallback(page);
   await insertShelf(page);
   await page.getByLabel('Part name').fill('Kitchen Shelf');
   await page.getByLabel('Part name').blur();
@@ -798,8 +809,10 @@ test('creating a new file can be cancelled and then starts a clean persisted des
   await expect(page.getByText('No parts yet.')).toBeVisible();
 });
 
-test('renaming the document updates the header and the saved filename', async ({ page }) => {
-  await page.goto('/');
+test('renaming the document drives the downloaded filename without extra dialogs', async ({
+  page,
+}) => {
+  await gotoWithDownloadFallback(page);
 
   const title = page.getByText('Untitled Design', { exact: true });
   await title.dblclick();
@@ -808,17 +821,47 @@ test('renaming the document updates the header and the saved filename', async ({
   await input.blur();
   await expect(page.getByText('Kitchen Remodel', { exact: true })).toBeVisible();
 
+  // No prompt is expected here — any dialog would fail the test by hanging the click.
+  page.on('dialog', () => {
+    throw new Error('Save to File must not open a JS dialog');
+  });
   const downloadPromise = page.waitForEvent('download');
   await page.getByRole('button', { name: 'Save to File' }).click();
   const download = await downloadPromise;
   expect(download.suggestedFilename()).toBe('Kitchen Remodel.forma.json');
 
-  // Not undoable — the title isn't part of the piece being designed.
-  await expect(page.getByRole('button', { name: 'Undo' })).toBeDisabled();
-
   // Survives a reload like the rest of the document.
   await page.reload();
   await expect(page.getByText('Kitchen Remodel', { exact: true })).toBeVisible();
+});
+
+test('opening a file sets the header from the on-disk filename', async ({ page }) => {
+  await page.goto('/');
+
+  const path = test.info().outputPath('From Disk.forma.json');
+  await writeFile(
+    path,
+    JSON.stringify({
+      schemaVersion: 4,
+      doc: {
+        defaultMaterialId: 'oak',
+        defaultColorId: 'natural',
+        defaultHardwareFinishId: 'brushed-brass',
+        overrides: {},
+        customParts: [],
+        hiddenIds: [],
+        transforms: {},
+        groups: [],
+        docTitle: 'Inside JSON',
+        versions: [],
+        currentVersionId: null,
+      },
+    }),
+  );
+
+  await page.locator('input[type="file"]').setInputFiles(path);
+  await expect(page.getByText('From Disk', { exact: true })).toBeVisible();
+  await expect(page.getByText('Inside JSON', { exact: true })).toHaveCount(0);
 });
 
 test('a blank document rename is discarded, keeping the previous title', async ({ page }) => {

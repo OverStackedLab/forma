@@ -136,7 +136,7 @@ export function Toolbar() {
         />
         <div className="h-5 w-px flex-none bg-white/10" />
         <IconButton icon="new_file" label="New File" onClick={createNewFile} />
-        <IconButton icon="save_file" label="Save to File" onClick={saveToFile} />
+        <IconButton icon="save_file" label="Save to File" onClick={() => void saveToFile()} />
         <OpenFileButton />
         <div className="h-5 w-px flex-none bg-white/10" />
         <button

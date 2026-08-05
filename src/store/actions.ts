@@ -1045,25 +1045,114 @@ function sanitizeFilename(title: string): string {
 }
 
 /**
- * Downloads the whole document — geometry, materials, groups and version
- * history — as a .forma.json file, using the same schema-versioned envelope
- * as localStorage autosave. This is a separate file on disk, distinct from a
- * Save Version snapshot, which stays inside this one document.
+ * Derives the document title from an on-disk filename. Strips a trailing
+ * `.forma.json` or `.json`, then applies the same sanitization used when saving.
  */
-export function saveToFile(): void {
-  const s = doc();
+export function titleFromFilename(filename: string): string {
+  const base = filename.replace(/^.*[/\\]/, '').trim();
+  const stem = base.replace(/\.forma\.json$/i, '').replace(/\.json$/i, '');
+  return sanitizeFilename(stem);
+}
+
+type SaveFilePickerWindow = Window & {
+  showSaveFilePicker?: (options?: {
+    suggestedName?: string;
+    types?: Array<{
+      description?: string;
+      accept: Record<string, string[]>;
+    }>;
+  }) => Promise<FileSystemFileHandle>;
+};
+
+/** Guards against a second Save while the picker is open (e.g. a double-click). */
+let isSavingToFile = false;
+
+/**
+ * Saves the whole document — geometry, materials, groups and version
+ * history — as a .forma.json file, using the same schema-versioned envelope
+ * as localStorage autosave. Prefers the File System Access save picker, where
+ * the chosen on-disk name drives `docTitle` so the header matches the file.
+ * Where the picker is unavailable, downloads under the current title with no
+ * extra dialog — the browser may still show its own save dialog, and that is
+ * the only one the user sees. Distinct from Save Version, which stays inside
+ * this one document.
+ */
+export async function saveToFile(): Promise<void> {
+  if (isSavingToFile) return;
+  isSavingToFile = true;
+  try {
+    await saveToFileOnce();
+  } finally {
+    isSavingToFile = false;
+  }
+}
+
+async function saveToFileOnce(): Promise<void> {
+  const title = sanitizeFilename(doc().docTitle);
+  const pickerWindow = typeof window !== 'undefined' ? (window as SaveFilePickerWindow) : undefined;
+
+  if (typeof pickerWindow?.showSaveFilePicker === 'function') {
+    let handle: FileSystemFileHandle;
+    try {
+      handle = await pickerWindow.showSaveFilePicker({
+        suggestedName: `${title}.forma.json`,
+        types: [
+          {
+            description: 'Forma design',
+            accept: { 'application/json': ['.json'] },
+          },
+        ],
+      });
+    } catch (error) {
+      // User dismissed the picker — not a save, so change nothing.
+      if (error instanceof DOMException && error.name === 'AbortError') return;
+      // The API exists but refused to show a dialog (embedded frame, browser
+      // policy). Nothing was shown yet, so the download below is the only dialog.
+      await writeDocumentToFile(title);
+      return;
+    }
+
+    // The picker was already shown — never stack a second save dialog on top
+    // of it. If the write fails, report it rather than falling back.
+    try {
+      await writeDocumentToFile(titleFromFilename(handle.name), handle);
+    } catch (error) {
+      console.error('Save to file failed', error);
+      ui().showToast('Could not save the file');
+    }
+    return;
+  }
+
+  await writeDocumentToFile(title);
+}
+
+async function writeDocumentToFile(
+  title: string,
+  handle?: FileSystemFileHandle,
+): Promise<void> {
+  renameDocument(title);
+
+  const state = doc();
   const document: FormaDocument = {
-    ...snapshotDocument(s),
-    docTitle: s.docTitle,
-    versions: s.versions,
-    currentVersionId: s.currentVersionId,
+    ...snapshotDocument(state),
+    docTitle: title,
+    versions: state.versions,
+    currentVersionId: state.currentVersionId,
   };
-  const envelope = { schemaVersion: SCHEMA_VERSION, doc: document };
-  downloadBlob(
-    new Blob([JSON.stringify(envelope, null, 2)], { type: 'application/json' }),
-    `${sanitizeFilename(s.docTitle)}.forma.json`,
+  const payload = JSON.stringify(
+    { schemaVersion: SCHEMA_VERSION, doc: document },
+    null,
+    2,
   );
-  ui().showToast('Saved to file');
+
+  if (handle) {
+    const writable = await handle.createWritable();
+    await writable.write(payload);
+    await writable.close();
+  } else {
+    downloadBlob(new Blob([payload], { type: 'application/json' }), `${title}.forma.json`);
+  }
+  ui().showToast(`Saved ${title}`);
 }
 
 /** Reads a .forma.json file and replaces the current document with it, as one undo step. */
@@ -1082,15 +1171,17 @@ export async function openFile(file: File): Promise<void> {
     return;
   }
 
+  // The on-disk name is the source of truth for the header once a file is opened.
+  const title = titleFromFilename(file.name);
   commit(() => {
     useDocumentStore.getState().replaceSnapshot(structuredClone(next));
     useDocumentStore.setState({
-      docTitle: next.docTitle,
+      docTitle: title,
       versions: next.versions,
       currentVersionId: next.currentVersionId,
     });
   });
   ui().clearSelection();
   useUiStore.setState({ historyOpen: false });
-  ui().showToast(`Opened ${next.docTitle}`);
+  ui().showToast(`Opened ${title}`);
 }
