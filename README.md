@@ -362,6 +362,11 @@ npm run test:e2e   # browser smoke tests (Playwright)
 | `src/viewport/` | The three.js layer, lazy-loaded. `SceneManager` owns the renderer and loop; `ModelBuilder` diff-updates the scene from part specs; the controllers handle gizmos, picking, measuring and camera flight. |
 | `src/ui/` | Presentational React components. Styling is Tailwind classes on components — never CSS strings assembled in the state layer. |
 
+For layering rules, `commit()` vs metadata, units, picking/dispose gotchas, and
+test conventions, see [`CODING_STANDARDS.md`](./CODING_STANDARDS.md). Bugs and
+non-bug follow-ups are tracked in [`BUGS.md`](./BUGS.md) and
+[`IMPROVEMENTS.md`](./IMPROVEMENTS.md).
+
 ## Deviations from the spec above
 
 Three deliberate departures, each fixing a defect the spec's approach caused:
