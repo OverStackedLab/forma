@@ -239,12 +239,6 @@ function normalizeSnapshot(value: unknown, legacyAxes = false): DocumentSnapshot
     partIds.forEach((id) => occupied.add(id));
     const label = raw.label.trim() || 'Group';
     const rawCabinet = asRecord(raw.cabinet);
-    const memberLabels = partIds
-      .map((id) => customParts.find((part) => part.id === id)?.label ?? '')
-      .join(' ');
-    const inferredCabinet = CABINET_PRESETS.find(
-      (preset) => preset.label === label || memberLabels.includes(`${preset.label} Left Side`),
-    );
     let cabinet: CabinetConfig | undefined;
     const dimensionsValid = rawCabinet &&
       typeof rawCabinet.width === 'number' && Number.isFinite(rawCabinet.width) &&
@@ -263,14 +257,26 @@ function normalizeSnapshot(value: unknown, legacyAxes = false): DocumentSnapshot
         depth: Math.min(1500, Math.max(100, rawCabinet.depth as number)),
         shelfCount: Math.min(8, Math.max(0, rawCabinet.shelfCount as number)),
       };
-    } else if (inferredCabinet && partIds.length === 5 + inferredCabinet.shelfCount) {
-      cabinet = {
-        presetId: inferredCabinet.id,
-        width: inferredCabinet.width,
-        height: inferredCabinet.height,
-        depth: inferredCabinet.depth,
-        shelfCount: inferredCabinet.shelfCount,
-      };
+    } else if (legacyAxes) {
+      // Label/member-count inference is only for schema-3 saves that predate
+      // explicit cabinet configs. On current-schema loads, a missing cabinet
+      // means the group was deliberately demoted after a partial edit — do
+      // not resurrect stock dimensions from the group label.
+      const memberLabels = partIds
+        .map((id) => customParts.find((part) => part.id === id)?.label ?? '')
+        .join(' ');
+      const inferredCabinet = CABINET_PRESETS.find(
+        (preset) => preset.label === label || memberLabels.includes(`${preset.label} Left Side`),
+      );
+      if (inferredCabinet && partIds.length === 5 + inferredCabinet.shelfCount) {
+        cabinet = {
+          presetId: inferredCabinet.id,
+          width: inferredCabinet.width,
+          height: inferredCabinet.height,
+          depth: inferredCabinet.depth,
+          shelfCount: inferredCabinet.shelfCount,
+        };
+      }
     }
     if (cabinet) {
       const layout = buildCabinetLayout({
@@ -289,8 +295,14 @@ function normalizeSnapshot(value: unknown, legacyAxes = false): DocumentSnapshot
         stored.category = generated.category;
         stored.bomLabel = generated.bomLabel;
         stored.thicknessAxis = generated.thicknessAxis;
-        stored.grainAxis = generated.grainAxis;
-        stored.edgeBanding = [...generated.edgeBanding];
+        // Grain and edge banding are user-editable on cabinet panels. Current-
+        // schema saves already carry the chosen values — overwriting them here
+        // would revert cut-list edits on every reload. Legacy migration still
+        // needs the generated defaults.
+        if (legacyAxes) {
+          stored.grainAxis = generated.grainAxis;
+          stored.edgeBanding = [...generated.edgeBanding];
+        }
       });
     }
     groups.push({ id: raw.id, label, partIds, cabinet });
