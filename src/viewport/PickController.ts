@@ -143,10 +143,13 @@ export class PickController {
     this.pointer.x = ((e.clientX - rect.left) / rect.width) * 2 - 1;
     this.pointer.y = -((e.clientY - rect.top) / rect.height) * 2 + 1;
     this.raycaster.setFromCamera(this.pointer, this.scene.camera);
+    // three.js raycasting ignores Object3D.visible, so a hidden part would
+    // otherwise still receive clicks and block drops onto whatever is behind it.
+    const visible = new Set(this.builder.visibleIds());
     const hits = this.raycaster.intersectObjects(this.builder.pickables, true);
     for (const h of hits) {
       const partId = h.object.userData.partId as string | undefined;
-      if (partId && h.face) {
+      if (partId && h.face && visible.has(partId)) {
         const normal = h.face.normal.clone().transformDirection(h.object.matrixWorld).normalize();
         return { partId, point: h.point, normal };
       }

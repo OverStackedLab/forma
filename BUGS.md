@@ -6,7 +6,104 @@ when the fix has been verified.
 
 ## Open bugs
 
-No open bugs logged yet.
+### BUG-011 — CSV formula injection through part labels
+
+- **Status:** Open
+- **Severity:** Low
+- **Found:** 2026-08-08
+- **Area:** Cut List
+- **App version or commit:** main @ review
+- **Frequency:** Always (when a label starts with a spreadsheet trigger)
+
+#### Steps to reproduce
+
+1. Rename a part to `=HYPERLINK("http://example.com","Shelf")`.
+2. Open Cut List → Export CSV.
+3. Open `cut-list.csv` in Excel or Google Sheets.
+
+#### Expected behavior
+
+The label is plain text in the spreadsheet.
+
+#### Actual behavior
+
+The cell becomes a live formula. `escapeField` handles RFC 4180 quoting but does
+not neutralize `=`, `+`, `-`, or `@`. See also IMP-005.
+
+#### Notes and evidence
+
+`src/domain/csv.ts` → `escapeField`. Labels are user-editable via `renamePart`.
+
+#### Resolution
+
+Leave blank until fixed.
+
+### BUG-012 — Custom panel W limits cannot represent factory thicknesses
+
+- **Status:** Open
+- **Severity:** Low
+- **Found:** 2026-08-08
+- **Area:** Panels / Properties
+- **App version or commit:** main @ review
+- **Frequency:** Always
+
+#### Steps to reproduce
+
+1. Insert a Side Panel (18 mm on W) or Knob (32 mm diameter).
+2. Open Properties and drag the Width / Diameter slider, then try to return to
+   the original value.
+
+#### Expected behavior
+
+Factory sizes (18 mm, 32 mm) are reachable; thin W thicknesses down to sheet
+stock (e.g. 8 mm) are allowed where H/D already allow 3 mm.
+
+#### Actual behavior
+
+`CUSTOM_PANEL_LIMITS.w` is `{ min: 10, max: 3000, step: 5 }`, so 18 and 32 are
+not on the grid. Persistence also clamps loaded dimensions to these limits.
+See also IMP-006.
+
+#### Notes and evidence
+
+`src/domain/catalog.ts` (`CUSTOM_PANEL_LIMITS`), `setCustomPartDim`,
+`persistence.normalizePart`.
+
+#### Resolution
+
+Leave blank until fixed.
+
+### BUG-013 — CSV em dash garbles in Excel without a UTF-8 BOM
+
+- **Status:** Open
+- **Severity:** Low
+- **Found:** 2026-08-08
+- **Area:** Cut List
+- **App version or commit:** main @ review
+- **Frequency:** Always on Excel / Windows default open
+
+#### Steps to reproduce
+
+1. Insert a Knob (or other hardware).
+2. Export the cut list CSV.
+3. Double-click the file open in Excel on Windows.
+
+#### Expected behavior
+
+The Grain column shows an em dash or a clear ASCII placeholder.
+
+#### Actual behavior
+
+Hardware grain is `—` (U+2014) with no BOM; Excel often decodes as ANSI and
+shows `â€"`. See also IMP-005.
+
+#### Notes and evidence
+
+`src/domain/bom.ts` grain placeholder; `CutList.tsx` export blob.
+
+#### Resolution
+
+Leave blank until fixed.
 
 ## Bug template
 
@@ -52,3 +149,7 @@ Leave blank until fixed. Record the change and how it was verified.
 | BUG-004 | A selected group could not be resized as one structure | Added typed overall width, height, and depth controls for regular groups. Each edit scales every member and its spacing around the shared group pivot in one undoable transform, follows the mm/cm preference, and leaves configurable cabinets on their parametric controls. Covered by shared-pivot unit tests, a full browser regression, and a live local-app check. | 2026-08-01 |
 | BUG-005 | Cabinet dimensions stayed stale after gizmo resizing | The scale gizmo now reports its shared scale factor and a fully selected configurable cabinet converts that gesture into one parametric rebuild. Properties updates immediately, the member-centroid pivot stays fixed, 18 mm carcass and 8 mm back thicknesses are preserved, and Undo restores the prior dimensions. | 2026-08-01 |
 | BUG-006 | Clicking a grouped piece selected the whole group | Viewport clicks and marquee selection now operate on the actual hit pieces. The Assembly group row remains the explicit whole-group selector, so individual and group properties are both reachable. Viewport readiness is also observable so group dimension controls appear reliably after lazy loading. | 2026-08-01 |
+| BUG-007 | Undo after Save Version deleted the checkpoint | `saveVersion` / `renameDocument` skip `commit()` but history snapshots still carry versions and title. `syncHistoryDocumentMeta()` now patches stacked snapshots after those metadata writes, and undo/redo re-reconciles `currentVersionId`. Covered by history unit tests. | 2026-08-08 |
+| BUG-008 | Reload reverted cabinet grain and edge-banding edits | Current-schema `normalizeSnapshot` no longer overwrites user-editable `grainAxis` / `edgeBanding` from a fresh cabinet layout. Legacy schema-3 migration still applies generated defaults. Covered by a persistence round-trip test. | 2026-08-08 |
+| BUG-009 | Reload resurrected a demoted cabinet from its label | Cabinet label/member-count inference is limited to legacy (schema-3) loads. A current-schema group saved with `cabinet: undefined` after a partial edit stays a regular group on reload. Covered by a persistence round-trip test. | 2026-08-08 |
+| BUG-010 | Hidden parts were still pickable | Click and drop raycasts now skip part ids absent from `ModelBuilder.visibleIds()`, matching marquee behaviour. three.js itself ignores `Object3D.visible`. | 2026-08-08 |

@@ -1,6 +1,14 @@
 import { describe, expect, it } from 'vitest';
-import { createDefaultDocument } from './documentStore';
+import {
+  addCabinetPreset,
+  setPartGrainAxis,
+  setPositionAxis,
+  togglePartEdgeBand,
+} from './actions';
+import { createDefaultDocument, useDocumentStore } from './documentStore';
+import { clearHistory } from './history';
 import { migrate, normalize, SCHEMA_VERSION } from './persistence';
+import { useUiStore } from './uiStore';
 
 describe('persistence.migrate', () => {
   it('accepts a current-schema payload', () => {
@@ -93,5 +101,52 @@ describe('persistence.normalize', () => {
       grainAxis: 'w',
       edgeBanding: [],
     });
+  });
+
+  it('preserves cabinet grain and edge-banding edits across a current-schema reload', () => {
+    useDocumentStore.getState().hydrate(createDefaultDocument());
+    useUiStore.setState({ selectedPartIds: [], toast: null });
+    clearHistory();
+    addCabinetPreset('base-600');
+    const leftSide = useDocumentStore.getState().customParts.find((part) =>
+      part.label.includes('Left Side'),
+    )!;
+    setPartGrainAxis(leftSide.id, 'd');
+    togglePartEdgeBand(leftSide.id, 'h-max');
+
+    const saved = useDocumentStore.getState();
+    const reloaded = migrate({
+      schemaVersion: SCHEMA_VERSION,
+      doc: {
+        ...saved,
+        versions: [],
+        currentVersionId: null,
+      },
+    });
+    const restored = reloaded?.customParts.find((part) => part.id === leftSide.id);
+    expect(restored?.grainAxis).toBe('d');
+    expect(restored?.edgeBanding).toContain('h-max');
+  });
+
+  it('does not resurrect a demoted cabinet from its label on current-schema reload', () => {
+    useDocumentStore.getState().hydrate(createDefaultDocument());
+    useUiStore.setState({ selectedPartIds: [], toast: null });
+    clearHistory();
+    addCabinetPreset('base-600');
+    const group = useDocumentStore.getState().groups[0]!;
+    setPositionAxis(group.partIds[0]!, 'x', 1500);
+    expect(useDocumentStore.getState().groups[0]?.cabinet).toBeUndefined();
+
+    const saved = useDocumentStore.getState();
+    const reloaded = migrate({
+      schemaVersion: SCHEMA_VERSION,
+      doc: {
+        ...saved,
+        versions: [],
+        currentVersionId: null,
+      },
+    });
+    expect(reloaded?.groups[0]?.cabinet).toBeUndefined();
+    expect(reloaded?.groups[0]?.label).toBe('Base 600');
   });
 });
