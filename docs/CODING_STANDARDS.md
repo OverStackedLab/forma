@@ -4,7 +4,8 @@ Guide for humans and agents working in this repo. Prefer the patterns already
 in `src/` over inventing new ones. When a rule here conflicts with nearby code,
 follow the nearby code and update this file.
 
-Related trackers: [`BUGS.md`](./BUGS.md) · [`IMPROVEMENTS.md`](./IMPROVEMENTS.md)
+Background: [`ARCHITECTURE.md`](./ARCHITECTURE.md) · [`DESIGN_SPEC.md`](./DESIGN_SPEC.md)
+Trackers: [`BUGS.md`](./BUGS.md) · [`IMPROVEMENTS.md`](./IMPROVEMENTS.md)
 
 ---
 
@@ -34,6 +35,7 @@ items or generated cabinet members.
 | `src/ui/` | App chrome: toolbar, sidebars, cut list, primitives, keyboard shortcuts |
 | `src/styles/theme.css` | Tailwind v4 `@theme` tokens + `@layer base` resets |
 | `e2e/` | Playwright smoke tests |
+| `docs/` | Architecture, design spec, standards, bug and improvement trackers |
 | `reference/` | Historical HTML prototype — **not** production code to copy |
 
 Keep each concern in its layer. Domain must not import React or Three.js at

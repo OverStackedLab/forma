@@ -76,6 +76,7 @@ const ICONS: Record<string, LucideIcon> = {
   panel_divider: Columns2,
   panel_door: DoorClosed,
   panel_knob: Circle,
+  panel_handle: RectangleHorizontal,
   cabinet: Box,
 };
 

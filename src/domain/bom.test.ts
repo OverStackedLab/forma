@@ -42,9 +42,9 @@ const knob: CustomPart = {
 const baseInput = {
   overrides: {},
   transforms: {},
-  defaultMaterialId: 'walnut' as const,
-  defaultColorId: 'natural' as const,
-  defaultHardwareFinishId: 'brushed-brass' as const,
+  defaultMaterialId: 'ash' as const,
+  defaultColorId: 'white' as const,
+  defaultHardwareFinishId: 'matte-black' as const,
 };
 
 describe('computeBOM', () => {
@@ -74,9 +74,9 @@ describe('computeBOM', () => {
 
   it('uses the appropriate design default for panels and hardware', () => {
     const bom = computeBOM({ ...baseInput, customParts: [shelf, knob] });
-    expect(bom.sheetRows[0]?.finish).toBe('Walnut');
+    expect(bom.sheetRows[0]?.finish).toBe('White');
     expect(bom.hardwareRows[0]).toMatchObject({
-      finish: 'Brushed Brass',
+      finish: 'Matte Black',
       thickness: null,
       edgeBand: 'None',
       grain: '—',
@@ -87,9 +87,9 @@ describe('computeBOM', () => {
     const bom = computeBOM({
       ...baseInput,
       customParts: [shelf],
-      overrides: { 'custom-1': { material: 'oak', color: 'ebony' } },
+      overrides: { 'custom-1': { material: 'ash', color: 'dark-gray' } },
     });
-    expect(bom.rows[0]?.finish).toBe('Ebony Stain');
+    expect(bom.rows[0]?.finish).toBe('Dark Gray');
   });
 
   it('groups matching pieces into one quantity row', () => {

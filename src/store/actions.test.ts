@@ -62,6 +62,32 @@ describe('library construction actions', () => {
     expect(useDocumentStore.getState().customParts[0]).toMatchObject({ w: 40, h: 40, d: 25 });
   });
 
+  it('adds ENERYDA as a bow-pull handle', () => {
+    addCustomPanel('eneryda');
+    expect(useDocumentStore.getState().customParts[0]).toMatchObject({
+      label: 'ENERYDA',
+      category: 'hardware',
+      shape: 'eneryda',
+      w: 112,
+      h: 17,
+      d: 30,
+      thicknessAxis: null,
+      grainAxis: null,
+    });
+  });
+
+  it('adds BAGGANÄS with its disc-knob profile', () => {
+    addCustomPanel('bagganas');
+    expect(useDocumentStore.getState().customParts[0]).toMatchObject({
+      label: 'BAGGANÄS',
+      category: 'hardware',
+      shape: 'bagganas',
+      w: 21,
+      h: 21,
+      d: 24,
+    });
+  });
+
   it('resizes a cabinet parametrically without changing panel thicknesses', () => {
     addCabinetPreset('base-600');
     const group = useDocumentStore.getState().groups[0]!;

@@ -19,6 +19,19 @@ describe('persistence.migrate', () => {
     expect(result?.defaultHardwareFinishId).toBe(doc.defaultHardwareFinishId);
   });
 
+  it('resets appearance defaults when migrating schema 4 to the current catalog', () => {
+    const doc = {
+      ...createDefaultDocument(),
+      defaultMaterialId: 'ash' as const,
+      defaultColorId: 'dark-gray' as const,
+      defaultHardwareFinishId: 'brushed-brass' as const,
+    };
+    const result = migrate({ schemaVersion: 4, doc });
+    expect(result?.defaultMaterialId).toBe('ash');
+    expect(result?.defaultColorId).toBe('white');
+    expect(result?.defaultHardwareFinishId).toBe('matte-black');
+  });
+
   it('migrates schema-3 side panels and knobs into world-axis dimensions', () => {
     const doc = {
       ...createDefaultDocument(),
@@ -66,7 +79,7 @@ describe('persistence.normalize', () => {
     expect(result.hiddenIds).toEqual([]);
     expect(result.transforms).toEqual({});
     expect(result.versions).toEqual([]);
-    expect(result.defaultHardwareFinishId).toBe('brushed-brass');
+    expect(result.defaultHardwareFinishId).toBe('matte-black');
   });
 
   it('keeps a valid defaultMaterialId and defaultColorId', () => {

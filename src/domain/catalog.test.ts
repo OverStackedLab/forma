@@ -36,15 +36,16 @@ describe('resolveAppearance', () => {
 
 describe('finishForAppearance', () => {
   it('maps a natural wood pair to its matching finish', () => {
-    expect(finishForAppearance('oak', 'natural').label).toBe('White Oak');
+    expect(finishForAppearance('oak', 'natural').label).toBe('Oak');
   });
 
   it('maps older mixed pairs to the closest user-facing finish', () => {
-    expect(finishForAppearance('oak', 'ebony').label).toBe('Ebony Stain');
+    expect(finishForAppearance('oak', 'ebony').label).toBe('Dark Gray');
   });
 
   it('maps metal appearances to a single hardware finish', () => {
     expect(finishForAppearance('metal', 'brass').label).toBe('Brushed Brass');
     expect(finishForAppearance('metal', 'steel').label).toBe('Brushed Steel');
+    expect(finishForAppearance('metal', 'white').label).toBe('White');
   });
 });

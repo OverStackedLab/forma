@@ -160,12 +160,12 @@ test('round hardware has purpose-built dimensions, finish and purchasing output'
 
   await expect(page.getByLabel('Diameter in millimetres')).toHaveValue('32');
   await expect(page.getByLabel('Projection in millimetres')).toHaveValue('25');
-  await expect(page.getByRole('button', { name: 'Brushed Brass' })).toHaveAttribute('aria-pressed', 'true');
+  await expect(page.getByRole('button', { name: 'Matte Black' })).toHaveAttribute('aria-pressed', 'true');
 
   await page.getByRole('tab', { name: 'Cut List' }).click();
   await expect(page.getByRole('heading', { name: 'Purchased Hardware' })).toBeVisible();
   await expect(page.getByText('Knob', { exact: true }).last()).toBeVisible();
-  await expect(page.getByText('Brushed Brass', { exact: true }).last()).toBeVisible();
+  await expect(page.getByText('Matte Black', { exact: true }).last()).toBeVisible();
   await expect(page.getByText('Sheet Goods', { exact: true })).toHaveCount(0);
 });
 
@@ -259,33 +259,33 @@ test('the Properties tab has its own finish picker, in sync with Finish', async 
   await expect(page.getByRole('tab', { name: 'Properties' })).toHaveAttribute('aria-selected', 'true');
 
   // Apply a finish without ever visiting the Finish tab.
-  await page.getByRole('button', { name: 'Ebony Stain' }).click();
-  await expect(page.getByRole('button', { name: 'Ebony Stain' })).toHaveAttribute('aria-pressed', 'true');
+  await page.getByRole('button', { name: 'Dark Gray' }).click();
+  await expect(page.getByRole('button', { name: 'Dark Gray' })).toHaveAttribute('aria-pressed', 'true');
 
   // Finish reflects the same override for the same part — one shared
   // FinishPicker, not two copies that could drift apart.
-  await page.getByRole('tab', { name: 'Finish' }).click();
+  await page.getByRole('tab', { name: 'Color' }).click();
   await expect(page.getByText('Editing: Shelf')).toBeVisible();
-  await expect(page.getByRole('button', { name: 'Ebony Stain' })).toHaveAttribute('aria-pressed', 'true');
-  await expect(page.getByText('Use design finish')).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Dark Gray' })).toHaveAttribute('aria-pressed', 'true');
+  await expect(page.getByText('Use design color')).toBeVisible();
 });
 
 test('a mixed-finish selection is clear and can be unified in one click', async ({ page }) => {
   await page.goto('/');
   await insertShelf(page);
-  await page.getByRole('button', { name: 'Walnut' }).click();
+  await page.getByRole('button', { name: 'Oak', exact: true }).click();
   await insertShelf(page);
-  await page.getByRole('button', { name: 'Ash' }).click();
+  await page.getByRole('button', { name: 'Dark Gray' }).click();
   await page.getByRole('tab', { name: 'Assembly' }).click();
 
   const shelves = page.getByRole('treeitem', { name: 'Shelf Hide Shelf' });
   await shelves.nth(0).click();
   await shelves.nth(1).click({ modifiers: ['Shift'] });
 
-  await expect(page.getByText('Mixed finishes')).toBeVisible();
-  await page.getByRole('button', { name: 'White Lacquer' }).click();
-  await expect(page.getByText('Mixed finishes')).toHaveCount(0);
-  await expect(page.getByRole('button', { name: 'White Lacquer' })).toHaveAttribute(
+  await expect(page.getByText('Mixed colors')).toBeVisible();
+  await page.getByRole('button', { name: 'White', exact: true }).click();
+  await expect(page.getByText('Mixed colors')).toHaveCount(0);
+  await expect(page.getByRole('button', { name: 'White', exact: true })).toHaveAttribute(
     'aria-pressed',
     'true',
   );
@@ -542,10 +542,10 @@ test('a saved version stops being Current after the design changes', async ({ pa
 test('the whole-piece finish applies without creating a fake override', async ({ page }) => {
   await page.goto('/');
   await expect(page.getByText('Editing: Whole Piece')).toBeVisible();
-  await page.getByRole('button', { name: 'Ash' }).click();
+  await page.getByRole('button', { name: 'Oak', exact: true }).click();
   await insertShelf(page);
-  await expect(page.getByRole('button', { name: 'Ash' })).toHaveAttribute('aria-pressed', 'true');
-  await expect(page.getByText('Use design finish')).toHaveCount(0);
+  await expect(page.getByRole('button', { name: 'Oak', exact: true })).toHaveAttribute('aria-pressed', 'true');
+  await expect(page.getByText('Use design color')).toHaveCount(0);
 });
 
 test('a freshly inserted Shelf lies flat, not standing upright', async ({ page }) => {
@@ -878,9 +878,9 @@ test('opening a file sets the header from the on-disk filename', async ({ page }
     JSON.stringify({
       schemaVersion: 4,
       doc: {
-        defaultMaterialId: 'oak',
-        defaultColorId: 'natural',
-        defaultHardwareFinishId: 'brushed-brass',
+        defaultMaterialId: 'ash',
+        defaultColorId: 'white',
+        defaultHardwareFinishId: 'matte-black',
         overrides: {},
         customParts: [],
         hiddenIds: [],

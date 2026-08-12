@@ -6,8 +6,10 @@ import {
   HARDWARE_FINISHES,
   findFinish,
   finishForAppearance,
+  isRoundHardwareShape,
   resolveAppearance,
 } from '@/domain/catalog';
+import { oakGrainDataUrl } from '@/domain/oakGrain';
 import { groupMatching, selectionUnits } from '@/domain/parts';
 import { quaternionToEulerDegrees } from '@/domain/rotation';
 import type { CabinetConfig, Group } from '@/domain/types';
@@ -50,7 +52,7 @@ import { scopeLabel, useSelectionInfo, type SelectionInfo } from './useSelection
 
 const TABS = [
   { id: 'properties', label: 'Properties' },
-  { id: 'materials', label: 'Finish' },
+  { id: 'materials', label: 'Color' },
 ] as const;
 
 export function RightSidebar() {
@@ -310,7 +312,7 @@ function DraftNumberInput({
   ariaLabel,
   value,
   onCommit,
-  widthClass = 'w-[64px]',
+  widthClass = 'w-16',
 }: {
   ariaLabel: string;
   value: number;
@@ -335,7 +337,7 @@ function DraftNumberInput({
       onKeyDown={(e) => {
         if (e.key === 'Enter') e.currentTarget.blur();
       }}
-      className={`h-[22px] ${widthClass} rounded-[5px] border border-white/10 bg-input px-1.5 text-right font-mono text-[11.5px] text-ink`}
+      className={`box-border h-7 ${widthClass} rounded-[5px] border border-white/10 bg-input px-2 text-right font-mono text-[11.5px] leading-none text-ink`}
     />
   );
 }
@@ -365,95 +367,111 @@ function ShelfFields({
   };
 
   const inputClass =
-    'h-[22px] rounded-[5px] border border-white/10 bg-input px-1.5 text-right font-mono text-[11.5px] text-ink';
+    'box-border h-7 rounded-[5px] border border-white/10 bg-input px-2 text-right font-mono text-[11.5px] leading-none text-ink';
+  const unitClass = 'w-6 flex-none font-mono text-[10.5px] leading-none text-ink/35';
+  const rowClass = 'flex h-7 items-center gap-2';
+
+  const commitAdd = () => {
+    const mm = parseToMm(addDraft);
+    if (mm === null) return;
+    addCabinetShelf(groupId, mm);
+    setAddDraft('');
+  };
+
+  const commitDistribute = () => {
+    const count = Math.floor(Number(countDraft));
+    const spacingMm = parseToMm(spacingDraft);
+    if (!Number.isFinite(count) || count < 1 || spacingMm === null) return;
+    distributeCabinetShelves(groupId, count, spacingMm);
+  };
 
   return (
     <>
       <SectionHeader>Shelves</SectionHeader>
 
-      {positions.map((positionMm, index) => (
-        <div key={`${index}-${positionMm}`} className="mb-1.5 flex items-center gap-2">
-          <span className="w-14 flex-none text-[11.5px] text-ink/55">Shelf {index + 1}</span>
-          <DraftNumberInput
-            ariaLabel={`Shelf ${index + 1} position in ${UNIT_NAMES[unit]}`}
-            value={convertedValue(positionMm, unit)}
-            onCommit={(value) =>
-              setCabinetShelfPositions(
-                groupId,
-                positions.map((p, i) => (i === index ? toMm(value, unit) : p)),
-              )
-            }
-          />
-          <span className="font-mono text-[10.5px] text-ink/35">{unit}</span>
-          <button
-            type="button"
-            aria-label={`Remove shelf ${index + 1}`}
-            onClick={() => removeCabinetShelf(groupId, index)}
-            className="flex h-5 w-5 flex-none items-center justify-center rounded text-ink/45 hover:text-danger"
-          >
-            <Icon name="close" size={13} />
-          </button>
+      {positions.length > 0 && (
+        <div className="mb-3 space-y-3">
+          {positions.map((positionMm, index) => (
+            <div key={`${index}-${positionMm}`}>
+              <p className="mb-1.5 text-[10.5px] leading-none text-ink/40">
+                Shelf {index + 1}
+              </p>
+              <div className={rowClass}>
+                <DraftNumberInput
+                  ariaLabel={`Shelf ${index + 1} position in ${UNIT_NAMES[unit]}`}
+                  value={convertedValue(positionMm, unit)}
+                  widthClass="w-16"
+                  onCommit={(value) =>
+                    setCabinetShelfPositions(
+                      groupId,
+                      positions.map((p, i) => (i === index ? toMm(value, unit) : p)),
+                    )
+                  }
+                />
+                <span className={unitClass}>{unit}</span>
+                <button
+                  type="button"
+                  aria-label={`Remove shelf ${index + 1}`}
+                  onClick={() => removeCabinetShelf(groupId, index)}
+                  className="ml-auto flex h-7 w-7 flex-none items-center justify-center rounded text-ink/45 hover:bg-white/5 hover:text-danger"
+                >
+                  <Icon name="close" size={13} />
+                </button>
+              </div>
+            </div>
+          ))}
         </div>
-      ))}
+      )}
 
-      <div className="mt-2.5 mb-1.5 flex items-center gap-2">
-        <input
-          type="number"
-          aria-label={`New shelf position in ${UNIT_NAMES[unit]}`}
-          placeholder={unit === 'mm' ? '300' : '30'}
-          value={addDraft}
-          onChange={(e) => setAddDraft(e.target.value)}
-          onKeyDown={(e) => {
-            if (e.key !== 'Enter') return;
-            const mm = parseToMm(addDraft);
-            if (mm === null) return;
-            addCabinetShelf(groupId, mm);
-            setAddDraft('');
-          }}
-          className={`${inputClass} w-[64px]`}
-        />
-        <span className="font-mono text-[10.5px] text-ink/35">{unit}</span>
-        <Button
-          onClick={() => {
-            const mm = parseToMm(addDraft);
-            if (mm === null) return;
-            addCabinetShelf(groupId, mm);
-            setAddDraft('');
-          }}
-        >
-          Add Shelf
-        </Button>
+      <div className="mb-3">
+        <p className="mb-1.5 text-[10.5px] leading-none text-ink/40">Add shelf</p>
+        <div className={rowClass}>
+          <input
+            type="number"
+            aria-label={`New shelf position in ${UNIT_NAMES[unit]}`}
+            placeholder={unit === 'mm' ? '300' : '30'}
+            value={addDraft}
+            onChange={(e) => setAddDraft(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') commitAdd();
+            }}
+            className={`${inputClass} w-16 flex-none`}
+          />
+          <span className={unitClass}>{unit}</span>
+          <Button className="ml-auto shrink-0" onClick={commitAdd}>
+            Add Shelf
+          </Button>
+        </div>
       </div>
 
-      <div className="mb-2 flex items-center gap-2">
-        <input
-          type="number"
-          aria-label="Shelf count"
-          min={1}
-          value={countDraft}
-          onChange={(e) => setCountDraft(e.target.value)}
-          className={`${inputClass} w-[38px]`}
-        />
-        <span className="flex-none text-[11px] text-ink/45">every</span>
-        <input
-          type="number"
-          aria-label={`Shelf spacing in ${UNIT_NAMES[unit]}`}
-          placeholder={unit === 'mm' ? '200' : '20'}
-          value={spacingDraft}
-          onChange={(e) => setSpacingDraft(e.target.value)}
-          className={`${inputClass} w-[56px]`}
-        />
-        <span className="font-mono text-[10.5px] text-ink/35">{unit}</span>
-        <Button
-          onClick={() => {
-            const count = Math.floor(Number(countDraft));
-            const spacingMm = parseToMm(spacingDraft);
-            if (!Number.isFinite(count) || count < 1 || spacingMm === null) return;
-            distributeCabinetShelves(groupId, count, spacingMm);
-          }}
-        >
-          Apply
-        </Button>
+      <div className="mb-3">
+        <p className="mb-1.5 text-[10.5px] leading-none text-ink/40">Space evenly</p>
+        <div className={rowClass}>
+          <input
+            type="number"
+            aria-label="Shelf count"
+            min={1}
+            value={countDraft}
+            onChange={(e) => setCountDraft(e.target.value)}
+            className={`${inputClass} w-10 flex-none`}
+          />
+          <span className="flex-none text-[11px] leading-none text-ink/45">every</span>
+          <input
+            type="number"
+            aria-label={`Shelf spacing in ${UNIT_NAMES[unit]}`}
+            placeholder={unit === 'mm' ? '200' : '20'}
+            value={spacingDraft}
+            onChange={(e) => setSpacingDraft(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') commitDistribute();
+            }}
+            className={`${inputClass} w-14 flex-none`}
+          />
+          <span className={unitClass}>{unit}</span>
+          <Button className="ml-auto shrink-0" onClick={commitDistribute}>
+            Apply
+          </Button>
+        </div>
       </div>
 
       <p className="mb-4 text-[10.5px] leading-relaxed text-ink/35">
@@ -547,28 +565,63 @@ function PropertiesTab() {
         <>
           <SectionHeader>Dimensions</SectionHeader>
           {selection.spec.category === 'hardware' ? (
-            <>
-              <SliderField
-                label="Diameter"
-                value={fromMm(Math.max(selection.size.w, selection.size.h), unit)}
-                min={convertRange(CUSTOM_PANEL_LIMITS.w, unit).min}
-                max={convertRange(CUSTOM_PANEL_LIMITS.w, unit).max}
-                step={convertRange(CUSTOM_PANEL_LIMITS.w, unit).step}
-                unit={unit}
-                unitName={UNIT_NAMES[unit]}
-                onChange={(value) => setHardwareDiameter(selection.spec.id, toMm(value, unit))}
-              />
-              <SliderField
-                label="Projection"
-                value={fromMm(selection.size.d, unit)}
-                min={convertRange(CUSTOM_PANEL_LIMITS.d, unit).min}
-                max={convertRange(CUSTOM_PANEL_LIMITS.d, unit).max}
-                step={convertRange(CUSTOM_PANEL_LIMITS.d, unit).step}
-                unit={unit}
-                unitName={UNIT_NAMES[unit]}
-                onChange={(value) => setCustomPartDim(selection.spec.id, 'd', toMm(value, unit))}
-              />
-            </>
+            isRoundHardwareShape(selection.spec.shape) ? (
+              <>
+                <SliderField
+                  label="Diameter"
+                  value={fromMm(Math.max(selection.size.w, selection.size.h), unit)}
+                  min={convertRange(CUSTOM_PANEL_LIMITS.w, unit).min}
+                  max={convertRange(CUSTOM_PANEL_LIMITS.w, unit).max}
+                  step={convertRange(CUSTOM_PANEL_LIMITS.w, unit).step}
+                  unit={unit}
+                  unitName={UNIT_NAMES[unit]}
+                  onChange={(value) => setHardwareDiameter(selection.spec.id, toMm(value, unit))}
+                />
+                <SliderField
+                  label="Projection"
+                  value={fromMm(selection.size.d, unit)}
+                  min={convertRange(CUSTOM_PANEL_LIMITS.d, unit).min}
+                  max={convertRange(CUSTOM_PANEL_LIMITS.d, unit).max}
+                  step={convertRange(CUSTOM_PANEL_LIMITS.d, unit).step}
+                  unit={unit}
+                  unitName={UNIT_NAMES[unit]}
+                  onChange={(value) => setCustomPartDim(selection.spec.id, 'd', toMm(value, unit))}
+                />
+              </>
+            ) : (
+              <>
+                <SliderField
+                  label="Length"
+                  value={fromMm(selection.size.w, unit)}
+                  min={convertRange(CUSTOM_PANEL_LIMITS.w, unit).min}
+                  max={convertRange(CUSTOM_PANEL_LIMITS.w, unit).max}
+                  step={convertRange(CUSTOM_PANEL_LIMITS.w, unit).step}
+                  unit={unit}
+                  unitName={UNIT_NAMES[unit]}
+                  onChange={(value) => setCustomPartDim(selection.spec.id, 'w', toMm(value, unit))}
+                />
+                <SliderField
+                  label="Width"
+                  value={fromMm(selection.size.h, unit)}
+                  min={convertRange(CUSTOM_PANEL_LIMITS.h, unit).min}
+                  max={convertRange(CUSTOM_PANEL_LIMITS.h, unit).max}
+                  step={convertRange(CUSTOM_PANEL_LIMITS.h, unit).step}
+                  unit={unit}
+                  unitName={UNIT_NAMES[unit]}
+                  onChange={(value) => setCustomPartDim(selection.spec.id, 'h', toMm(value, unit))}
+                />
+                <SliderField
+                  label="Projection"
+                  value={fromMm(selection.size.d, unit)}
+                  min={convertRange(CUSTOM_PANEL_LIMITS.d, unit).min}
+                  max={convertRange(CUSTOM_PANEL_LIMITS.d, unit).max}
+                  step={convertRange(CUSTOM_PANEL_LIMITS.d, unit).step}
+                  unit={unit}
+                  unitName={UNIT_NAMES[unit]}
+                  onChange={(value) => setCustomPartDim(selection.spec.id, 'd', toMm(value, unit))}
+                />
+              </>
+            )
           ) : DIM_FIELDS.map((field) => {
             const range = convertRange(CUSTOM_PANEL_LIMITS[field.key], unit);
             return (
@@ -735,7 +788,7 @@ function FinishPicker() {
   if (selectedKinds.size > 1) {
     return (
       <div className="rounded-[7px] border border-hairline bg-surface px-3 py-3 text-[11px] leading-relaxed text-ink/50">
-        Select only panels or only hardware to change their finish.
+        Select only panels or only hardware to change their color.
       </div>
     );
   }
@@ -767,9 +820,9 @@ function FinishPicker() {
   return (
     <>
       <div className="mb-2 flex items-center justify-between gap-3">
-        <SectionHeader>{editingHardware ? 'Hardware Finish' : 'Finish'}</SectionHeader>
+        <SectionHeader>{editingHardware ? 'Hardware' : 'Color'}</SectionHeader>
         {isMixed && (
-          <span className="mb-2 text-[10.5px] font-medium text-select">Mixed finishes</span>
+          <span className="mb-2 text-[10.5px] font-medium text-select">Mixed colors</span>
         )}
       </div>
       <div className="grid grid-cols-2 gap-2">
@@ -791,8 +844,11 @@ function FinishPicker() {
           >
             <span
               aria-hidden="true"
-              className="block h-7 w-7 flex-none rounded-md border border-white/15 shadow-sm"
-              style={{ background: appearance.color }}
+              className="block h-7 w-7 flex-none rounded-md border border-white/15 bg-cover bg-center shadow-sm"
+              style={{
+                backgroundColor: appearance.color,
+                backgroundImage: finish.id === 'oak' ? `url(${oakGrainDataUrl()})` : undefined,
+              }}
             />
             <span className="text-[11px] leading-tight">{finish.label}</span>
           </button>
@@ -806,14 +862,14 @@ function FinishPicker() {
           className="mt-2 text-[11px] text-select"
           onClick={() => resetOverrides(selectedPartIds)}
         >
-          Use design finish
+          Use design color
         </button>
       )}
 
       {!selectedPartIds.length && (
         <div className="mt-4 border-t border-hairline pt-4">
           <div className="mb-2 flex items-center justify-between gap-3">
-            <SectionHeader>Hardware Finish</SectionHeader>
+            <SectionHeader>Hardware</SectionHeader>
           </div>
           <div className="grid grid-cols-2 gap-2">
             {HARDWARE_FINISHES.map((finish) => {

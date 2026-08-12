@@ -108,7 +108,7 @@ export function resetOverrides(partIds: readonly string[]): void {
       return { overrides };
     });
   });
-  ui().showToast('Using design finish');
+  ui().showToast('Using design color');
 }
 
 // ─── Panels ──────────────────────────────────────────────────────────────────
