@@ -41,7 +41,7 @@ import {
   snapshotDocument,
   useDocumentStore,
 } from './documentStore';
-import { clearHistory, commit } from './history';
+import { clearHistory, commit, syncHistoryDocumentMeta } from './history';
 import { migrate, SCHEMA_VERSION } from './persistence';
 import { useUiStore } from './uiStore';
 
@@ -1125,6 +1125,9 @@ export function saveVersion(): void {
     doc: snapshotDocument(s),
   };
   useDocumentStore.getState().setVersions([...s.versions, version], id);
+  // Versions live outside commit(); keep stacked snapshots from resurrecting
+  // a version-less document when the user undoes a later geometry edit.
+  syncHistoryDocumentMeta();
   ui().showToast(`Saved ${version.label}`);
 }
 
@@ -1142,13 +1145,17 @@ export function restoreVersion(id: string): void {
 
 /**
  * Renames the document. Blank input is ignored, keeping the previous title.
- * Not wrapped in commit() — like docTitle itself, this is outside the
- * undoable DocumentSnapshot, so it can't desync from the piece being edited.
+ * Not wrapped in commit() — the title is document metadata, not a geometry
+ * edit — but history snapshots still carry it for whole-document undo
+ * (`openFile`), so stacked entries are patched to keep Undo from reverting
+ * the rename.
  */
 export function renameDocument(title: string): void {
   const trimmed = title.trim();
   if (!trimmed) return;
+  if (doc().docTitle === trimmed) return;
   useDocumentStore.getState().setDocTitle(trimmed);
+  syncHistoryDocumentMeta();
 }
 
 // ─── File ────────────────────────────────────────────────────────────────────

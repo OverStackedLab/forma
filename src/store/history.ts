@@ -100,10 +100,36 @@ export function redo(): boolean {
 function applySnapshot(snapshot: FormaDocument): void {
   useDocumentStore.getState().hydrate(structuredClone(snapshot));
   pruneSelection(livePartIds(useDocumentStore.getState().customParts));
+  // Stack entries may carry a stale currentVersionId after metadata sync
+  // patches versions without rewriting which checkpoint matched that entry.
+  reconcileCurrentVersion();
 }
 
 export function clearHistory(): void {
   undoStack.length = 0;
   redoStack.length = 0;
   notify();
+}
+
+/**
+ * `saveVersion` and `renameDocument` intentionally skip `commit()` — they are
+ * document metadata, not geometry edits. History snapshots still carry those
+ * fields (so `openFile` can undo a whole document), which means an unpatched
+ * stack would resurrect a pre-save/pre-rename meta state on the next Undo.
+ * Push the live title and version list into every stacked snapshot so geometry
+ * undo cannot silently destroy checkpoints or titles. `currentVersionId` is
+ * left alone and re-derived on apply via `reconcileCurrentVersion`.
+ */
+export function syncHistoryDocumentMeta(): void {
+  const state = useDocumentStore.getState();
+  const docTitle = state.docTitle;
+  const versions = structuredClone(state.versions);
+  for (const entry of undoStack) {
+    entry.docTitle = docTitle;
+    entry.versions = structuredClone(versions);
+  }
+  for (const entry of redoStack) {
+    entry.docTitle = docTitle;
+    entry.versions = structuredClone(versions);
+  }
 }
