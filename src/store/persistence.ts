@@ -91,6 +91,8 @@ const EDGE_BAND_SIDES: readonly EdgeBandSide[] = [
 
 function inferredPreset(label: string) {
   const normalized = label.toLowerCase();
+  if (normalized.includes('enhet'))
+    return PANEL_PRESETS.find((preset) => preset.id === 'enhet-leg');
   if (normalized.includes('eneryda') || normalized.includes('handle'))
     return PANEL_PRESETS.find((preset) => preset.id === 'eneryda');
   if (normalized.includes('baggan')) return PANEL_PRESETS.find((preset) => preset.id === 'bagganas');
@@ -106,7 +108,13 @@ function inferredPreset(label: string) {
 function normalizePart(value: unknown): CustomPart | null {
   const part = asRecord(value);
   if (!part || typeof part.id !== 'string' || !part.id || typeof part.label !== 'string') return null;
-  if (part.shape !== 'box' && part.shape !== 'cylinder' && part.shape !== 'bagganas' && part.shape !== 'eneryda')
+  if (
+    part.shape !== 'box'
+    && part.shape !== 'cylinder'
+    && part.shape !== 'bagganas'
+    && part.shape !== 'eneryda'
+    && part.shape !== 'enhet-leg'
+  )
     return null;
   const clampDimension = (axis: 'w' | 'h' | 'd') => {
     const raw = part[axis];
@@ -131,7 +139,7 @@ function normalizePart(value: unknown): CustomPart | null {
   const category =
     part.category === 'panel' || part.category === 'front' || part.category === 'hardware'
       ? part.category
-      : preset?.category ?? (shape === 'cylinder' || shape === 'bagganas' || shape === 'eneryda' ? 'hardware' : 'panel');
+      : preset?.category ?? (shape === 'cylinder' || shape === 'bagganas' || shape === 'eneryda' || shape === 'enhet-leg' ? 'hardware' : 'panel');
   const grainAxis =
     part.grainAxis === 'w' || part.grainAxis === 'h' || part.grainAxis === 'd'
       ? part.grainAxis
@@ -153,7 +161,7 @@ function normalizePart(value: unknown): CustomPart | null {
     h,
     d,
     shape,
-    thicknessAxis: category === 'hardware' || shape === 'cylinder' || shape === 'bagganas' || shape === 'eneryda'
+    thicknessAxis: category === 'hardware' || shape === 'cylinder' || shape === 'bagganas' || shape === 'eneryda' || shape === 'enhet-leg'
       ? null
       : validAxis ? thicknessAxis as DimensionAxis : undefined,
     grainAxis,

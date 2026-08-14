@@ -53,6 +53,7 @@ test('boots to an empty scene with no starting model', async ({ page }) => {
   await expect(page.getByRole('heading', { name: 'Hardware' })).toBeVisible();
   await expect(page.getByRole('button', { name: 'Shelf' })).toBeVisible();
   await expect(page.getByRole('button', { name: 'Door' })).toBeVisible();
+  await expect(page.getByRole('button', { name: /ENHET/ })).toBeVisible();
 
   expect(errors).toEqual([]);
 });
@@ -171,6 +172,20 @@ test('round hardware has purpose-built dimensions, finish and purchasing output'
   await expect(page.getByText('Knob', { exact: true }).last()).toBeVisible();
   await expect(page.getByText('Matte Black', { exact: true }).last()).toBeVisible();
   await expect(page.getByText('Sheet Goods', { exact: true })).toHaveCount(0);
+});
+
+test('ENHET legs insert as purchased hardware with diameter and height', async ({ page }) => {
+  await page.goto('/');
+  await page.getByRole('tab', { name: 'Library' }).click();
+  await page.getByRole('button', { name: /ENHET/ }).click();
+  await expect(page.getByText('ENHET added to scene')).toBeVisible();
+
+  await expect(page.getByLabel('Diameter in millimetres')).toHaveValue('50');
+  await expect(page.getByLabel('Height in millimetres')).toHaveValue('125');
+
+  await page.getByRole('tab', { name: 'Cut List' }).click();
+  await expect(page.getByRole('heading', { name: 'Purchased Hardware' })).toBeVisible();
+  await expect(page.getByText('ENHET', { exact: true }).last()).toBeVisible();
 });
 
 test('shift-click adds to the selection without triggering a marquee', async ({ page }) => {

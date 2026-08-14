@@ -7,6 +7,7 @@ import {
   findFinish,
   finishForAppearance,
   isRoundHardwareShape,
+  isLegHardwareShape,
   resolveAppearance,
 } from '@/domain/catalog';
 import { oakGrainDataUrl } from '@/domain/oakGrain';
@@ -568,7 +569,30 @@ function PropertiesTab() {
         <>
           <SectionHeader>Dimensions</SectionHeader>
           {selection.spec.category === 'hardware' ? (
-            isRoundHardwareShape(selection.spec.shape) ? (
+            isLegHardwareShape(selection.spec.shape) ? (
+              <>
+                <SliderField
+                  label="Diameter"
+                  value={fromMm(Math.max(selection.size.w, selection.size.d), unit)}
+                  min={convertRange(CUSTOM_PANEL_LIMITS.w, unit).min}
+                  max={convertRange(CUSTOM_PANEL_LIMITS.w, unit).max}
+                  step={convertRange(CUSTOM_PANEL_LIMITS.w, unit).step}
+                  unit={unit}
+                  unitName={UNIT_NAMES[unit]}
+                  onChange={(value) => setHardwareDiameter(selection.spec.id, toMm(value, unit))}
+                />
+                <SliderField
+                  label="Height"
+                  value={fromMm(selection.size.h, unit)}
+                  min={convertRange(CUSTOM_PANEL_LIMITS.h, unit).min}
+                  max={convertRange(CUSTOM_PANEL_LIMITS.h, unit).max}
+                  step={convertRange(CUSTOM_PANEL_LIMITS.h, unit).step}
+                  unit={unit}
+                  unitName={UNIT_NAMES[unit]}
+                  onChange={(value) => setCustomPartDim(selection.spec.id, 'h', toMm(value, unit))}
+                />
+              </>
+            ) : isRoundHardwareShape(selection.spec.shape) ? (
               <>
                 <SliderField
                   label="Diameter"
