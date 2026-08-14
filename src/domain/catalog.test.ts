@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { findColor, findMaterial, finishForAppearance, resolveAppearance } from './catalog';
+import { findColor, findMaterial, finishForAppearance, resolveAppearance, resolveCabinetPresetId } from './catalog';
 
 describe('resolveAppearance', () => {
   it("uses the material's own color and finish when the color is natural", () => {
@@ -47,5 +47,16 @@ describe('finishForAppearance', () => {
     expect(finishForAppearance('metal', 'brass').label).toBe('Brushed Brass');
     expect(finishForAppearance('metal', 'steel').label).toBe('Brushed Steel');
     expect(finishForAppearance('metal', 'white').label).toBe('White');
+  });
+});
+
+describe('resolveCabinetPresetId', () => {
+  it('maps retired library ids onto the current METOD presets', () => {
+    expect(resolveCabinetPresetId('base-450')).toBe('base-400');
+    expect(resolveCabinetPresetId('base-900')).toBe('base-800');
+    expect(resolveCabinetPresetId('wall-900')).toBe('wall-800');
+    expect(resolveCabinetPresetId('tall-600')).toBe('high-600');
+    expect(resolveCabinetPresetId('base-600')).toBe('base-600');
+    expect(resolveCabinetPresetId('nope')).toBeUndefined();
   });
 });

@@ -8,6 +8,7 @@ import {
   isHardwareFinishId,
   isMaterialId,
   PANEL_PRESETS,
+  resolveCabinetPresetId,
 } from '@/domain/catalog';
 import type {
   CabinetConfig,
@@ -279,11 +280,9 @@ function normalizeSnapshot(value: unknown, legacyAxes = false): DocumentSnapshot
           })
         : undefined;
       cabinet = {
-        presetId:
-          typeof rawCabinet.presetId === 'string' &&
-          CABINET_PRESETS.some((preset) => preset.id === rawCabinet.presetId)
-            ? rawCabinet.presetId as CabinetConfig['presetId']
-            : undefined,
+        presetId: resolveCabinetPresetId(
+          typeof rawCabinet.presetId === 'string' ? rawCabinet.presetId : undefined,
+        ),
         width: Math.min(3000, Math.max(100, rawCabinet.width as number)),
         height,
         depth: Math.min(1500, Math.max(100, rawCabinet.depth as number)),

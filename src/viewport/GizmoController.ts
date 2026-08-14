@@ -2,10 +2,12 @@ import * as THREE from 'three';
 import { TransformControls } from 'three/addons/controls/TransformControls.js';
 import type { Transform } from '@/domain/types';
 import type { GizmoMode } from '@/store/uiStore';
+import { applyFaceSnapPlan, computeFaceSnap, type FaceSnapAxis } from './faceSnap';
 import type { ModelBuilder } from './ModelBuilder';
 import type { SceneManager } from './SceneManager';
+import { SnapGuide } from './snapGuide';
 
-/** Snap increments: 100 mm, 15°, 0.1×. */
+/** Grid increments, used for rotation/scale and for Shift-held translation. */
 const SNAP = { translate: 0.1, rotate: Math.PI / 12, scale: 0.1 };
 
 export type GizmoCommitContext = {
@@ -31,6 +33,15 @@ function sameTransform(a: Transform, b: Transform): boolean {
   );
 }
 
+function translateAxes(axis: string | null | undefined): readonly FaceSnapAxis[] {
+  if (!axis || axis === 'XYZ' || axis === 'E') return ['x', 'y', 'z'];
+  const axes: FaceSnapAxis[] = [];
+  if (axis.includes('X')) axes.push('x');
+  if (axis.includes('Y')) axes.push('y');
+  if (axis.includes('Z')) axes.push('z');
+  return axes.length ? axes : ['x', 'y', 'z'];
+}
+
 /**
  * Wraps TransformControls.
  *
@@ -38,15 +49,23 @@ function sameTransform(a: Transform, b: Transform): boolean {
  * frame of a drag — which is why gizmo moves never landed on the undo stack in
  * a usable form. Here the drag mutates the scene freely and commits **once** on
  * release, producing exactly one undo entry per gesture.
+ *
+ * The magnet toggle is object-face snap while translating. Shift temporarily
+ * restores the 100 mm grid; rotation and scale still use their increment snaps.
  */
 export class GizmoController {
   private readonly controls: TransformControls;
   private readonly pivot = new THREE.Object3D();
+  private readonly guide: SnapGuide;
+  private readonly onShift = (event: KeyboardEvent) => this.setShiftHeld(event.shiftKey);
+  private readonly onBlur = () => this.setShiftHeld(false);
   private pivotAttached = false;
   private relatives = new Map<string, THREE.Matrix4>();
   private ids: string[] = [];
   private mode: GizmoMode = 'select';
   private dragging = false;
+  private snapEnabled = false;
+  private shiftHeld = false;
   private dragStart: Record<string, Transform> | null = null;
 
   constructor(
@@ -56,6 +75,7 @@ export class GizmoController {
   ) {
     this.controls = new TransformControls(scene.camera, scene.renderer.domElement);
     this.controls.size = 0.85;
+    this.guide = new SnapGuide(scene);
     scene.scene.add(this.controls.getHelper());
     scene.scene.add(this.pivot);
 
@@ -70,7 +90,12 @@ export class GizmoController {
 
     this.controls.addEventListener('objectChange', () => {
       if (this.ids.length > 1) this.applyPivotToParts();
+      this.applyLiveFaceSnap();
     });
+
+    window.addEventListener('keydown', this.onShift);
+    window.addEventListener('keyup', this.onShift);
+    window.addEventListener('blur', this.onBlur);
   }
 
   get isDragging(): boolean {
@@ -78,19 +103,20 @@ export class GizmoController {
   }
 
   setSnapEnabled(enabled: boolean): void {
-    this.controls.setTranslationSnap(enabled ? SNAP.translate : null);
-    this.controls.setRotationSnap(enabled ? SNAP.rotate : null);
-    this.controls.setScaleSnap(enabled ? SNAP.scale : null);
+    this.snapEnabled = enabled;
+    this.applyGizmoIncrements();
   }
 
   sync(mode: GizmoMode, selectedIds: readonly string[]): void {
     const ids = selectedIds.filter((id) => this.builder.getRoot(id));
     this.ids = ids;
     this.mode = mode;
+    this.applyGizmoIncrements();
 
     if (!ids.length || mode === 'select' || mode === 'pan') {
       this.controls.detach();
       this.pivotAttached = false;
+      this.guide.clear();
       return;
     }
 
@@ -157,6 +183,40 @@ export class GizmoController {
     }
   }
 
+  private setShiftHeld(held: boolean): void {
+    if (held === this.shiftHeld) return;
+    this.shiftHeld = held;
+    this.applyGizmoIncrements();
+    if (this.dragging) this.applyLiveFaceSnap();
+  }
+
+  /** Grid snap is Shift+translate; the magnet itself is object-face snap. */
+  private applyGizmoIncrements(): void {
+    const gridTranslate = this.shiftHeld && this.mode === 'translate';
+    this.controls.setTranslationSnap(gridTranslate ? SNAP.translate : null);
+    this.controls.setRotationSnap(this.snapEnabled ? SNAP.rotate : null);
+    this.controls.setScaleSnap(this.snapEnabled ? SNAP.scale : null);
+  }
+
+  private applyLiveFaceSnap(): void {
+    if (!this.dragging || this.mode !== 'translate' || !this.snapEnabled || this.shiftHeld) {
+      this.guide.clear();
+      return;
+    }
+    const plan = computeFaceSnap(this.builder, this.ids, translateAxes(this.controls.axis));
+    if (!plan) {
+      this.guide.clear();
+      return;
+    }
+    const snapped = applyFaceSnapPlan(this.builder, this.ids, plan);
+    if (this.pivotAttached && Object.keys(snapped).length) {
+      this.pivot.position.x += plan.delta.x;
+      this.pivot.position.y += plan.delta.y;
+      this.pivot.position.z += plan.delta.z;
+    }
+    this.guide.setGuides(plan.guides);
+  }
+
   private readTransforms(): Record<string, Transform> {
     const out: Record<string, Transform> = {};
     for (const id of this.ids) {
@@ -172,6 +232,7 @@ export class GizmoController {
   }
 
   private commit(): void {
+    this.guide.clear();
     const current = this.readTransforms();
     const before = this.dragStart;
     this.dragStart = null;
@@ -195,6 +256,10 @@ export class GizmoController {
   }
 
   dispose(): void {
+    window.removeEventListener('keydown', this.onShift);
+    window.removeEventListener('keyup', this.onShift);
+    window.removeEventListener('blur', this.onBlur);
+    this.guide.dispose();
     this.controls.detach();
     this.controls.getHelper().removeFromParent();
     this.pivot.removeFromParent();

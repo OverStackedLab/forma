@@ -52,5 +52,6 @@ Tailwind v4 for styling.
 | [`docs/ARCHITECTURE.md`](./docs/ARCHITECTURE.md) | How the layers fit together, how a change flows from click to cut list, and why the parametric sideboard was removed |
 | [`docs/CODING_STANDARDS.md`](./docs/CODING_STANDARDS.md) | The rules: layering, `commit()` vs metadata, units, dispose and picking gotchas, naming, testing, change workflow |
 | [`docs/DESIGN_SPEC.md`](./docs/DESIGN_SPEC.md) | The full visual and interaction spec — colours, typography, metrics, every screen — plus the prototype it came from |
+| [`CHANGELOG.md`](./CHANGELOG.md) | User-facing changes, newest first |
 | [`docs/BUGS.md`](./docs/BUGS.md) | Open and resolved defects (`BUG-###`) |
 | [`docs/IMPROVEMENTS.md`](./docs/IMPROVEMENTS.md) | Non-bug follow-ups (`IMP-###`) |

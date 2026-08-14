@@ -32,9 +32,9 @@ describe('group resizing', () => {
       transforms: { left: at(0), right: at(0.3) },
       overrides: {},
       hiddenIds: [],
-      defaultMaterialId: 'oak',
-      defaultColorId: 'natural',
-      defaultHardwareFinishId: 'brushed-brass',
+      defaultMaterialId: 'ash',
+      defaultColorId: 'white',
+      defaultHardwareFinishId: 'matte-black',
     });
 
     const resized = computeGroupResizeTransforms(builder, ['left', 'right'], 'x', 800);
@@ -59,9 +59,9 @@ describe('group resizing', () => {
       transforms: { available: at(0) },
       overrides: {},
       hiddenIds: [],
-      defaultMaterialId: 'oak',
-      defaultColorId: 'natural',
-      defaultHardwareFinishId: 'brushed-brass',
+      defaultMaterialId: 'ash',
+      defaultColorId: 'white',
+      defaultHardwareFinishId: 'matte-black',
     });
 
     expect(computeGroupResizeTransforms(builder, ['available', 'missing'], 'x', 200)).toBeNull();

@@ -31,9 +31,9 @@ describe('snap together', () => {
       transforms: { target: at(0), 'moving-a': at(1), 'moving-b': at(1.3) },
       overrides: {},
       hiddenIds: [],
-      defaultMaterialId: 'oak',
-      defaultColorId: 'natural',
-      defaultHardwareFinishId: 'brushed-brass',
+      defaultMaterialId: 'ash',
+      defaultColorId: 'white',
+      defaultHardwareFinishId: 'matte-black',
     });
 
     const snapped = computeSnapTogetherTransforms(builder, ['target'], ['moving-a', 'moving-b']);

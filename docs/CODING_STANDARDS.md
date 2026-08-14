@@ -333,6 +333,7 @@ Read these before changing picking, history, cabinets, or materials:
 8. **Hidden ≠ unpickable in three.js** — filter with `visibleIds()`
 9. **Unlayered base CSS breaks buttons** — keep resets in `@layer base`
 10. **Empty canvas is intentional** — do not restore the parametric sideboard
+11. **Magnet is object-face snap** — the 100 mm grid is Shift-held translation only; do not wire `setTranslationSnap(0.1)` to the magnet toggle
 
 ---
 

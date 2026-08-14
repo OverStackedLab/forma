@@ -25,6 +25,7 @@ import {
 import type {
   AppearanceFinishId,
   CabinetConfig,
+  CabinetPreset,
   CustomPart,
   DimensionAxis,
   EdgeBandSide,
@@ -179,6 +180,24 @@ export function addCustomPanel(presetId: string, placement?: DropPlacement): voi
   u.showToast(`${preset.label} added to scene`);
 }
 
+/**
+ * Bottom-centre origin for a newly inserted cabinet. Floor insertions (click
+ * or a ground drop) honour `preset.bottomMm` so wall units hang instead of
+ * sitting on the grid; drops onto a vertical face keep the hit height.
+ */
+function cabinetInsertionOrigin(
+  preset: CabinetPreset,
+  centre: [number, number, number],
+  placement?: DropPlacement,
+): [number, number, number] {
+  const hangMm = !placement || placement.normal.y > 0.5 ? (preset.bottomMm ?? 0) : 0;
+  return [
+    centre[0],
+    centre[1] - preset.height / 2000 + hangMm / 1000,
+    centre[2],
+  ];
+}
+
 /** Adds a complete open-front cabinet as one named, selectable group. */
 export function addCabinetPreset(presetId: string, placement?: DropPlacement): void {
   const preset = CABINET_PRESETS.find((candidate) => candidate.id === presetId) ?? CABINET_PRESETS[0]!;
@@ -196,7 +215,7 @@ export function addCabinetPreset(presetId: string, placement?: DropPlacement): v
         placement.point.z + placement.normal.z * supportMm / 1000,
       ]
     : [nextInsertionX(state, preset.width / 2), preset.height / 2000, 0];
-  const origin: [number, number, number] = [centre[0], centre[1] - preset.height / 2000, centre[2]];
+  const origin = cabinetInsertionOrigin(preset, centre, placement);
   const ids = layout.map(() => nextCustomId());
   const newParts: CustomPart[] = layout.map((item, index) => ({
     id: ids[index]!,
@@ -701,7 +720,7 @@ function cabinetResizeMetadata(group: Group, requested: CabinetConfig): {
       );
   config.presetId = matchingPreset?.id;
   const generatedLabel =
-    currentPreset?.label === group.label || /^(Base|Wall|Tall) \d+×\d+×\d+$/.test(group.label);
+    currentPreset?.label === group.label || /^(Base|Wall|Tall|High) \d+×\d+×\d+$/.test(group.label);
   const family = currentPreset?.label.split(' ')[0] ?? group.label.split(' ')[0] ?? 'Cabinet';
   const label = generatedLabel
     ? matchingPreset?.label ??

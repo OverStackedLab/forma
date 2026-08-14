@@ -12,8 +12,8 @@ describe('oriented part bounds', () => {
     const side = PANEL_PRESETS.find((preset) => preset.id === 'flat')!;
     const extents = orientedHalfExtentsMm(side, side.defaultQuaternion);
     expect(extents.x).toBeCloseTo(9, 8);
-    expect(extents.y).toBeCloseTo(360, 8);
-    expect(extents.z).toBeCloseTo(280, 8);
+    expect(extents.y).toBeCloseTo(400, 8);
+    expect(extents.z).toBeCloseTo(300, 8);
   });
 
   it('computes the offset needed to place a shelf on a horizontal surface', () => {

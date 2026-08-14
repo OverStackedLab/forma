@@ -22,19 +22,19 @@ describe('buildCabinetLayout', () => {
     ]);
     expect(parts[0]).toMatchObject({
       w: 18,
-      h: 720,
-      d: 560,
-      positionMm: [-291, 360, 0],
+      h: 800,
+      d: 600,
+      positionMm: [-291, 400, 0],
       thicknessAxis: 'w',
       grainAxis: 'h',
       edgeBanding: ['d-max'],
     });
-    expect(parts[2]).toMatchObject({ w: 564, h: 18, d: 552, positionMm: [0, 9, 4] });
+    expect(parts[2]).toMatchObject({ w: 564, h: 18, d: 592, positionMm: [0, 9, 4] });
     expect(parts[4]).toMatchObject({ thicknessAxis: 'd', edgeBanding: [] });
   });
 
-  it('adds four evenly spaced shelves to the tall module', () => {
-    const preset = CABINET_PRESETS.find((candidate) => candidate.id === 'tall-600')!;
+  it('adds four evenly spaced shelves to the high module', () => {
+    const preset = CABINET_PRESETS.find((candidate) => candidate.id === 'high-600')!;
     const parts = buildCabinetLayout(preset);
     expect(parts.filter((part) => part.label.includes('Shelf'))).toHaveLength(4);
     expect(parts).toHaveLength(9);

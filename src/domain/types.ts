@@ -39,12 +39,12 @@ export type PanelPresetId =
   | 'bagganas'
   | 'eneryda';
 export type CabinetPresetId =
-  | 'base-450'
+  | 'base-400'
   | 'base-600'
-  | 'base-900'
+  | 'base-800'
   | 'wall-600'
-  | 'wall-900'
-  | 'tall-600';
+  | 'wall-800'
+  | 'high-600';
 /** Every part renders as one of a few shared unit geometries, scaled per instance. */
 export type PanelShape = 'box' | 'cylinder' | 'bagganas' | 'eneryda';
 
@@ -102,6 +102,11 @@ export type CabinetPreset = {
   depth: number;
   shelfCount: number;
   icon: string;
+  /**
+   * Underside height in mm when the cabinet is inserted onto the floor.
+   * Wall cabinets hang above the grid; base and tall units omit this (0).
+   */
+  bottomMm?: number;
 };
 
 export type CabinetConfig = {

@@ -88,21 +88,44 @@ describe('library construction actions', () => {
     });
   });
 
+  it('hangs wall cabinets above the floor so their top lines up with a tall unit', () => {
+    addCabinetPreset('wall-600');
+    addCabinetPreset('base-600');
+    const state = useDocumentStore.getState();
+    const wall = state.groups[0]!;
+    const base = state.groups[1]!;
+    // Left side centre is half the 800 mm carcass above a 1400 mm underside.
+    expect(state.transforms[wall.partIds[0]!]!.position[1]).toBeCloseTo(1.8, 8);
+    expect(state.transforms[base.partIds[0]!]!.position[1]).toBeCloseTo(0.4, 8);
+  });
+
+  it('keeps a wall cabinet at hanging height when dropped onto the floor', () => {
+    addCabinetPreset('wall-600', {
+      point: { x: 0.4, y: 0, z: -0.2 },
+      normal: { x: 0, y: 1, z: 0 },
+    });
+    const state = useDocumentStore.getState();
+    const side = state.transforms[state.groups[0]!.partIds[0]!]!;
+    expect(side.position[0]).toBeCloseTo(0.4 - 0.291, 8);
+    expect(side.position[1]).toBeCloseTo(1.8, 8);
+    expect(side.position[2]).toBeCloseTo(-0.2, 8);
+  });
+
   it('resizes a cabinet parametrically without changing panel thicknesses', () => {
     addCabinetPreset('base-600');
     const group = useDocumentStore.getState().groups[0]!;
-    setCabinetDim(group.id, 'width', 900);
+    setCabinetDim(group.id, 'width', 800);
 
     const state = useDocumentStore.getState();
     const resized = state.groups[0]!;
     const members = resized.partIds.map((id) => state.customParts.find((part) => part.id === id)!);
-    expect(resized.cabinet?.width).toBe(900);
-    expect(resized.label).toBe('Base 900');
+    expect(resized.cabinet?.width).toBe(800);
+    expect(resized.label).toBe('Base 800');
     expect(members.slice(0, 2).map((part) => part.w)).toEqual([18, 18]);
-    expect(members[2]).toMatchObject({ w: 864, h: 18, d: 552 });
-    expect(members[4]).toMatchObject({ w: 864, h: 684, d: 8 });
-    expect(state.transforms[resized.partIds[0]!]!.position[0]).toBeCloseTo(-0.441, 8);
-    expect(state.transforms[resized.partIds[1]!]!.position[0]).toBeCloseTo(0.441, 8);
+    expect(members[2]).toMatchObject({ w: 764, h: 18, d: 592 });
+    expect(members[4]).toMatchObject({ w: 764, h: 764, d: 8 });
+    expect(state.transforms[resized.partIds[0]!]!.position[0]).toBeCloseTo(-0.391, 8);
+    expect(state.transforms[resized.partIds[1]!]!.position[0]).toBeCloseTo(0.391, 8);
   });
 
   it('turns a full-cabinet gizmo scale into one parametric resize around the shared pivot', () => {
@@ -124,17 +147,17 @@ describe('library construction actions', () => {
       resized.partIds.reduce((sum, id) => sum + state.transforms[id]!.position[axis]!, 0) /
       resized.partIds.length,
     );
-    expect(resized.cabinet).toMatchObject({ width: 900, height: 900, depth: 672 });
-    expect(members[0]).toMatchObject({ w: 18, h: 900, d: 672 });
-    expect(members[2]).toMatchObject({ w: 864, h: 18, d: 664 });
-    expect(members[4]).toMatchObject({ w: 864, h: 864, d: 8 });
+    expect(resized.cabinet).toMatchObject({ width: 900, height: 1000, depth: 720 });
+    expect(members[0]).toMatchObject({ w: 18, h: 1000, d: 720 });
+    expect(members[2]).toMatchObject({ w: 864, h: 18, d: 712 });
+    expect(members[4]).toMatchObject({ w: 864, h: 964, d: 8 });
     expect(resized.partIds.every((id) => state.transforms[id]!.scale.every((value) => value === 1)))
       .toBe(true);
     pivotAfter.forEach((value, axis) => expect(value).toBeCloseTo(pivotBefore[axis]!, 8));
 
     expect(undo()).toBe(true);
     state = useDocumentStore.getState();
-    expect(state.groups[0]?.cabinet).toMatchObject({ width: 600, height: 720, depth: 560 });
+    expect(state.groups[0]?.cabinet).toMatchObject({ width: 600, height: 800, depth: 600 });
   });
 
   it('resets a rotated cabinet as one coherent carcass', () => {
@@ -155,7 +178,7 @@ describe('library construction actions', () => {
     resetTransforms(group.partIds);
     const state = useDocumentStore.getState();
     expect(state.transforms[group.partIds[0]!]!.position[0]).toBeCloseTo(-0.291, 8);
-    expect(state.transforms[group.partIds[0]!]!.position[1]).toBeCloseTo(0.36, 8);
+    expect(state.transforms[group.partIds[0]!]!.position[1]).toBeCloseTo(0.4, 8);
     expect(state.transforms[group.partIds[0]!]!.position[2]).toBeCloseTo(0, 8);
     expect(state.transforms[group.partIds[1]!]!.position[0]).toBeCloseTo(0.291, 8);
     expect(group.partIds.every((id) =>
@@ -215,7 +238,7 @@ describe('library construction actions', () => {
     addCabinetShelf(group.id, 300);
     group = useDocumentStore.getState().groups[0]!;
     expect(group.partIds).toHaveLength(7);
-    expect(group.cabinet?.shelfPositionsMm).toEqual([300, 360]);
+    expect(group.cabinet?.shelfPositionsMm).toEqual([300, 400]);
     expect(group.cabinet?.presetId).toBeUndefined();
 
     // Every member, including the new shelf, has a transform and a part.
@@ -226,7 +249,7 @@ describe('library construction actions', () => {
     }
     const shelfIds = group.partIds.slice(5);
     const shelfYs = shelfIds.map((id) => Math.round(state.transforms[id]!.position[1] * 1000));
-    expect(shelfYs).toEqual([300, 360]);
+    expect(shelfYs).toEqual([300, 400]);
 
     // Moving a shelf keeps the count; removing one shrinks the group.
     setCabinetShelfPositions(group.id, [250, 500]);
@@ -257,7 +280,7 @@ describe('library construction actions', () => {
     distributeCabinetShelves(group.id, 4, 200);
 
     const next = useDocumentStore.getState().groups[0]!;
-    // 720 high: shelves at 218/418/618; the fourth would leave the interior.
+    // 800 high: shelves at 218/418/618; the fourth would leave the interior.
     expect(next.cabinet?.shelfPositionsMm).toEqual([218, 418, 618]);
     expect(next.partIds).toHaveLength(8);
     expect(useUiStore.getState().toast?.message).toBe('Only 3 of 4 shelves fit');

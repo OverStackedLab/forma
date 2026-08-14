@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react';
 import { CABINET_PRESETS, PANEL_PRESETS } from '@/domain/catalog';
-import type { Group, PartSpec } from '@/domain/types';
+import type { Group, PanelPreset, PartSpec } from '@/domain/types';
 import {
   addCustomPanel,
   addCabinetPreset,
@@ -302,9 +302,38 @@ function GroupRow({
   );
 }
 
+function LibrarySection({
+  title,
+  presets,
+}: {
+  title: string;
+  presets: readonly PanelPreset[];
+}) {
+  return (
+    <div>
+      <h3 className="mb-2 text-[11px] font-semibold tracking-[.04em] text-ink/45 uppercase">
+        {title}
+      </h3>
+      <div className="grid grid-cols-2 gap-1.5">
+        {presets.map((preset) => (
+          <OptionCard
+            key={preset.id}
+            label={preset.label}
+            description={preset.description}
+            icon={preset.icon}
+            dragPayload={`panel:${preset.id}`}
+            onClick={() => addCustomPanel(preset.id)}
+          />
+        ))}
+      </div>
+    </div>
+  );
+}
+
 /** Library entry point for cabinet assemblies, panels, fronts and hardware. */
 function LibraryPanel() {
-  const panels = PANEL_PRESETS.filter((preset) => preset.category !== 'hardware');
+  const panels = PANEL_PRESETS.filter((preset) => preset.category === 'panel');
+  const fronts = PANEL_PRESETS.filter((preset) => preset.category === 'front');
   const hardware = PANEL_PRESETS.filter((preset) => preset.category === 'hardware');
 
   return (
@@ -326,45 +355,13 @@ function LibraryPanel() {
           ))}
         </div>
         <p className="mt-2 text-[10px] leading-relaxed text-ink/30">
-          Metric carcass sizes. Heights exclude legs and worktops.
+          IKEA METOD frame sizes. Heights exclude legs and worktops.
         </p>
       </div>
 
-      <div>
-        <h3 className="mb-2 text-[11px] font-semibold tracking-[.04em] text-ink/45 uppercase">
-          Panels &amp; Fronts
-        </h3>
-        <div className="grid grid-cols-2 gap-1.5">
-          {panels.map((p) => (
-            <OptionCard
-              key={p.id}
-              label={p.label}
-              description={p.description}
-              icon={p.icon}
-              dragPayload={`panel:${p.id}`}
-              onClick={() => addCustomPanel(p.id)}
-            />
-          ))}
-        </div>
-      </div>
-
-      <div>
-        <h3 className="mb-2 text-[11px] font-semibold tracking-[.04em] text-ink/45 uppercase">
-          Hardware
-        </h3>
-        <div className="grid grid-cols-2 gap-1.5">
-          {hardware.map((item) => (
-            <OptionCard
-              key={item.id}
-              label={item.label}
-              description={item.description}
-              icon={item.icon}
-              dragPayload={`panel:${item.id}`}
-              onClick={() => addCustomPanel(item.id)}
-            />
-          ))}
-        </div>
-      </div>
+      <LibrarySection title="Panels" presets={panels} />
+      <LibrarySection title="Fronts" presets={fronts} />
+      <LibrarySection title="Hardware" presets={hardware} />
 
       <p className="text-[11px] leading-relaxed text-ink/35">
         Click an item to add it to the scene, or drag it onto the viewport.

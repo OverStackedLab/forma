@@ -19,7 +19,7 @@ export const GRID_SIZE_LIMITS_M = { min: 1, max: 20, step: 0.1 } as const;
 /** The size every derived number below is calibrated against: at 4 m, k = 1. */
 export const DEFAULT_GRID_SIZE_M: GridSizeM = 4;
 
-/** 100 mm cells at every grid size — matching the gizmo's 0.1 translate snap. */
+/** 100 mm cells at every grid size — matching Shift-held gizmo translation snap. */
 const CELL_SIZE_M = 0.1;
 
 /**

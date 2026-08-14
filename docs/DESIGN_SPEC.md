@@ -202,7 +202,7 @@ The CSV export must serialize exactly what the table shows, including custom pan
 Backed by three.js `TransformControls`. Modes: translate / rotate / scale, plus a Select mode with no gizmo and a Pan mode that switches OrbitControls' left mouse button to panning. OrbitControls must be disabled while a gizmo drag is in progress (`dragging-changed`). Transforms are persisted per part id in a `manualTransforms` map so they survive model rebuilds.
 
 ### Snapping
-Toggle in the gizmo toolbar. When on: translation snap `0.1` (100 mm, matching the grid), rotation snap `Math.PI / 12` (15°), scale snap `0.1`.
+Toggle in the gizmo toolbar. When on, translation magnetically snaps to nearby part faces while dragging (60 mm capture, live face guide). Hold Shift to snap translation to the 100 mm grid instead. Rotation snap `Math.PI / 12` (15°) and scale snap `0.1` still follow the toggle.
 
 ### Measuring
 Toggle in the toolbar. Click two points on the model; each click raycasts and records a hit point. Renders two 8 mm spheres and a dashed line in `#4FA3FF`, with a DOM label at the projected midpoint showing the distance in millimetres. A third click starts a fresh measurement.

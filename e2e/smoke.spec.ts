@@ -48,7 +48,11 @@ test('boots to an empty scene with no starting model', async ({ page }) => {
   await expect(page.getByText('Leg Style')).toHaveCount(0);
   await expect(page.getByText('Handle Style')).toHaveCount(0);
   await expect(page.getByText('Base Style')).toHaveCount(0);
+  await expect(page.getByRole('heading', { name: 'Panels' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Fronts' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Hardware' })).toBeVisible();
   await expect(page.getByRole('button', { name: 'Shelf' })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Door' })).toBeVisible();
 
   expect(errors).toEqual([]);
 });
@@ -95,7 +99,7 @@ test('cabinet shelves can be added at a position and distributed by spacing', as
   await expect(page.getByText('6 parts').first()).toBeVisible();
 
   // The preset's single shelf sits at the interior centre.
-  await expect(page.getByLabel('Shelf 1 position in millimetres')).toHaveValue('360');
+  await expect(page.getByLabel('Shelf 1 position in millimetres')).toHaveValue('400');
 
   // "I need one panel at 30 cm."
   await page.getByLabel('New shelf position in millimetres').fill('300');
@@ -103,7 +107,7 @@ test('cabinet shelves can be added at a position and distributed by spacing', as
   await expect(page.getByText('Shelf added at 300 mm')).toBeVisible();
   await expect(page.getByText('7 parts').first()).toBeVisible();
   await expect(page.getByLabel('Shelf 1 position in millimetres')).toHaveValue('300');
-  await expect(page.getByLabel('Shelf 2 position in millimetres')).toHaveValue('360');
+  await expect(page.getByLabel('Shelf 2 position in millimetres')).toHaveValue('400');
 
   // "I need n panels at a distance of n cm" — 3 shelves every 200 mm.
   await page.getByLabel('Shelf count').fill('3');
@@ -143,13 +147,13 @@ test('a prebuilt cabinet resizes from nominal dimensions without changing panel 
 
   const width = page.getByLabel('Cabinet Width in millimetres');
   await expect(width).toHaveValue('600');
-  await width.fill('900');
+  await width.fill('800');
   await width.blur();
-  await expect(width).toHaveValue('900');
+  await expect(width).toHaveValue('800');
 
   await page.getByRole('tab', { name: 'Cut List' }).click();
-  await expect(page.getByText('Base 900 Side', { exact: true }).last()).toBeVisible();
-  await expect(page.getByText('864', { exact: true }).first()).toBeVisible();
+  await expect(page.getByText('Base 800 Side', { exact: true }).last()).toBeVisible();
+  await expect(page.getByText('764', { exact: true }).first()).toBeVisible();
   await expect(page.getByText('18', { exact: true }).first()).toBeVisible();
 });
 
@@ -450,10 +454,10 @@ test('duplicating a group creates an independently editable grouped copy', async
   // The copied cabinet keeps its parametric controls and can change without
   // rebuilding the original group.
   const width = page.getByLabel('Cabinet Width in millimetres');
-  await width.fill('900');
+  await width.fill('800');
   await width.blur();
   await expect(page.getByRole('treeitem', { name: /Base 600/ }).first()).toBeVisible();
-  await expect(page.getByRole('treeitem', { name: /Base 900/ }).first()).toBeVisible();
+  await expect(page.getByRole('treeitem', { name: /Base 800/ }).first()).toBeVisible();
 
   // One undo restores the copy's dimensions; a second removes the duplicate.
   await page.getByRole('button', { name: 'Undo' }).click();
@@ -751,8 +755,8 @@ test('resizing a cabinet with the scale gizmo updates its parametric dimensions'
 
   const width = page.getByLabel('Cabinet Width in millimetres');
   await expect(width).toHaveValue('600');
-  await expect(page.getByLabel('Cabinet Height in millimetres')).toHaveValue('720');
-  await expect(page.getByLabel('Cabinet Depth in millimetres')).toHaveValue('560');
+  await expect(page.getByLabel('Cabinet Height in millimetres')).toHaveValue('800');
+  await expect(page.getByLabel('Cabinet Depth in millimetres')).toHaveValue('600');
 
   const canvasBox = await page.locator('canvas').boundingBox();
   if (!canvasBox) throw new Error('viewport canvas has no bounding box');
@@ -767,8 +771,8 @@ test('resizing a cabinet with the scale gizmo updates its parametric dimensions'
 
   await expect(page.getByText('Cabinet dimensions updated')).toBeVisible();
   await expect(width).not.toHaveValue('600');
-  await expect(page.getByLabel('Cabinet Height in millimetres')).toHaveValue('720');
-  await expect(page.getByLabel('Cabinet Depth in millimetres')).toHaveValue('560');
+  await expect(page.getByLabel('Cabinet Height in millimetres')).toHaveValue('800');
+  await expect(page.getByLabel('Cabinet Depth in millimetres')).toHaveValue('600');
 
   // The gesture rebuilds the cabinet instead of stretching sheet thickness.
   await page.getByRole('tab', { name: 'Cut List' }).click();

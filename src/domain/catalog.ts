@@ -1,5 +1,6 @@
 import type {
   CabinetPreset,
+  CabinetPresetId,
   Color,
   ColorId,
   Finish,
@@ -61,23 +62,23 @@ export const PANEL_PRESETS: readonly PanelPreset[] = [
     edgeBanding: ['d-max'], defaultQuaternion: [0, 0, 0, 1],
   },
   {
-    id: 'flat', label: 'Side Panel', w: 18, h: 720, d: 560, icon: 'panel_flat', shape: 'box',
-    category: 'panel', description: '18×720×560 mm', thicknessAxis: 'w', grainAxis: 'h',
+    id: 'flat', label: 'Side Panel', w: 18, h: 800, d: 600, icon: 'panel_flat', shape: 'box',
+    category: 'panel', description: '18×800×600 mm', thicknessAxis: 'w', grainAxis: 'h',
     edgeBanding: ['d-max'], defaultQuaternion: [0, 0, 0, 1],
   },
   {
-    id: 'back', label: 'Back Panel', w: 600, h: 720, d: 8, icon: 'panel_back', shape: 'box',
-    category: 'panel', description: '600×720×8 mm', thicknessAxis: 'd', grainAxis: 'h',
+    id: 'back', label: 'Back Panel', w: 600, h: 800, d: 8, icon: 'panel_back', shape: 'box',
+    category: 'panel', description: '600×800×8 mm', thicknessAxis: 'd', grainAxis: 'h',
     edgeBanding: [], defaultQuaternion: [0, 0, 0, 1],
   },
   {
-    id: 'divider', label: 'Divider', w: 18, h: 720, d: 560, icon: 'panel_divider', shape: 'box',
-    category: 'panel', description: '18×720×560 mm', thicknessAxis: 'w', grainAxis: 'h',
+    id: 'divider', label: 'Divider', w: 18, h: 800, d: 600, icon: 'panel_divider', shape: 'box',
+    category: 'panel', description: '18×800×600 mm', thicknessAxis: 'w', grainAxis: 'h',
     edgeBanding: ['d-max'], defaultQuaternion: [0, 0, 0, 1],
   },
   {
-    id: 'door', label: 'Door', w: 400, h: 700, d: 18, icon: 'panel_door', shape: 'box',
-    category: 'front', description: '400×700×18 mm', thicknessAxis: 'd', grainAxis: 'h',
+    id: 'door', label: 'Door', w: 400, h: 800, d: 18, icon: 'panel_door', shape: 'box',
+    category: 'front', description: '400×800×18 mm', thicknessAxis: 'd', grainAxis: 'h',
     edgeBanding: ['w-min', 'w-max', 'h-min', 'h-max'], defaultQuaternion: [0, 0, 0, 1],
   },
   {
@@ -97,15 +98,31 @@ export const PANEL_PRESETS: readonly PanelPreset[] = [
   },
 ];
 
-/** Common metric carcass modules. Heights exclude legs, worktops and mounting rails. */
+/** IKEA METOD frame sizes. Heights exclude legs, worktops and the 1 cm wall gap. */
 export const CABINET_PRESETS: readonly CabinetPreset[] = [
-  { id: 'base-450', label: 'Base 450', width: 450, height: 720, depth: 560, shelfCount: 1, icon: 'cabinet' },
-  { id: 'base-600', label: 'Base 600', width: 600, height: 720, depth: 560, shelfCount: 1, icon: 'cabinet' },
-  { id: 'base-900', label: 'Base 900', width: 900, height: 720, depth: 560, shelfCount: 1, icon: 'cabinet' },
-  { id: 'wall-600', label: 'Wall 600', width: 600, height: 720, depth: 320, shelfCount: 1, icon: 'cabinet' },
-  { id: 'wall-900', label: 'Wall 900', width: 900, height: 720, depth: 320, shelfCount: 1, icon: 'cabinet' },
-  { id: 'tall-600', label: 'Tall 600', width: 600, height: 2100, depth: 560, shelfCount: 4, icon: 'cabinet' },
+  { id: 'base-400', label: 'Base 400', width: 400, height: 800, depth: 600, shelfCount: 1, icon: 'cabinet' },
+  { id: 'base-600', label: 'Base 600', width: 600, height: 800, depth: 600, shelfCount: 1, icon: 'cabinet' },
+  { id: 'base-800', label: 'Base 800', width: 800, height: 800, depth: 600, shelfCount: 1, icon: 'cabinet' },
+  // 1400 mm underside so an 800 mm wall unit’s top lines up with High 2200.
+  { id: 'wall-600', label: 'Wall 600', width: 600, height: 800, depth: 370, shelfCount: 1, icon: 'cabinet', bottomMm: 1400 },
+  { id: 'wall-800', label: 'Wall 800', width: 800, height: 800, depth: 370, shelfCount: 1, icon: 'cabinet', bottomMm: 1400 },
+  { id: 'high-600', label: 'High 600', width: 600, height: 2200, depth: 600, shelfCount: 4, icon: 'cabinet' },
 ];
+
+/** Older library ids, kept so saved cabinets still resolve to a catalog preset. */
+export const CABINET_PRESET_ALIASES: Readonly<Record<string, CabinetPresetId>> = {
+  'base-450': 'base-400',
+  'base-900': 'base-800',
+  'wall-900': 'wall-800',
+  'tall-600': 'high-600',
+};
+
+export function resolveCabinetPresetId(id: string | undefined): CabinetPresetId | undefined {
+  if (!id) return undefined;
+  const aliased = CABINET_PRESET_ALIASES[id];
+  if (aliased) return aliased;
+  return CABINET_PRESETS.find((preset) => preset.id === id)?.id;
+}
 
 export const DEFAULT_MATERIAL_ID: MaterialId = 'ash';
 export const DEFAULT_COLOR_ID: ColorId = 'white';
