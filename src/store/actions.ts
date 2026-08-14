@@ -63,6 +63,11 @@ export function liveIds(): string[] {
   return livePartIds(doc().customParts);
 }
 
+/**
+ * Clears `cabinet` when an independent size edit hits some but not all
+ * members. Translate, rotate and rename do not demote — moving a carcass
+ * (or one panel) must not hide shelf controls.
+ */
 function invalidatePartiallyEditedCabinets(groups: readonly Group[], changedIds: readonly string[]): Group[] {
   const changed = new Set(changedIds);
   return groups.map((group) => {
@@ -287,7 +292,6 @@ export function renamePart(id: string, label: string): void {
       customParts: s.customParts.map((p) =>
         p.id === id ? { ...p, label: trimmed, bomLabel: undefined } : p,
       ),
-      groups: invalidatePartiallyEditedCabinets(s.groups, [id]),
     }));
   });
 }
@@ -632,7 +636,6 @@ export function commitTransforms(next: Record<string, Transform>): void {
   commit(() => {
     useDocumentStore.setState((s) => ({
       transforms: { ...s.transforms, ...sanitized },
-      groups: invalidatePartiallyEditedCabinets(s.groups, Object.keys(sanitized)),
     }));
   });
 }
@@ -988,10 +991,7 @@ export function resetTransforms(ids: readonly string[]): void {
         const t = transforms[id];
         if (t) transforms[id] = { ...t, quaternion: [0, 0, 0, 1], scale: [1, 1, 1] };
       }
-      return {
-        transforms,
-        groups: invalidatePartiallyEditedCabinets(prev.groups, ids),
-      };
+      return { transforms };
     });
   });
   ui().showToast('Transform reset');
@@ -1012,7 +1012,6 @@ export function setPositionAxis(id: string, axis: 'x' | 'y' | 'z', millimetres: 
   commit(() => {
     useDocumentStore.setState((s) => ({
       transforms: { ...s.transforms, [id]: { ...current, position } },
-      groups: invalidatePartiallyEditedCabinets(s.groups, [id]),
     }));
   });
 }
@@ -1078,7 +1077,6 @@ export function setRotationAxis(id: string, axis: 'x' | 'y' | 'z', degrees: numb
   commit(() => {
     useDocumentStore.setState((s) => ({
       transforms: { ...s.transforms, [id]: { ...current, quaternion } },
-      groups: invalidatePartiallyEditedCabinets(s.groups, [id]),
     }));
   });
 }

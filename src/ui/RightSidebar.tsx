@@ -10,7 +10,7 @@ import {
   resolveAppearance,
 } from '@/domain/catalog';
 import { oakGrainDataUrl } from '@/domain/oakGrain';
-import { groupMatching, selectionUnits } from '@/domain/parts';
+import { cabinetContainingSelection, groupMatching, selectionUnits } from '@/domain/parts';
 import { quaternionToEulerDegrees } from '@/domain/rotation';
 import type { CabinetConfig, Group } from '@/domain/types';
 import { convertedValue, convertRange, fromMm, toMm, type DisplayUnit } from '@/domain/units';
@@ -337,7 +337,7 @@ function DraftNumberInput({
       onKeyDown={(e) => {
         if (e.key === 'Enter') e.currentTarget.blur();
       }}
-      className={`box-border h-7 ${widthClass} rounded-[5px] border border-white/10 bg-input px-2 text-right font-mono text-[11.5px] leading-none text-ink`}
+      className={`box-border h-7 ${widthClass} rounded-[5px] border border-white/10 bg-input px-2 text-right font-mono text-[11.5px] text-ink [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-inner-spin-button]:m-0`}
     />
   );
 }
@@ -357,9 +357,10 @@ function ShelfFields({
   unit: DisplayUnit;
 }) {
   const positions = shelfPositions(cabinet);
-  const [addDraft, setAddDraft] = useState('');
+  const defaultAdd = String(convertedValue(300, unit));
+  const [addDraft, setAddDraft] = useState(defaultAdd);
   const [countDraft, setCountDraft] = useState('3');
-  const [spacingDraft, setSpacingDraft] = useState('');
+  const [spacingDraft, setSpacingDraft] = useState(() => String(convertedValue(200, unit)));
 
   const parseToMm = (draft: string): number | null => {
     const n = Number(draft);
@@ -367,7 +368,7 @@ function ShelfFields({
   };
 
   const inputClass =
-    'box-border h-7 rounded-[5px] border border-white/10 bg-input px-2 text-right font-mono text-[11.5px] leading-none text-ink';
+    'box-border h-7 rounded-[5px] border border-white/10 bg-input px-2 text-right font-mono text-[11.5px] text-ink [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-inner-spin-button]:m-0';
   const unitClass = 'w-6 flex-none font-mono text-[10.5px] leading-none text-ink/35';
   const rowClass = 'flex h-7 items-center gap-2';
 
@@ -375,7 +376,7 @@ function ShelfFields({
     const mm = parseToMm(addDraft);
     if (mm === null) return;
     addCabinetShelf(groupId, mm);
-    setAddDraft('');
+    setAddDraft(defaultAdd);
   };
 
   const commitDistribute = () => {
@@ -429,7 +430,6 @@ function ShelfFields({
           <input
             type="number"
             aria-label={`New shelf position in ${UNIT_NAMES[unit]}`}
-            placeholder={unit === 'mm' ? '300' : '30'}
             value={addDraft}
             onChange={(e) => setAddDraft(e.target.value)}
             onKeyDown={(e) => {
@@ -453,19 +453,18 @@ function ShelfFields({
             min={1}
             value={countDraft}
             onChange={(e) => setCountDraft(e.target.value)}
-            className={`${inputClass} w-10 flex-none`}
+            className={`${inputClass} w-12 flex-none`}
           />
           <span className="flex-none text-[11px] leading-none text-ink/45">every</span>
           <input
             type="number"
             aria-label={`Shelf spacing in ${UNIT_NAMES[unit]}`}
-            placeholder={unit === 'mm' ? '200' : '20'}
             value={spacingDraft}
             onChange={(e) => setSpacingDraft(e.target.value)}
             onKeyDown={(e) => {
               if (e.key === 'Enter') commitDistribute();
             }}
-            className={`${inputClass} w-14 flex-none`}
+            className={`${inputClass} w-16 flex-none`}
           />
           <span className={unitClass}>{unit}</span>
           <Button className="ml-auto shrink-0" onClick={commitDistribute}>
@@ -531,10 +530,14 @@ function PropertiesTab() {
   const selectedPartIds = useUiStore((s) => s.selectedPartIds);
   const groups = useDocumentStore((s) => s.groups);
   const matchedGroup = groupMatching(groups, selectedPartIds);
+  const cabinetGroup = cabinetContainingSelection(groups, selectedPartIds);
   const units = selectionUnits(groups, selectedPartIds);
   const canSnapTogether = units.length === 2;
   const containsSavedGroup = units.some((selectionUnit) => selectionUnit.kind === 'group');
   const unit = useUiStore((s) => s.displayUnit);
+  const shelfEditor = cabinetGroup?.cabinet ? (
+    <ShelfFields groupId={cabinetGroup.id} cabinet={cabinetGroup.cabinet} unit={unit} />
+  ) : null;
 
   return (
     <>
@@ -638,6 +641,7 @@ function PropertiesTab() {
               />
             );
           })}
+          {shelfEditor}
           <hr className="my-4 border-hairline" />
           <PositionFields partId={selection.spec.id} />
           <RotationFields partId={selection.spec.id} />
@@ -647,6 +651,7 @@ function PropertiesTab() {
 
       {selection.kind === 'multi' && matchedGroup?.cabinet && (
         <>
+          {shelfEditor}
           <SectionHeader>Cabinet Dimensions</SectionHeader>
           {CABINET_DIM_FIELDS.map(({ key, label }) => {
             const range = convertRange(CABINET_DIM_LIMITS[key], unit);
@@ -667,10 +672,11 @@ function PropertiesTab() {
           <p className="mb-4 text-[10.5px] leading-relaxed text-ink/35">
             Resizing rebuilds the carcass and keeps its panels at 18 mm with an 8 mm back.
           </p>
-          <ShelfFields groupId={matchedGroup.id} cabinet={matchedGroup.cabinet} unit={unit} />
           <hr className="my-4 border-hairline" />
         </>
       )}
+
+      {selection.kind === 'multi' && !matchedGroup?.cabinet && shelfEditor}
 
       {selection.kind === 'multi' && matchedGroup && !matchedGroup.cabinet && selection.size && (
         <GroupSizeFields group={matchedGroup} size={selection.size} />

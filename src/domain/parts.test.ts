@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   computePartSpecs,
+  cabinetContainingSelection,
   groupContaining,
   groupMatching,
   livePartIds,
@@ -82,6 +83,34 @@ describe('groupContaining', () => {
 
   it('returns undefined for an ungrouped part', () => {
     expect(groupContaining([group], 'custom-3')).toBeUndefined();
+  });
+});
+
+describe('cabinetContainingSelection', () => {
+  const cabinet: Group = {
+    id: 'cab-1',
+    label: 'Base 400',
+    partIds: ['a', 'b', 'c'],
+    cabinet: { width: 400, height: 800, depth: 600, shelfCount: 1 },
+  };
+  const rigid: Group = { id: 'g-1', label: 'Rigid', partIds: ['d', 'e'] };
+  const other: Group = {
+    id: 'cab-2',
+    label: 'Wall 800',
+    partIds: ['f', 'g'],
+    cabinet: { width: 800, height: 800, depth: 370, shelfCount: 1 },
+  };
+
+  it('resolves a single member, a partial set, and the full group to the same cabinet', () => {
+    expect(cabinetContainingSelection([cabinet], ['a'])).toBe(cabinet);
+    expect(cabinetContainingSelection([cabinet], ['b', 'c'])).toBe(cabinet);
+    expect(cabinetContainingSelection([cabinet], ['c', 'a', 'b'])).toBe(cabinet);
+  });
+
+  it('ignores rigid groups and selections that spill outside one cabinet', () => {
+    expect(cabinetContainingSelection([rigid], ['d', 'e'])).toBeUndefined();
+    expect(cabinetContainingSelection([cabinet, other], ['a', 'f'])).toBeUndefined();
+    expect(cabinetContainingSelection([cabinet], [])).toBeUndefined();
   });
 });
 

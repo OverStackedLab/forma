@@ -12,6 +12,7 @@ import {
   openFile,
   removeCabinetShelf,
   renameDocument,
+  renamePart,
   resizeCabinetFromGizmo,
   resetTransforms,
   saveToFile,
@@ -21,6 +22,7 @@ import {
   setCustomPartDim,
   setGroupPositionAxis,
   setHardwareDiameter,
+  setPositionAxis,
   titleFromFilename,
 } from './actions';
 import { createDefaultDocument, useDocumentStore } from './documentStore';
@@ -191,6 +193,28 @@ describe('library construction actions', () => {
     const group = useDocumentStore.getState().groups[0]!;
     setCustomPartDim(group.partIds[0]!, 'h', 700);
     expect(useDocumentStore.getState().groups[0]?.cabinet).toBeUndefined();
+  });
+
+  it('keeps cabinet config after a member is moved, rotated or renamed', () => {
+    addCabinetPreset('base-400');
+    const group = useDocumentStore.getState().groups[0]!;
+    const id = group.partIds[0]!;
+    const current = useDocumentStore.getState().transforms[id]!;
+
+    setPositionAxis(id, 'x', 1500);
+    expect(useDocumentStore.getState().groups[0]?.cabinet).toBeDefined();
+
+    commitTransforms({
+      [id]: { ...current, position: [1.5, current.position[1], current.position[2]] },
+    });
+    expect(useDocumentStore.getState().groups[0]?.cabinet).toBeDefined();
+
+    renamePart(id, 'Moved side');
+    expect(useDocumentStore.getState().groups[0]?.cabinet).toMatchObject({
+      width: 400,
+      height: 800,
+      depth: 600,
+    });
   });
 
   it('duplicates a cabinet as an independent, undoable group', () => {

@@ -1,8 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import {
   addCabinetPreset,
+  setCustomPartDim,
   setPartGrainAxis,
-  setPositionAxis,
   togglePartEdgeBand,
 } from './actions';
 import { createDefaultDocument, useDocumentStore } from './documentStore';
@@ -147,7 +147,7 @@ describe('persistence.normalize', () => {
     clearHistory();
     addCabinetPreset('base-600');
     const group = useDocumentStore.getState().groups[0]!;
-    setPositionAxis(group.partIds[0]!, 'x', 1500);
+    setCustomPartDim(group.partIds[0]!, 'h', 700);
     expect(useDocumentStore.getState().groups[0]?.cabinet).toBeUndefined();
 
     const saved = useDocumentStore.getState();

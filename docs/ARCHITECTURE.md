@@ -51,9 +51,9 @@ material + colour — which is why removing a single part must never dispose the
 **Cabinets are groups that remember they are cabinets.** `buildCabinetLayout`
 generates ordinary panels bundled into a `Group` carrying a `cabinet` config.
 Because the config survives, changing the cabinet's width rebuilds the carcass
-parametrically while preserving the 18 mm panels and 8 mm back. Editing only some
-members clears the config — the group demotes to a plain group, because it can no
-longer be regenerated faithfully.
+parametrically while preserving the 18 mm panels and 8 mm back. Changing only some
+members' size clears the config — the group demotes to a plain group, because it
+can no longer be regenerated faithfully. Moving or renaming members does not.
 
 **Gizmo drags commit once, on release.** The scene is mutated freely during the
 drag; `commitTransforms` fires on pointer-up. One undo entry per gesture, and the

@@ -386,12 +386,14 @@ test('viewport clicks select one grouped piece while the Assembly group row sele
 
   await expect(page.getByLabel('Part name')).toBeVisible();
   await expect(page.getByLabel('Cabinet Width in millimetres')).toHaveCount(0);
+  await expect(page.getByRole('button', { name: 'Add Shelf' })).toBeVisible();
 
   await page.getByRole('tab', { name: 'Assembly' }).click();
   await expect(page.getByText('1 selected')).toBeVisible();
   await page.getByRole('treeitem', { name: /Collapse group Base 600 6 Hide Base 600/ }).click();
   await expect(page.getByText('Editing: Base 600')).toBeVisible();
   await expect(page.getByText('Configurable cabinet · 6 pieces')).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Add Shelf' })).toBeVisible();
   await expect(page.getByLabel('Group X Position in millimetres')).toHaveValue('0');
 });
 
