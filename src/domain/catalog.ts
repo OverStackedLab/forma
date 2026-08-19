@@ -96,6 +96,11 @@ export const PANEL_PRESETS: readonly PanelPreset[] = [
     category: 'hardware', description: '112 mm · 96 mm centres · IKEA 703.475.16', thicknessAxis: null,
     grainAxis: null, edgeBanding: [], defaultQuaternion: [0, 0, 0, 1],
   },
+  {
+    id: 'enhet-leg', label: 'ENHET', w: 50, h: 125, d: 50, icon: 'panel_leg', shape: 'enhet-leg',
+    category: 'hardware', description: 'Leg · 125 mm · IKEA 104.490.18', thicknessAxis: null,
+    grainAxis: null, edgeBanding: [], defaultQuaternion: [0, 0, 0, 1],
+  },
 ];
 
 /** IKEA METOD frame sizes. Heights exclude legs, worktops and the 1 cm wall gap. */
@@ -176,6 +181,11 @@ export function isHardwareFinishId(id: string): id is HardwareFinishId {
 /** Round purchased knobs share diameter + projection controls. */
 export function isRoundHardwareShape(shape: string | undefined): boolean {
   return shape === 'cylinder' || shape === 'bagganas';
+}
+
+/** Floor-standing round legs share diameter (X/Z) + height (Y) controls. */
+export function isLegHardwareShape(shape: string | undefined): boolean {
+  return shape === 'enhet-leg';
 }
 
 /** Maps saved material/color combinations into the closest single finish. */

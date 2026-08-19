@@ -3,6 +3,7 @@ import {
   ChevronDown,
   Circle,
   Columns2,
+  Cylinder,
   DoorClosed,
   Download,
   Eye,
@@ -77,6 +78,7 @@ const ICONS: Record<string, LucideIcon> = {
   panel_door: DoorClosed,
   panel_knob: Circle,
   panel_handle: RectangleHorizontal,
+  panel_leg: Cylinder,
   cabinet: Box,
 };
 
