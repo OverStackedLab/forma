@@ -10,6 +10,7 @@ import {
   distributeCabinetDividers,
   distributeCabinetShelves,
   downloadVersion,
+  deleteParts,
   duplicateSelected,
   newDocument,
   openFile,
@@ -388,6 +389,44 @@ describe('library construction actions', () => {
     expect(next.cabinet?.dividerPositionsMm).toEqual([218, 418]);
     expect(next.partIds).toHaveLength(10);
     expect(useUiStore.getState().toast?.message).toBe('Only 2 of 4 panels fit');
+  });
+
+  it('keeps cabinet config when a generated shelf or interior panel is deleted', () => {
+    addCabinetPreset('base-600');
+    let group = useDocumentStore.getState().groups[0]!;
+    const shelfId = useDocumentStore.getState().customParts.find((part) =>
+      part.label.includes('Shelf'),
+    )!.id;
+
+    deleteParts([shelfId]);
+    group = useDocumentStore.getState().groups[0]!;
+    expect(group.cabinet).toBeDefined();
+    expect(group.cabinet?.shelfCount).toBe(0);
+    expect(group.partIds).toHaveLength(5);
+
+    addCabinetDivider(group.id, 300);
+    group = useDocumentStore.getState().groups[0]!;
+    expect(group.partIds).toHaveLength(6);
+    const panelId = useDocumentStore.getState().customParts.find((part) =>
+      part.label.includes('Panel 1'),
+    )!.id;
+    deleteParts([panelId]);
+    group = useDocumentStore.getState().groups[0]!;
+    expect(group.cabinet).toBeDefined();
+    expect(group.cabinet?.dividerPositionsMm).toBeUndefined();
+    expect(group.partIds).toHaveLength(5);
+
+    expect(undo()).toBe(true);
+    expect(useDocumentStore.getState().groups[0]!.cabinet?.dividerPositionsMm).toEqual([300]);
+  });
+
+  it('demotes a cabinet when a carcass panel is deleted', () => {
+    addCabinetPreset('base-600');
+    const leftId = useDocumentStore.getState().customParts.find((part) =>
+      part.label.includes('Left Side'),
+    )!.id;
+    deleteParts([leftId]);
+    expect(useDocumentStore.getState().groups[0]?.cabinet).toBeUndefined();
   });
 
   it('starts a clean document without resetting workspace preferences', () => {
