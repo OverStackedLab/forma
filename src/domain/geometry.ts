@@ -26,6 +26,7 @@ export class GeometryCache {
   private cylinder: TBufferGeometry | null = null;
   private bagganas: TBufferGeometry | null = null;
   private eneryda: TBufferGeometry | null = null;
+  private enhetLeg: TBufferGeometry | null = null;
 
   constructor(private readonly THREE: ThreeModule) {}
 
@@ -123,9 +124,61 @@ export class GeometryCache {
     return this.eneryda;
   }
 
+  /**
+   * IKEA ENHET cabinet leg (104.490.18): Ø50 mm mounting plate, steel tube,
+   * threaded adjuster and plastic foot. Nominal height 125 mm (adjustable
+   * 110–135). Built in mm with Y up, then packed into the unit box.
+   */
+  unitEnhetLeg(): TBufferGeometry {
+    if (!this.enhetLeg) {
+      const width = 50;
+      const height = 125;
+      const depth = 50;
+      const plateR = 25;
+      const plateH = 3;
+      const tubeR = 14;
+      const collarH = 5;
+      const footR = 16;
+      const footH = 11;
+      const stemR = 5.5;
+      const stemH = 15;
+      const tubeH = height - plateH - footH - stemH;
+      const segs = 32;
+
+      const plate = new this.THREE.CylinderGeometry(plateR, plateR, plateH, segs);
+      plate.translate(0, height - plateH / 2, 0);
+
+      const collar = new this.THREE.CylinderGeometry(tubeR + 3, tubeR, collarH, segs);
+      collar.translate(0, height - plateH - collarH / 2, 0);
+
+      const tube = new this.THREE.CylinderGeometry(tubeR, tubeR, tubeH, segs);
+      tube.translate(0, footH + stemH + tubeH / 2, 0);
+
+      const stem = new this.THREE.CylinderGeometry(stemR, stemR, stemH, segs);
+      stem.translate(0, footH + stemH / 2, 0);
+
+      const foot = new this.THREE.CylinderGeometry(footR * 0.88, footR, footH, segs);
+      foot.translate(0, footH / 2, 0);
+
+      const merged = this.mergeGeometries([plate, collar, tube, stem, foot]);
+      plate.dispose();
+      collar.dispose();
+      tube.dispose();
+      stem.dispose();
+      foot.dispose();
+
+      merged.translate(0, -height / 2, 0);
+      merged.scale(1 / width, 1 / height, 1 / depth);
+      merged.computeVertexNormals();
+      this.enhetLeg = merged;
+    }
+    return this.enhetLeg;
+  }
+
   forShape(shape: PanelShape): TBufferGeometry {
     if (shape === 'bagganas') return this.unitBagganas();
     if (shape === 'eneryda') return this.unitEneryda();
+    if (shape === 'enhet-leg') return this.unitEnhetLeg();
     if (shape === 'cylinder') return this.unitCylinder();
     return this.unitBox();
   }
@@ -222,6 +275,8 @@ export class GeometryCache {
     this.bagganas = null;
     this.eneryda?.dispose();
     this.eneryda = null;
+    this.enhetLeg?.dispose();
+    this.enhetLeg = null;
   }
 }
 

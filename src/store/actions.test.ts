@@ -90,6 +90,27 @@ describe('library construction actions', () => {
     });
   });
 
+  it('adds an ENHET cabinet leg standing on the floor', () => {
+    addCustomPanel('enhet-leg');
+    const part = useDocumentStore.getState().customParts[0]!;
+    const transform = useDocumentStore.getState().transforms[part.id]!;
+    expect(part).toMatchObject({
+      label: 'ENHET',
+      category: 'hardware',
+      shape: 'enhet-leg',
+      w: 50,
+      h: 125,
+      d: 50,
+      thicknessAxis: null,
+      grainAxis: null,
+    });
+    // Centre sits at half height so the foot rests on the grid.
+    expect(transform.position[1]).toBeCloseTo(0.0625, 8);
+
+    setHardwareDiameter(part.id, 60);
+    expect(useDocumentStore.getState().customParts[0]).toMatchObject({ w: 60, h: 125, d: 60 });
+  });
+
   it('hangs wall cabinets above the floor so their top lines up with a tall unit', () => {
     addCabinetPreset('wall-600');
     addCabinetPreset('base-600');

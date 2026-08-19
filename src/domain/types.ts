@@ -37,7 +37,8 @@ export type PanelPresetId =
   | 'door'
   | 'knob'
   | 'bagganas'
-  | 'eneryda';
+  | 'eneryda'
+  | 'enhet-leg';
 export type CabinetPresetId =
   | 'base-400'
   | 'base-600'
@@ -46,7 +47,7 @@ export type CabinetPresetId =
   | 'wall-800'
   | 'high-600';
 /** Every part renders as one of a few shared unit geometries, scaled per instance. */
-export type PanelShape = 'box' | 'cylinder' | 'bagganas' | 'eneryda';
+export type PanelShape = 'box' | 'cylinder' | 'bagganas' | 'eneryda' | 'enhet-leg';
 
 export type Material = {
   id: MaterialId;

@@ -12,6 +12,7 @@ import {
   CUSTOM_PANEL_LIMITS,
   findFinish,
   isHardwareFinishId,
+  isLegHardwareShape,
   PANEL_PRESETS,
 } from '@/domain/catalog';
 import { groupMatching, livePartIds, selectionUnits } from '@/domain/parts';
@@ -346,15 +347,25 @@ export function setHardwareDiameter(id: string, value: number): void {
   const clamped = Math.min(limits.max, Math.max(limits.min, value));
   commit(() => {
     useDocumentStore.setState((state) => {
+      const part = state.customParts.find((candidate) => candidate.id === id);
       const transform = state.transforms[id];
+      const standing = isLegHardwareShape(part?.shape);
       return {
-        customParts: state.customParts.map((part) =>
-          part.id === id ? { ...part, w: clamped, h: clamped } : part,
-        ),
+        customParts: state.customParts.map((candidate) => {
+          if (candidate.id !== id) return candidate;
+          return standing
+            ? { ...candidate, w: clamped, d: clamped }
+            : { ...candidate, w: clamped, h: clamped };
+        }),
         transforms: transform
           ? {
               ...state.transforms,
-              [id]: { ...transform, scale: [1, 1, transform.scale[2]] },
+              [id]: {
+                ...transform,
+                scale: standing
+                  ? [1, transform.scale[1], 1]
+                  : [1, 1, transform.scale[2]],
+              },
             }
           : state.transforms,
       };

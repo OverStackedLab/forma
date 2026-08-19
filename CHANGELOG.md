@@ -10,6 +10,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 - IKEA KNOXHULT / ASPUDDEN panel colors (Oak, Dark Gray, Dark Gray-Green, White) and hardware finishes (Brushed Brass, Matte Black, Brushed Steel, White).
 - BAGGANÄS knob and ENERYDA bow-pull geometry in the hardware library.
+- ENHET cabinet legs (IKEA 104.490.18, 125 mm) in the hardware library.
 - Oak wood-grain texture for the Oak color.
 - Cabinet shelf placement by explicit height or even spacing.
 - Toolbar buttons to hide the left and right sidebars.
