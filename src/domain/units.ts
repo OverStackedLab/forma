@@ -1,6 +1,6 @@
 export type DisplayUnit = 'mm' | 'cm';
 
-export const DISPLAY_UNITS: readonly DisplayUnit[] = ['mm', 'cm'];
+export const DISPLAY_UNITS: readonly DisplayUnit[] = ['cm', 'mm'];
 
 export type Range = { min: number; max: number; step: number };
 

@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
+  addCabinetDivider,
   addCabinetPreset,
   setCustomPartDim,
   setPartGrainAxis,
@@ -139,6 +140,28 @@ describe('persistence.normalize', () => {
     const restored = reloaded?.customParts.find((part) => part.id === leftSide.id);
     expect(restored?.grainAxis).toBe('d');
     expect(restored?.edgeBanding).toContain('h-max');
+  });
+
+  it('round-trips cabinet vertical panel positions on the current schema', () => {
+    useDocumentStore.getState().hydrate(createDefaultDocument());
+    useUiStore.setState({ selectedPartIds: [], toast: null });
+    clearHistory();
+    addCabinetPreset('base-600');
+    const group = useDocumentStore.getState().groups[0]!;
+    addCabinetDivider(group.id, 300);
+
+    const saved = useDocumentStore.getState();
+    const reloaded = migrate({
+      schemaVersion: SCHEMA_VERSION,
+      doc: {
+        ...saved,
+        versions: [],
+        currentVersionId: null,
+      },
+    });
+    expect(reloaded?.groups[0]?.cabinet?.dividerPositionsMm).toEqual([300]);
+    expect(reloaded?.customParts.filter((part) => part.label.includes('Panel'))).toHaveLength(1);
+    expect(reloaded?.customParts.filter((part) => part.label.includes('Shelf'))).toHaveLength(2);
   });
 
   it('does not resurrect a demoted cabinet from its label on current-schema reload', () => {

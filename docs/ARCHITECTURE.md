@@ -38,7 +38,7 @@ about — part sizes, cabinet dimensions, cut-list numbers — is millimetres.
 Everything three.js touches is metres, because transforms come straight off
 `Object3D`. The conversion is the `MM = 1/1000` constant in `geometry.ts` plus
 explicit `*1000` / `/1000` in actions. Centimetres exist only as a display
-preference and are never stored.
+preference (default) and are never stored.
 
 **Size and placement are separate objects.** Each part is a root `Group` carrying
 placement (position / quaternion / gizmo scale) around a `Mesh` carrying the

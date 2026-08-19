@@ -15,20 +15,24 @@ import { cabinetContainingSelection, groupMatching, selectionUnits } from '@/dom
 import { quaternionToEulerDegrees } from '@/domain/rotation';
 import type { CabinetConfig, Group } from '@/domain/types';
 import { convertedValue, convertRange, fromMm, toMm, type DisplayUnit } from '@/domain/units';
-import { shelfPositions } from '@/domain/cabinets';
+import { dividerPositions, shelfPositions } from '@/domain/cabinets';
 import {
+  addCabinetDivider,
   addCabinetShelf,
   applyFinish,
   deleteParts,
+  distributeCabinetDividers,
   distributeCabinetShelves,
   duplicateSelected,
   groupSelected,
+  removeCabinetDivider,
   removeCabinetShelf,
   renameGroup,
   renamePart,
   resetOverrides,
   resetTransforms,
   setCabinetDim,
+  setCabinetDividerPositions,
   setCabinetShelfPositions,
   setCustomPartDim,
   setHardwareDiameter,
@@ -344,20 +348,38 @@ function DraftNumberInput({
 }
 
 /**
- * Parametric shelf editor for a generated cabinet. Positions are measured
- * from the cabinet bottom to each shelf's centreline; edits rebuild the
- * carcass through the same path as the dimension sliders.
+ * Parametric interior-member editor for a generated cabinet. Shelves are
+ * measured from the bottom; vertical panels from the left.
  */
-function ShelfFields({
-  groupId,
-  cabinet,
+function InteriorMemberFields({
+  title,
+  itemLabel,
+  addHeading,
+  addButton,
+  applyButton,
+  countAria,
+  hint,
+  positions,
   unit,
+  onAdd,
+  onDistribute,
+  onRemove,
+  onSetPositions,
 }: {
-  groupId: string;
-  cabinet: CabinetConfig;
+  title: string;
+  itemLabel: string;
+  addHeading: string;
+  addButton: string;
+  applyButton: string;
+  countAria: string;
+  hint: string;
+  positions: number[];
   unit: DisplayUnit;
+  onAdd: (mm: number) => void;
+  onDistribute: (count: number, spacingMm: number) => void;
+  onRemove: (index: number) => void;
+  onSetPositions: (positionsMm: number[]) => void;
 }) {
-  const positions = shelfPositions(cabinet);
   const defaultAdd = String(convertedValue(300, unit));
   const [addDraft, setAddDraft] = useState(defaultAdd);
   const [countDraft, setCountDraft] = useState('3');
@@ -372,11 +394,12 @@ function ShelfFields({
     'box-border h-7 rounded-[5px] border border-white/10 bg-input px-2 text-right font-mono text-[11.5px] text-ink [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-inner-spin-button]:m-0';
   const unitClass = 'w-6 flex-none font-mono text-[10.5px] leading-none text-ink/35';
   const rowClass = 'flex h-7 items-center gap-2';
+  const itemLower = itemLabel.toLowerCase();
 
   const commitAdd = () => {
     const mm = parseToMm(addDraft);
     if (mm === null) return;
-    addCabinetShelf(groupId, mm);
+    onAdd(mm);
     setAddDraft(defaultAdd);
   };
 
@@ -384,37 +407,34 @@ function ShelfFields({
     const count = Math.floor(Number(countDraft));
     const spacingMm = parseToMm(spacingDraft);
     if (!Number.isFinite(count) || count < 1 || spacingMm === null) return;
-    distributeCabinetShelves(groupId, count, spacingMm);
+    onDistribute(count, spacingMm);
   };
 
   return (
     <>
-      <SectionHeader>Shelves</SectionHeader>
+      <SectionHeader>{title}</SectionHeader>
 
       {positions.length > 0 && (
         <div className="mb-3 space-y-3">
           {positions.map((positionMm, index) => (
             <div key={`${index}-${positionMm}`}>
               <p className="mb-1.5 text-[10.5px] leading-none text-ink/40">
-                Shelf {index + 1}
+                {itemLabel} {index + 1}
               </p>
               <div className={rowClass}>
                 <DraftNumberInput
-                  ariaLabel={`Shelf ${index + 1} position in ${UNIT_NAMES[unit]}`}
+                  ariaLabel={`${itemLabel} ${index + 1} position in ${UNIT_NAMES[unit]}`}
                   value={convertedValue(positionMm, unit)}
                   widthClass="w-16"
                   onCommit={(value) =>
-                    setCabinetShelfPositions(
-                      groupId,
-                      positions.map((p, i) => (i === index ? toMm(value, unit) : p)),
-                    )
+                    onSetPositions(positions.map((p, i) => (i === index ? toMm(value, unit) : p)))
                   }
                 />
                 <span className={unitClass}>{unit}</span>
                 <button
                   type="button"
-                  aria-label={`Remove shelf ${index + 1}`}
-                  onClick={() => removeCabinetShelf(groupId, index)}
+                  aria-label={`Remove ${itemLower} ${index + 1}`}
+                  onClick={() => onRemove(index)}
                   className="ml-auto flex h-7 w-7 flex-none items-center justify-center rounded text-ink/45 hover:bg-white/5 hover:text-danger"
                 >
                   <Icon name="close" size={13} />
@@ -426,11 +446,11 @@ function ShelfFields({
       )}
 
       <div className="mb-3">
-        <p className="mb-1.5 text-[10.5px] leading-none text-ink/40">Add shelf</p>
+        <p className="mb-1.5 text-[10.5px] leading-none text-ink/40">{addHeading}</p>
         <div className={rowClass}>
           <input
             type="number"
-            aria-label={`New shelf position in ${UNIT_NAMES[unit]}`}
+            aria-label={`New ${itemLower} position in ${UNIT_NAMES[unit]}`}
             value={addDraft}
             onChange={(e) => setAddDraft(e.target.value)}
             onKeyDown={(e) => {
@@ -440,7 +460,7 @@ function ShelfFields({
           />
           <span className={unitClass}>{unit}</span>
           <Button className="ml-auto shrink-0" onClick={commitAdd}>
-            Add Shelf
+            {addButton}
           </Button>
         </div>
       </div>
@@ -450,7 +470,7 @@ function ShelfFields({
         <div className={rowClass}>
           <input
             type="number"
-            aria-label="Shelf count"
+            aria-label={countAria}
             min={1}
             value={countDraft}
             onChange={(e) => setCountDraft(e.target.value)}
@@ -459,7 +479,7 @@ function ShelfFields({
           <span className="flex-none text-[11px] leading-none text-ink/45">every</span>
           <input
             type="number"
-            aria-label={`Shelf spacing in ${UNIT_NAMES[unit]}`}
+            aria-label={`${itemLabel} spacing in ${UNIT_NAMES[unit]}`}
             value={spacingDraft}
             onChange={(e) => setSpacingDraft(e.target.value)}
             onKeyDown={(e) => {
@@ -469,16 +489,69 @@ function ShelfFields({
           />
           <span className={unitClass}>{unit}</span>
           <Button className="ml-auto shrink-0" onClick={commitDistribute}>
-            Apply
+            {applyButton}
           </Button>
         </div>
       </div>
 
-      <p className="mb-4 text-[10.5px] leading-relaxed text-ink/35">
-        Positions run from the cabinet bottom to each shelf's centreline. Spaced shelves start one
-        spacing above the cabinet floor; any that don't fit are dropped.
-      </p>
+      <p className="mb-4 text-[10.5px] leading-relaxed text-ink/35">{hint}</p>
     </>
+  );
+}
+
+function ShelfFields({
+  groupId,
+  cabinet,
+  unit,
+}: {
+  groupId: string;
+  cabinet: CabinetConfig;
+  unit: DisplayUnit;
+}) {
+  return (
+    <InteriorMemberFields
+      title="Shelves"
+      itemLabel="Shelf"
+      addHeading="Add shelf"
+      addButton="Add Shelf"
+      applyButton="Apply"
+      countAria="Shelf count"
+      hint="Positions run from the cabinet bottom to each shelf's centreline. Spaced shelves start one spacing above the cabinet floor; any that don't fit are dropped."
+      positions={shelfPositions(cabinet)}
+      unit={unit}
+      onAdd={(mm) => addCabinetShelf(groupId, mm)}
+      onDistribute={(count, spacingMm) => distributeCabinetShelves(groupId, count, spacingMm)}
+      onRemove={(index) => removeCabinetShelf(groupId, index)}
+      onSetPositions={(positionsMm) => setCabinetShelfPositions(groupId, positionsMm)}
+    />
+  );
+}
+
+function PanelFields({
+  groupId,
+  cabinet,
+  unit,
+}: {
+  groupId: string;
+  cabinet: CabinetConfig;
+  unit: DisplayUnit;
+}) {
+  return (
+    <InteriorMemberFields
+      title="Panels"
+      itemLabel="Panel"
+      addHeading="Add panel"
+      addButton="Add Panel"
+      applyButton="Apply Panels"
+      countAria="Panel count"
+      hint="Positions run from the cabinet left to each panel's centreline. Spaced panels start one spacing in from the left inner face; any that don't fit are dropped."
+      positions={dividerPositions(cabinet)}
+      unit={unit}
+      onAdd={(mm) => addCabinetDivider(groupId, mm)}
+      onDistribute={(count, spacingMm) => distributeCabinetDividers(groupId, count, spacingMm)}
+      onRemove={(index) => removeCabinetDivider(groupId, index)}
+      onSetPositions={(positionsMm) => setCabinetDividerPositions(groupId, positionsMm)}
+    />
   );
 }
 
@@ -537,7 +610,10 @@ function PropertiesTab() {
   const containsSavedGroup = units.some((selectionUnit) => selectionUnit.kind === 'group');
   const unit = useUiStore((s) => s.displayUnit);
   const shelfEditor = cabinetGroup?.cabinet ? (
-    <ShelfFields groupId={cabinetGroup.id} cabinet={cabinetGroup.cabinet} unit={unit} />
+    <>
+      <ShelfFields groupId={cabinetGroup.id} cabinet={cabinetGroup.cabinet} unit={unit} />
+      <PanelFields groupId={cabinetGroup.id} cabinet={cabinetGroup.cabinet} unit={unit} />
+    </>
   ) : null;
 
   return (

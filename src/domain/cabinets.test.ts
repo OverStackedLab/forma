@@ -2,7 +2,10 @@ import { describe, expect, it } from 'vitest';
 import { CABINET_PRESETS } from './catalog';
 import {
   buildCabinetLayout,
+  distributedDividerPositions,
   distributedShelfPositions,
+  dividerPositionRange,
+  dividerPositions,
   shelfPositionRange,
   shelfPositions,
 } from './cabinets';
@@ -48,6 +51,26 @@ describe('buildCabinetLayout', () => {
     expect(shelves.map((shelf) => shelf.positionMm[1])).toEqual([300, 500]);
     expect(parts).toHaveLength(7);
   });
+
+  it('places vertical panels from the left and splits shelves into bays', () => {
+    const preset = CABINET_PRESETS.find((candidate) => candidate.id === 'base-600')!;
+    const parts = buildCabinetLayout({ ...preset, dividerPositionsMm: [300] });
+    const panels = parts.filter((part) => part.label.includes('Panel'));
+    const shelves = parts.filter((part) => part.label.includes('Shelf'));
+    expect(panels).toHaveLength(1);
+    expect(panels[0]).toMatchObject({
+      w: 18,
+      h: 764,
+      d: 592,
+      positionMm: [0, 400, 4],
+      thicknessAxis: 'w',
+      grainAxis: 'h',
+    });
+    expect(shelves).toHaveLength(2);
+    expect(shelves.map((shelf) => shelf.positionMm[0])).toEqual([-145.5, 145.5]);
+    expect(shelves[0]?.w).toBe(271);
+    expect(parts).toHaveLength(8);
+  });
 });
 
 describe('shelfPositions', () => {
@@ -72,5 +95,27 @@ describe('distributedShelfPositions', () => {
 
   it('rejects a non-positive spacing', () => {
     expect(distributedShelfPositions({ height: 720 }, 3, 0)).toEqual([]);
+  });
+});
+
+describe('dividerPositions', () => {
+  it('clamps explicit positions into the carcass interior and sorts them', () => {
+    expect(dividerPositions({ width: 720, dividerPositionsMm: [10_000, 0, 300] }))
+      .toEqual([27, 300, 693]);
+    expect(dividerPositionRange(720)).toEqual({ min: 27, max: 693 });
+  });
+
+  it('returns no panels when none are stored', () => {
+    expect(dividerPositions({ width: 720 })).toEqual([]);
+  });
+});
+
+describe('distributedDividerPositions', () => {
+  it('spaces panels from the left inner face and drops those that overflow', () => {
+    expect(distributedDividerPositions({ width: 720 }, 4, 200)).toEqual([218, 418, 618]);
+  });
+
+  it('rejects a non-positive spacing', () => {
+    expect(distributedDividerPositions({ width: 720 }, 3, 0)).toEqual([]);
   });
 });

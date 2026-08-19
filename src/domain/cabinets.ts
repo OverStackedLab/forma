@@ -12,6 +12,7 @@ const SHELF_CLEARANCE = 2;
 const IDENTITY: Transform['quaternion'] = [0, 0, 0, 1];
 
 export const MAX_SHELF_COUNT = 20;
+export const MAX_DIVIDER_COUNT = 20;
 
 export type CabinetLayoutPart = Omit<CustomPart, 'id'> & {
   positionMm: [number, number, number];
@@ -70,6 +71,77 @@ export function distributedShelfPositions(
   return positions;
 }
 
+/** The widths a vertical panel centreline may occupy — inside the carcass sides. */
+export function dividerPositionRange(widthMm: number): { min: number; max: number } {
+  return { min: PANEL_THICKNESS * 1.5, max: widthMm - PANEL_THICKNESS * 1.5 };
+}
+
+type DividerSpec = {
+  width: number;
+  dividerPositionsMm?: readonly number[];
+};
+
+/**
+ * Explicit vertical-panel centrelines — millimetres from the cabinet left,
+ * clamped into the interior and sorted. Absent or empty means no extra panels.
+ */
+export function dividerPositions(config: DividerSpec): number[] {
+  if (!config.dividerPositionsMm?.length) return [];
+  const range = dividerPositionRange(config.width);
+  return [...config.dividerPositionsMm]
+    .map((x) => Math.min(range.max, Math.max(range.min, Math.round(x))))
+    .sort((a, b) => a - b)
+    .slice(0, MAX_DIVIDER_COUNT);
+}
+
+/**
+ * Panel centrelines for "count panels every spacing mm", measured centre to
+ * centre starting one spacing in from the left inner face. Panels that would
+ * leave the interior are dropped rather than bunched at the right.
+ */
+export function distributedDividerPositions(
+  config: { width: number },
+  count: number,
+  spacingMm: number,
+): number[] {
+  if (!Number.isFinite(spacingMm) || spacingMm <= 0) return [];
+  const range = dividerPositionRange(config.width);
+  const positions: number[] = [];
+  for (let index = 1; index <= Math.min(count, MAX_DIVIDER_COUNT); index++) {
+    const x = PANEL_THICKNESS + spacingMm * index;
+    if (x < range.min || x > range.max) break;
+    positions.push(x);
+  }
+  return positions;
+}
+
+/** Interior bays between the sides and any vertical panels, in millimetres. */
+function shelfBays(
+  width: number,
+  dividerCentresFromLeft: readonly number[],
+): { centerX: number; innerWidth: number }[] {
+  const leftInterior = -width / 2 + PANEL_THICKNESS;
+  const rightInterior = width / 2 - PANEL_THICKNESS;
+  const half = PANEL_THICKNESS / 2;
+  const edges = [leftInterior];
+  for (const fromLeft of dividerCentresFromLeft) {
+    const worldX = -width / 2 + fromLeft;
+    edges.push(worldX - half, worldX + half);
+  }
+  edges.push(rightInterior);
+
+  const bays: { centerX: number; innerWidth: number }[] = [];
+  for (let index = 0; index < edges.length; index += 2) {
+    const left = edges[index];
+    const right = edges[index + 1];
+    if (left === undefined || right === undefined) break;
+    const innerWidth = right - left;
+    if (innerWidth <= SHELF_CLEARANCE) continue;
+    bays.push({ centerX: (left + right) / 2, innerWidth });
+  }
+  return bays;
+}
+
 function part(
   label: string,
   bomLabel: string,
@@ -100,7 +172,10 @@ function part(
 
 /** Builds an open-front frameless cabinet carcass around a bottom-centre origin. */
 export function buildCabinetLayout(
-  preset: CabinetPreset & { shelfPositionsMm?: readonly number[] },
+  preset: CabinetPreset & {
+    shelfPositionsMm?: readonly number[];
+    dividerPositionsMm?: readonly number[];
+  },
 ): CabinetLayoutPart[] {
   const { label, width, height, depth, shelfCount } = preset;
   const innerWidth = width - PANEL_THICKNESS * 2;
@@ -108,6 +183,11 @@ export function buildCabinetLayout(
   const panelDepth = depth - BACK_THICKNESS;
   const panelZ = BACK_THICKNESS / 2;
   const sideX = (width - PANEL_THICKNESS) / 2;
+  const panelXs = dividerPositions({
+    width,
+    dividerPositionsMm: preset.dividerPositionsMm,
+  });
+  const bays = shelfBays(width, panelXs);
 
   const parts: CabinetLayoutPart[] = [
     part(`${label} Left Side`, `${label} Side`, PANEL_THICKNESS, height, depth, 'w', 'h', ['d-max'], [-sideX, height / 2, 0]),
@@ -132,18 +212,38 @@ export function buildCabinetLayout(
     shelfCount,
     shelfPositionsMm: preset.shelfPositionsMm,
   });
-  for (const [index, y] of shelfYs.entries()) {
+  let shelfNumber = 1;
+  for (const y of shelfYs) {
+    for (const bay of bays) {
+      parts.push(
+        part(
+          `${label} Shelf ${shelfNumber}`,
+          `${label} Shelf`,
+          bay.innerWidth - SHELF_CLEARANCE,
+          PANEL_THICKNESS,
+          panelDepth,
+          'h',
+          'w',
+          ['d-max'],
+          [bay.centerX, y, panelZ],
+        ),
+      );
+      shelfNumber += 1;
+    }
+  }
+
+  for (const [index, fromLeft] of panelXs.entries()) {
     parts.push(
       part(
-        `${label} Shelf ${index + 1}`,
-        `${label} Shelf`,
-        innerWidth - SHELF_CLEARANCE,
+        `${label} Panel ${index + 1}`,
+        `${label} Panel`,
         PANEL_THICKNESS,
+        innerHeight,
         panelDepth,
-        'h',
         'w',
+        'h',
         ['d-max'],
-        [0, y, panelZ],
+        [-width / 2 + fromLeft, height / 2, panelZ],
       ),
     );
   }

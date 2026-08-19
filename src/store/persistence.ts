@@ -1,6 +1,6 @@
 import { DISPLAY_UNITS, type DisplayUnit } from '@/domain/units';
 import { isGridSizeM, type GridSizeM } from '@/domain/workspace';
-import { buildCabinetLayout, MAX_SHELF_COUNT, shelfPositions } from '@/domain/cabinets';
+import { buildCabinetLayout, dividerPositions, MAX_SHELF_COUNT, shelfPositions } from '@/domain/cabinets';
 import {
   CABINET_PRESETS,
   CUSTOM_PANEL_LIMITS,
@@ -278,6 +278,7 @@ function normalizeSnapshot(value: unknown, legacyAxes = false): DocumentSnapshot
       typeof rawCabinet.shelfCount === 'number' && Number.isInteger(rawCabinet.shelfCount);
     if (dimensionsValid) {
       const height = Math.min(3000, Math.max(100, rawCabinet.height as number));
+      const width = Math.min(3000, Math.max(100, rawCabinet.width as number));
       const shelfPositionsMm = Array.isArray(rawCabinet.shelfPositionsMm)
         ? shelfPositions({
             height,
@@ -287,17 +288,26 @@ function normalizeSnapshot(value: unknown, legacyAxes = false): DocumentSnapshot
             ),
           })
         : undefined;
+      const dividerPositionsMm = Array.isArray(rawCabinet.dividerPositionsMm)
+        ? dividerPositions({
+            width,
+            dividerPositionsMm: rawCabinet.dividerPositionsMm.filter(
+              (x): x is number => typeof x === 'number' && Number.isFinite(x),
+            ),
+          })
+        : undefined;
       cabinet = {
         presetId: resolveCabinetPresetId(
           typeof rawCabinet.presetId === 'string' ? rawCabinet.presetId : undefined,
         ),
-        width: Math.min(3000, Math.max(100, rawCabinet.width as number)),
+        width,
         height,
         depth: Math.min(1500, Math.max(100, rawCabinet.depth as number)),
         shelfCount: shelfPositionsMm?.length
           ? shelfPositionsMm.length
           : Math.min(MAX_SHELF_COUNT, Math.max(0, rawCabinet.shelfCount as number)),
         shelfPositionsMm: shelfPositionsMm?.length ? shelfPositionsMm : undefined,
+        dividerPositionsMm: dividerPositionsMm?.length ? dividerPositionsMm : undefined,
       };
     } else if (legacyAxes) {
       // Label/member-count inference is only for schema-3 saves that predate
@@ -329,6 +339,7 @@ function normalizeSnapshot(value: unknown, legacyAxes = false): DocumentSnapshot
         depth: cabinet.depth,
         shelfCount: cabinet.shelfCount,
         shelfPositionsMm: cabinet.shelfPositionsMm,
+        dividerPositionsMm: cabinet.dividerPositionsMm,
         icon: 'cabinet',
       });
       partIds.forEach((id, index) => {

@@ -121,6 +121,11 @@ export type CabinetConfig = {
    * ascending. Absent for the default even distribution driven by shelfCount.
    */
   shelfPositionsMm?: number[];
+  /**
+   * Explicit vertical-panel centreline offsets in mm from the cabinet left,
+   * sorted ascending. Absent or empty means the carcass has no extra panels.
+   */
+  dividerPositionsMm?: number[];
 };
 
 /** A user-inserted or cabinet-generated part. Placement lives in Transforms. */

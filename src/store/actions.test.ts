@@ -2,15 +2,18 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { Transform } from '@/domain/types';
 import * as download from '@/ui/download';
 import {
+  addCabinetDivider,
   addCabinetPreset,
   addCabinetShelf,
   addCustomPanel,
   commitTransforms,
+  distributeCabinetDividers,
   distributeCabinetShelves,
   downloadVersion,
   duplicateSelected,
   newDocument,
   openFile,
+  removeCabinetDivider,
   removeCabinetShelf,
   renameDocument,
   renamePart,
@@ -19,6 +22,7 @@ import {
   saveToFile,
   saveVersion,
   setCabinetDim,
+  setCabinetDividerPositions,
   setCabinetShelfPositions,
   setCustomPartDim,
   setGroupPositionAxis,
@@ -40,7 +44,7 @@ describe('library construction actions', () => {
       viewMode: 'model',
       historyOpen: false,
       measureActive: false,
-      displayUnit: 'mm',
+      displayUnit: 'cm',
       gridSizeM: 4,
       toast: null,
     });
@@ -330,6 +334,60 @@ describe('library construction actions', () => {
     expect(next.cabinet?.shelfPositionsMm).toEqual([218, 418, 618]);
     expect(next.partIds).toHaveLength(8);
     expect(useUiStore.getState().toast?.message).toBe('Only 3 of 4 shelves fit');
+  });
+
+  it('adds, moves and removes cabinet panels by explicit position', () => {
+    addCabinetPreset('base-600');
+    let group = useDocumentStore.getState().groups[0]!;
+    expect(group.partIds).toHaveLength(6);
+
+    addCabinetDivider(group.id, 300);
+    group = useDocumentStore.getState().groups[0]!;
+    expect(group.cabinet?.dividerPositionsMm).toEqual([300]);
+    expect(group.cabinet?.presetId).toBeUndefined();
+    // One centred panel splits the preset shelf into two bay shelves.
+    expect(group.partIds).toHaveLength(8);
+
+    const state = useDocumentStore.getState();
+    for (const id of group.partIds) {
+      expect(state.transforms[id]).toBeDefined();
+      expect(state.customParts.find((part) => part.id === id)).toBeDefined();
+    }
+    const panel = state.customParts.find((part) => part.label.includes('Panel 1'));
+    expect(panel).toMatchObject({ w: 18, h: 764, d: 592 });
+    expect(Math.round((state.transforms[panel!.id]!.position[0] ?? 0) * 1000)).toBe(0);
+
+    setCabinetDividerPositions(group.id, [200, 400]);
+    group = useDocumentStore.getState().groups[0]!;
+    expect(group.cabinet?.dividerPositionsMm).toEqual([200, 400]);
+    expect(group.partIds).toHaveLength(10);
+
+    removeCabinetDivider(group.id, 0);
+    group = useDocumentStore.getState().groups[0]!;
+    expect(group.partIds).toHaveLength(8);
+    expect(group.cabinet?.dividerPositionsMm).toEqual([400]);
+
+    expect(undo()).toBe(true);
+    expect(useDocumentStore.getState().groups[0]!.partIds).toHaveLength(10);
+    expect(undo()).toBe(true);
+    expect(undo()).toBe(true);
+    group = useDocumentStore.getState().groups[0]!;
+    expect(group.partIds).toHaveLength(6);
+    expect(group.cabinet?.dividerPositionsMm).toBeUndefined();
+    expect(group.cabinet?.presetId).toBe('base-600');
+  });
+
+  it('distributes panels by spacing and drops the ones that do not fit', () => {
+    addCabinetPreset('base-600');
+    const group = useDocumentStore.getState().groups[0]!;
+
+    distributeCabinetDividers(group.id, 4, 200);
+
+    const next = useDocumentStore.getState().groups[0]!;
+    // 600 wide: panels at 218/418; the third (618) would leave the interior.
+    expect(next.cabinet?.dividerPositionsMm).toEqual([218, 418]);
+    expect(next.partIds).toHaveLength(10);
+    expect(useUiStore.getState().toast?.message).toBe('Only 2 of 4 panels fit');
   });
 
   it('starts a clean document without resetting workspace preferences', () => {
