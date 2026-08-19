@@ -283,22 +283,49 @@ Mesh identity: `root.name` and `userData.partId` equal the part id.
 
 ## 9. Persistence
 
-- Autosave envelope: `{ schemaVersion, doc }` under localStorage key `forma:doc`
-- **Current schema: 4** (world-aligned dims + manufacturing metadata)
-- Schema 3 migrates (including legacy axis fixes); schema &lt; 3 is unmigratable →
-  fresh empty document
-- Preferences (`forma:displayUnit`, `forma:gridSize`) are separate keys and are
-  **not** schema-versioned
+Autosave, Save to File, Open File, and Version History downloads share one
+envelope: `{ schemaVersion, doc }` (`localStorage` key `forma:doc`, files
+`.forma.json`). `migrate()` in `src/store/persistence.ts` is the only load
+door. Preferences (`forma:displayUnit`, `forma:gridSize`) are separate keys
+and are **not** schema-versioned.
+
+- **Current schema: 5** (KNOXHULT/ASPUDDEN appearance defaults: white panels,
+  matte-black hardware)
+- Schema 4 migrates by applying those appearance defaults, then `normalize`
+- Schema 3 migrates (world-aligned dims, manufacturing metadata, axis fixes)
+  then the schema-4 appearance step
+- Schema &lt; 3 and unknown versions are unmigratable → `null` → empty document
+  / Open File error. Do not guess a mapping from the old parametric sideboard.
 - Autosave is debounced (600ms) with a `beforeunload` flush; failures set save
   status to `error`
-- `normalize` / `migrate` must stay defensive: clamp dims, drop bad parts,
-  dedupe ids, repair missing transforms
-- On current-schema load: do **not** overwrite user grain/edge banding; do **not**
-  infer cabinets from labels when `cabinet` was intentionally cleared
-
 - Save Version keeps a checkpoint in this browser. Version History can download
-  `{title} - Version N.forma.json` using the same envelope as Save to File.
-  File save/open uses the same envelope (`.forma.json`).
+  `{title} - Version N.forma.json` using the same envelope.
+
+### Keep saved files loading
+
+`normalize` / `migrate` must stay defensive: clamp dims, drop bad parts, dedupe
+ids, repair missing transforms. Extra JSON fields are ignored. On **current-
+schema** load: do **not** overwrite user grain/edge banding (BUG-008); do **not**
+infer cabinets from labels when `cabinet` was cleared (BUG-009).
+
+When a PR touches `FormaDocument` / `CustomPart` fields, catalog ids, or
+`normalize*`, classify the change:
+
+| Kind of change | What to do |
+|---|---|
+| New library item, optional field, or `shape` old files never stored | No schema bump. Teach `normalize` / `normalizePart` to accept it. Keep stored millimetres; do not overwrite from the catalog. |
+| Rename a preset id (`base-900` → `base-800`) | Add an alias in `CABINET_PRESET_ALIASES`. No schema bump. |
+| Rename, remove, or reinterpret a stored field (axes, units, nested shape) | Bump `SCHEMA_VERSION`. Add a `migrate` branch that converts the old envelope. Leave previous cases working. |
+| New insert defaults (METOD sizes, hang height, finishes) | Apply on **new** inserts only. Do not rewrite saved millimetres on current-schema load. |
+
+A PR that would change millimetres or group membership of an existing file is a
+schema bump plus a migrator, not a silent rewrite.
+
+### Tests for old files
+
+- Round-trip current schema: mutate a document, `migrate({ schemaVersion: SCHEMA_VERSION, doc })`, assert parts/groups/millimetres (see grain and demotion tests in `persistence.test.ts`)
+- Keep a `migrate` case for every supported schema (3, 4, 5) and assert `schemaVersion: 999` stays `null`
+- E2E Open File already loads a schema-4 fixture; add a fixture per schema you still support when the document shape changes
 
 ---
 
@@ -312,6 +339,8 @@ Mesh identity: `root.name` and `userData.partId` equal the part id.
 Conventions:
 
 - Unit tests hydrate stores in `beforeEach` and assert store/domain state
+- Persistence changes need a `migrate` / round-trip test for every schema still
+  supported (see §9)
 - E2E prefers roles (`getByRole('tab' | 'button' | 'treeitem')`)
 - Dev/preview/e2e server port is **pinned to 5199** (`strictPort`) so tests never
   attach to another project’s Vite server
@@ -332,11 +361,12 @@ Read these before changing picking, history, cabinets, or materials:
 4. **Halos inflate bounds** — exclude them from measure/frame/snap boxes
 5. **`preserveDrawingBuffer: true`** — required for PNG export
 6. **Metadata outside `commit()`** — patch history with `syncHistoryDocumentMeta()`
-7. **Demoted cabinets** — missing `cabinet` on schema 4 means “regular group”
+7. **Demoted cabinets** — missing `cabinet` on a current-schema group means “regular group”
 8. **Hidden ≠ unpickable in three.js** — filter with `visibleIds()`
 9. **Unlayered base CSS breaks buttons** — keep resets in `@layer base`
 10. **Empty canvas is intentional** — do not restore the parametric sideboard
 11. **Magnet is object-face snap** — the 100 mm grid is Shift-held translation only; do not wire `setTranslationSnap(0.1)` to the magnet toggle
+12. **Saved files** — load only through `migrate()`; bump `SCHEMA_VERSION` when stored meaning changes; never rewrite current-schema millimetres from the catalog (see §9)
 
 ---
 
