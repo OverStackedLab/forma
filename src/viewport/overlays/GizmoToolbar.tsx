@@ -55,8 +55,8 @@ export function GizmoToolbar() {
       <button
         type="button"
         aria-pressed={snapEnabled}
-        aria-label="Toggle snapping"
-        title="Snap"
+        aria-label="Toggle object snapping"
+        title="Snap to objects — hold Shift for 100 mm grid"
         className={buttonClass(snapEnabled)}
         onClick={toggleSnap}
       >

@@ -1,5 +1,6 @@
 import type {
   CabinetPreset,
+  CabinetPresetId,
   Color,
   ColorId,
   Finish,
@@ -13,8 +14,8 @@ import type {
 /** The wood species a part is milled from. Its own color/roughness shows through when the color is 'natural'. */
 export const MATERIALS: readonly Material[] = [
   { id: 'walnut', label: 'Walnut', color: '#4b3327', roughness: 0.55, metalness: 0.04 },
-  { id: 'oak', label: 'White Oak', color: '#c7a374', roughness: 0.6, metalness: 0.03 },
-  { id: 'ash', label: 'Ash', color: '#d9cdb6', roughness: 0.62, metalness: 0.02 },
+  { id: 'oak', label: 'Oak', color: '#c7a374', roughness: 0.58, metalness: 0.03 },
+  { id: 'ash', label: 'Ash', color: '#d9cdb6', roughness: 0.45, metalness: 0.02 },
   { id: 'metal', label: 'Metal', color: '#9a9a9a', roughness: 0.28, metalness: 0.82 },
 ];
 
@@ -22,25 +23,28 @@ export const MATERIALS: readonly Material[] = [
 export const COLORS: readonly Color[] = [
   { id: 'natural', label: 'Natural', tint: null },
   { id: 'ebony', label: 'Ebony Stain', tint: '#211c19', roughness: 0.5, metalness: 0.04 },
-  { id: 'white', label: 'White Lacquer', tint: '#eef0ea', roughness: 0.28, metalness: 0.0 },
+  { id: 'dark-gray', label: 'Dark Gray', tint: '#4a4a4c', roughness: 0.42, metalness: 0.02 },
+  // ASPUDDEN dark gray-green — muted sage charcoal foil.
+  { id: 'dark-gray-green', label: 'Dark Gray-Green', tint: '#3f4a42', roughness: 0.4, metalness: 0.02 },
+  { id: 'white', label: 'White', tint: '#f2f2f0', roughness: 0.32, metalness: 0.0 },
   { id: 'brass', label: 'Brushed Brass', tint: '#b6884b', roughness: 0.3, metalness: 0.84 },
   { id: 'matte-black', label: 'Matte Black', tint: '#232323', roughness: 0.52, metalness: 0.55 },
   { id: 'steel', label: 'Brushed Steel', tint: '#9a9a9a', roughness: 0.27, metalness: 0.9 },
 ];
 
-/** The only appearance choices exposed in the UI. Each resolves to one internal material/color pair. */
+/** Panel colors. Each resolves to one internal material/color pair. */
 export const FINISHES: readonly Finish[] = [
-  { id: 'walnut', label: 'Walnut', materialId: 'walnut', colorId: 'natural' },
-  { id: 'white-oak', label: 'White Oak', materialId: 'oak', colorId: 'natural' },
-  { id: 'ash', label: 'Ash', materialId: 'ash', colorId: 'natural' },
-  { id: 'ebony', label: 'Ebony Stain', materialId: 'walnut', colorId: 'ebony' },
-  { id: 'white-lacquer', label: 'White Lacquer', materialId: 'ash', colorId: 'white' },
+  { id: 'oak', label: 'Oak', materialId: 'oak', colorId: 'natural' },
+  { id: 'dark-gray', label: 'Dark Gray', materialId: 'ash', colorId: 'dark-gray' },
+  { id: 'dark-gray-green', label: 'Dark Gray-Green', materialId: 'ash', colorId: 'dark-gray-green' },
+  { id: 'white', label: 'White', materialId: 'ash', colorId: 'white' },
 ];
 
 export const HARDWARE_FINISHES: readonly Finish[] = [
   { id: 'brushed-brass', label: 'Brushed Brass', materialId: 'metal', colorId: 'brass' },
   { id: 'matte-black', label: 'Matte Black', materialId: 'metal', colorId: 'matte-black' },
   { id: 'brushed-steel', label: 'Brushed Steel', materialId: 'metal', colorId: 'steel' },
+  { id: 'matte-white', label: 'White', materialId: 'metal', colorId: 'white' },
 ];
 
 export const ALL_FINISHES: readonly Finish[] = [...FINISHES, ...HARDWARE_FINISHES];
@@ -58,23 +62,23 @@ export const PANEL_PRESETS: readonly PanelPreset[] = [
     edgeBanding: ['d-max'], defaultQuaternion: [0, 0, 0, 1],
   },
   {
-    id: 'flat', label: 'Side Panel', w: 18, h: 720, d: 560, icon: 'panel_flat', shape: 'box',
-    category: 'panel', description: '18×720×560 mm', thicknessAxis: 'w', grainAxis: 'h',
+    id: 'flat', label: 'Side Panel', w: 18, h: 800, d: 600, icon: 'panel_flat', shape: 'box',
+    category: 'panel', description: '18×800×600 mm', thicknessAxis: 'w', grainAxis: 'h',
     edgeBanding: ['d-max'], defaultQuaternion: [0, 0, 0, 1],
   },
   {
-    id: 'back', label: 'Back Panel', w: 600, h: 720, d: 8, icon: 'panel_back', shape: 'box',
-    category: 'panel', description: '600×720×8 mm', thicknessAxis: 'd', grainAxis: 'h',
+    id: 'back', label: 'Back Panel', w: 600, h: 800, d: 8, icon: 'panel_back', shape: 'box',
+    category: 'panel', description: '600×800×8 mm', thicknessAxis: 'd', grainAxis: 'h',
     edgeBanding: [], defaultQuaternion: [0, 0, 0, 1],
   },
   {
-    id: 'divider', label: 'Divider', w: 18, h: 720, d: 560, icon: 'panel_divider', shape: 'box',
-    category: 'panel', description: '18×720×560 mm', thicknessAxis: 'w', grainAxis: 'h',
+    id: 'divider', label: 'Divider', w: 18, h: 800, d: 600, icon: 'panel_divider', shape: 'box',
+    category: 'panel', description: '18×800×600 mm', thicknessAxis: 'w', grainAxis: 'h',
     edgeBanding: ['d-max'], defaultQuaternion: [0, 0, 0, 1],
   },
   {
-    id: 'door', label: 'Door', w: 400, h: 700, d: 18, icon: 'panel_door', shape: 'box',
-    category: 'front', description: '400×700×18 mm', thicknessAxis: 'd', grainAxis: 'h',
+    id: 'door', label: 'Door', w: 400, h: 800, d: 18, icon: 'panel_door', shape: 'box',
+    category: 'front', description: '400×800×18 mm', thicknessAxis: 'd', grainAxis: 'h',
     edgeBanding: ['w-min', 'w-max', 'h-min', 'h-max'], defaultQuaternion: [0, 0, 0, 1],
   },
   {
@@ -82,21 +86,47 @@ export const PANEL_PRESETS: readonly PanelPreset[] = [
     category: 'hardware', description: 'Ø32 × 25 mm projection', thicknessAxis: null,
     grainAxis: null, edgeBanding: [], defaultQuaternion: [0, 0, 0, 1],
   },
+  {
+    id: 'bagganas', label: 'BAGGANÄS', w: 21, h: 21, d: 24, icon: 'panel_knob', shape: 'bagganas',
+    category: 'hardware', description: 'Ø21 × 24 mm · IKEA 903.384.17', thicknessAxis: null,
+    grainAxis: null, edgeBanding: [], defaultQuaternion: [0, 0, 0, 1],
+  },
+  {
+    id: 'eneryda', label: 'ENERYDA', w: 112, h: 17, d: 30, icon: 'panel_handle', shape: 'eneryda',
+    category: 'hardware', description: '112 mm · 96 mm centres · IKEA 703.475.16', thicknessAxis: null,
+    grainAxis: null, edgeBanding: [], defaultQuaternion: [0, 0, 0, 1],
+  },
 ];
 
-/** Common metric carcass modules. Heights exclude legs, worktops and mounting rails. */
+/** IKEA METOD frame sizes. Heights exclude legs, worktops and the 1 cm wall gap. */
 export const CABINET_PRESETS: readonly CabinetPreset[] = [
-  { id: 'base-450', label: 'Base 450', width: 450, height: 720, depth: 560, shelfCount: 1, icon: 'cabinet' },
-  { id: 'base-600', label: 'Base 600', width: 600, height: 720, depth: 560, shelfCount: 1, icon: 'cabinet' },
-  { id: 'base-900', label: 'Base 900', width: 900, height: 720, depth: 560, shelfCount: 1, icon: 'cabinet' },
-  { id: 'wall-600', label: 'Wall 600', width: 600, height: 720, depth: 320, shelfCount: 1, icon: 'cabinet' },
-  { id: 'wall-900', label: 'Wall 900', width: 900, height: 720, depth: 320, shelfCount: 1, icon: 'cabinet' },
-  { id: 'tall-600', label: 'Tall 600', width: 600, height: 2100, depth: 560, shelfCount: 4, icon: 'cabinet' },
+  { id: 'base-400', label: 'Base 400', width: 400, height: 800, depth: 600, shelfCount: 1, icon: 'cabinet' },
+  { id: 'base-600', label: 'Base 600', width: 600, height: 800, depth: 600, shelfCount: 1, icon: 'cabinet' },
+  { id: 'base-800', label: 'Base 800', width: 800, height: 800, depth: 600, shelfCount: 1, icon: 'cabinet' },
+  // 1400 mm underside so an 800 mm wall unit’s top lines up with High 2200.
+  { id: 'wall-600', label: 'Wall 600', width: 600, height: 800, depth: 370, shelfCount: 1, icon: 'cabinet', bottomMm: 1400 },
+  { id: 'wall-800', label: 'Wall 800', width: 800, height: 800, depth: 370, shelfCount: 1, icon: 'cabinet', bottomMm: 1400 },
+  { id: 'high-600', label: 'High 600', width: 600, height: 2200, depth: 600, shelfCount: 4, icon: 'cabinet' },
 ];
 
-export const DEFAULT_MATERIAL_ID: MaterialId = 'oak';
-export const DEFAULT_COLOR_ID: ColorId = 'natural';
-export const DEFAULT_HARDWARE_FINISH_ID: HardwareFinishId = 'brushed-brass';
+/** Older library ids, kept so saved cabinets still resolve to a catalog preset. */
+export const CABINET_PRESET_ALIASES: Readonly<Record<string, CabinetPresetId>> = {
+  'base-450': 'base-400',
+  'base-900': 'base-800',
+  'wall-900': 'wall-800',
+  'tall-600': 'high-600',
+};
+
+export function resolveCabinetPresetId(id: string | undefined): CabinetPresetId | undefined {
+  if (!id) return undefined;
+  const aliased = CABINET_PRESET_ALIASES[id];
+  if (aliased) return aliased;
+  return CABINET_PRESETS.find((preset) => preset.id === id)?.id;
+}
+
+export const DEFAULT_MATERIAL_ID: MaterialId = 'ash';
+export const DEFAULT_COLOR_ID: ColorId = 'white';
+export const DEFAULT_HARDWARE_FINISH_ID: HardwareFinishId = 'matte-black';
 
 /**
  * Slider range for a panel's own W/H/D. Unlike a hard domain rule, this isn't
@@ -136,14 +166,19 @@ export function isColorId(id: string): id is ColorId {
 }
 
 export function findFinish(id: FinishId | HardwareFinishId | string | undefined): Finish {
-  return ALL_FINISHES.find((finish) => finish.id === id) ?? FINISHES[1]!;
+  return ALL_FINISHES.find((finish) => finish.id === id) ?? FINISHES[0]!;
 }
 
 export function isHardwareFinishId(id: string): id is HardwareFinishId {
   return HARDWARE_FINISHES.some((finish) => finish.id === id);
 }
 
-/** Maps old saved material/color combinations into the closest single finish. */
+/** Round purchased knobs share diameter + projection controls. */
+export function isRoundHardwareShape(shape: string | undefined): boolean {
+  return shape === 'cylinder' || shape === 'bagganas';
+}
+
+/** Maps saved material/color combinations into the closest single finish. */
 export function finishForAppearance(
   materialId: MaterialId | string | undefined,
   colorId: ColorId | string | undefined,
@@ -155,11 +190,9 @@ export function finishForAppearance(
   if (colorId === 'brass') return findFinish('brushed-brass');
   if (colorId === 'matte-black') return findFinish('matte-black');
   if (colorId === 'steel') return findFinish('brushed-steel');
-  if (colorId === 'ebony') return findFinish('ebony');
-  if (colorId === 'white') return findFinish('white-lacquer');
-  if (materialId === 'walnut') return findFinish('walnut');
-  if (materialId === 'ash') return findFinish('ash');
-  return findFinish('white-oak');
+  if (colorId === 'dark-gray' || colorId === 'ebony') return findFinish('dark-gray');
+  if (colorId === 'white') return findFinish('white');
+  return findFinish('oak');
 }
 
 /** The final render appearance — a color's tint and finish override the material's own where set. */

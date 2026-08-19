@@ -31,9 +31,9 @@ describe('floor snapping', () => {
       transforms: { lower: transform(0.25), upper: transform(1) },
       overrides: {},
       hiddenIds: [],
-      defaultMaterialId: 'oak',
-      defaultColorId: 'natural',
-      defaultHardwareFinishId: 'brushed-brass',
+      defaultMaterialId: 'ash',
+      defaultColorId: 'white',
+      defaultHardwareFinishId: 'matte-black',
     });
 
     const beforeGap = builder.getRoot('upper')!.position.y - builder.getRoot('lower')!.position.y;

@@ -4,7 +4,8 @@ Guide for humans and agents working in this repo. Prefer the patterns already
 in `src/` over inventing new ones. When a rule here conflicts with nearby code,
 follow the nearby code and update this file.
 
-Related trackers: [`BUGS.md`](./BUGS.md) · [`IMPROVEMENTS.md`](./IMPROVEMENTS.md)
+Background: [`ARCHITECTURE.md`](./ARCHITECTURE.md) · [`DESIGN_SPEC.md`](./DESIGN_SPEC.md)
+Trackers: [`BUGS.md`](./BUGS.md) · [`IMPROVEMENTS.md`](./IMPROVEMENTS.md)
 
 ---
 
@@ -34,6 +35,7 @@ items or generated cabinet members.
 | `src/ui/` | App chrome: toolbar, sidebars, cut list, primitives, keyboard shortcuts |
 | `src/styles/theme.css` | Tailwind v4 `@theme` tokens + `@layer base` resets |
 | `e2e/` | Playwright smoke tests |
+| `docs/` | Architecture, design spec, standards, bug and improvement trackers |
 | `reference/` | Historical HTML prototype — **not** production code to copy |
 
 Keep each concern in its layer. Domain must not import React or Three.js at
@@ -131,8 +133,9 @@ count, Select All, and BOM. Do not maintain a parallel “fixed parts” list.
 
 - Generated cabinets carry `group.cabinet` config; parametric rebuilds go through
   `setCabinetDim` / `resizeCabinetFromGizmo` / `commitCabinetResize`
-- Editing a **subset** of members clears `cabinet` (demotion). Persistence must
-  not resurrect stock configs from labels on current-schema loads (BUG-009)
+- Changing a **subset** of members' **size** clears `cabinet` (demotion). Moving,
+  rotating or renaming members does not. Persistence must not resurrect stock
+  configs from labels on current-schema loads (BUG-009)
 - Grain / edge banding on cabinet panels are user-editable and must survive
   reload (BUG-008)
 
@@ -331,6 +334,7 @@ Read these before changing picking, history, cabinets, or materials:
 8. **Hidden ≠ unpickable in three.js** — filter with `visibleIds()`
 9. **Unlayered base CSS breaks buttons** — keep resets in `@layer base`
 10. **Empty canvas is intentional** — do not restore the parametric sideboard
+11. **Magnet is object-face snap** — the 100 mm grid is Shift-held translation only; do not wire `setTranslationSnap(0.1)` to the magnet toggle
 
 ---
 

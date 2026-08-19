@@ -15,6 +15,7 @@ import {
   MousePointer2,
   Move,
   PanelLeft,
+  PanelRight,
   RectangleHorizontal,
   Redo2,
   RotateCw,
@@ -47,6 +48,8 @@ const ICONS: Record<string, LucideIcon> = {
   save_file: Download,
   open_file: Upload,
   new_file: FilePlus2,
+  sidebar_left: PanelLeft,
+  sidebar_right: PanelRight,
 
   // View mode tabs
   model: Box,
@@ -73,6 +76,7 @@ const ICONS: Record<string, LucideIcon> = {
   panel_divider: Columns2,
   panel_door: DoorClosed,
   panel_knob: Circle,
+  panel_handle: RectangleHorizontal,
   cabinet: Box,
 };
 

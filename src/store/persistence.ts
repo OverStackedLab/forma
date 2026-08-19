@@ -1,6 +1,6 @@
 import { DISPLAY_UNITS, type DisplayUnit } from '@/domain/units';
 import { isGridSizeM, type GridSizeM } from '@/domain/workspace';
-import { buildCabinetLayout } from '@/domain/cabinets';
+import { buildCabinetLayout, MAX_SHELF_COUNT, shelfPositions } from '@/domain/cabinets';
 import {
   CABINET_PRESETS,
   CUSTOM_PANEL_LIMITS,
@@ -8,6 +8,7 @@ import {
   isHardwareFinishId,
   isMaterialId,
   PANEL_PRESETS,
+  resolveCabinetPresetId,
 } from '@/domain/catalog';
 import type {
   CabinetConfig,
@@ -30,15 +31,27 @@ const DISPLAY_UNIT_KEY = 'forma:displayUnit';
 /** Likewise a view setting: which grid the viewport draws, not part of the design. */
 const GRID_SIZE_KEY = 'forma:gridSize';
 /**
- * Schema 4 gives parts explicit manufacturing metadata and world-aligned
- * dimensions. Schema 3 saves are migrated, including their rotated side
- * panels and Y-axis cylinders. Older parametric formats still have no safe
- * mapping onto the empty-canvas designer.
+ * Schema 5 adopts the KNOXHULT/ASPUDDEN appearance defaults (white panels,
+ * matte-black hardware). Schema 4 gives parts explicit manufacturing metadata
+ * and world-aligned dimensions. Schema 3 saves are migrated, including their
+ * rotated side panels and Y-axis cylinders. Older parametric formats still
+ * have no safe mapping onto the empty-canvas designer.
  */
-const SCHEMA_VERSION = 4;
+const SCHEMA_VERSION = 5;
 const DEBOUNCE_MS = 600;
 
 type Envelope = { schemaVersion: number; doc: FormaDocument };
+
+/** One-time catalog rebrand: replace whatever design defaults were saved. */
+function withProductAppearanceDefaults(doc: FormaDocument): FormaDocument {
+  const base = createDefaultDocument();
+  return {
+    ...doc,
+    defaultMaterialId: base.defaultMaterialId,
+    defaultColorId: base.defaultColorId,
+    defaultHardwareFinishId: base.defaultHardwareFinishId,
+  };
+}
 
 function migrate(raw: unknown): FormaDocument | null {
   if (!raw || typeof raw !== 'object') return null;
@@ -48,8 +61,10 @@ function migrate(raw: unknown): FormaDocument | null {
   switch (envelope.schemaVersion) {
     case SCHEMA_VERSION:
       return normalize(envelope.doc);
+    case 4:
+      return withProductAppearanceDefaults(normalize(envelope.doc));
     case 3:
-      return normalize(envelope.doc, true);
+      return withProductAppearanceDefaults(normalize(envelope.doc, true));
     default:
       // Older sideboard-shaped saves, or a version we no longer understand.
       return null;
@@ -76,6 +91,9 @@ const EDGE_BAND_SIDES: readonly EdgeBandSide[] = [
 
 function inferredPreset(label: string) {
   const normalized = label.toLowerCase();
+  if (normalized.includes('eneryda') || normalized.includes('handle'))
+    return PANEL_PRESETS.find((preset) => preset.id === 'eneryda');
+  if (normalized.includes('baggan')) return PANEL_PRESETS.find((preset) => preset.id === 'bagganas');
   if (normalized.includes('knob')) return PANEL_PRESETS.find((preset) => preset.id === 'knob');
   if (normalized.includes('door')) return PANEL_PRESETS.find((preset) => preset.id === 'door');
   if (normalized.includes('back')) return PANEL_PRESETS.find((preset) => preset.id === 'back');
@@ -88,7 +106,8 @@ function inferredPreset(label: string) {
 function normalizePart(value: unknown): CustomPart | null {
   const part = asRecord(value);
   if (!part || typeof part.id !== 'string' || !part.id || typeof part.label !== 'string') return null;
-  if (part.shape !== 'box' && part.shape !== 'cylinder') return null;
+  if (part.shape !== 'box' && part.shape !== 'cylinder' && part.shape !== 'bagganas' && part.shape !== 'eneryda')
+    return null;
   const clampDimension = (axis: 'w' | 'h' | 'd') => {
     const raw = part[axis];
     if (typeof raw !== 'number' || !Number.isFinite(raw) || raw <= 0) return null;
@@ -107,10 +126,12 @@ function normalizePart(value: unknown): CustomPart | null {
       ? PANEL_PRESETS.find((preset) => preset.id === part.presetId)
       : undefined;
   const preset = explicitPreset ?? inferredPreset(label);
+  // Prefer the catalog shape so older BAGGANÄS saves (stored as cylinder) pick up the disc profile.
+  const shape = explicitPreset?.shape ?? part.shape;
   const category =
     part.category === 'panel' || part.category === 'front' || part.category === 'hardware'
       ? part.category
-      : preset?.category ?? (part.shape === 'cylinder' ? 'hardware' : 'panel');
+      : preset?.category ?? (shape === 'cylinder' || shape === 'bagganas' || shape === 'eneryda' ? 'hardware' : 'panel');
   const grainAxis =
     part.grainAxis === 'w' || part.grainAxis === 'h' || part.grainAxis === 'd'
       ? part.grainAxis
@@ -131,8 +152,10 @@ function normalizePart(value: unknown): CustomPart | null {
     w,
     h,
     d,
-    shape: part.shape,
-    thicknessAxis: part.shape === 'cylinder' ? null : validAxis ? thicknessAxis as DimensionAxis : undefined,
+    shape,
+    thicknessAxis: category === 'hardware' || shape === 'cylinder' || shape === 'bagganas' || shape === 'eneryda'
+      ? null
+      : validAxis ? thicknessAxis as DimensionAxis : undefined,
     grainAxis,
     edgeBanding,
   };
@@ -246,16 +269,27 @@ function normalizeSnapshot(value: unknown, legacyAxes = false): DocumentSnapshot
       typeof rawCabinet.depth === 'number' && Number.isFinite(rawCabinet.depth) &&
       typeof rawCabinet.shelfCount === 'number' && Number.isInteger(rawCabinet.shelfCount);
     if (dimensionsValid) {
+      const height = Math.min(3000, Math.max(100, rawCabinet.height as number));
+      const shelfPositionsMm = Array.isArray(rawCabinet.shelfPositionsMm)
+        ? shelfPositions({
+            height,
+            shelfCount: 0,
+            shelfPositionsMm: rawCabinet.shelfPositionsMm.filter(
+              (y): y is number => typeof y === 'number' && Number.isFinite(y),
+            ),
+          })
+        : undefined;
       cabinet = {
-        presetId:
-          typeof rawCabinet.presetId === 'string' &&
-          CABINET_PRESETS.some((preset) => preset.id === rawCabinet.presetId)
-            ? rawCabinet.presetId as CabinetConfig['presetId']
-            : undefined,
+        presetId: resolveCabinetPresetId(
+          typeof rawCabinet.presetId === 'string' ? rawCabinet.presetId : undefined,
+        ),
         width: Math.min(3000, Math.max(100, rawCabinet.width as number)),
-        height: Math.min(3000, Math.max(100, rawCabinet.height as number)),
+        height,
         depth: Math.min(1500, Math.max(100, rawCabinet.depth as number)),
-        shelfCount: Math.min(8, Math.max(0, rawCabinet.shelfCount as number)),
+        shelfCount: shelfPositionsMm?.length
+          ? shelfPositionsMm.length
+          : Math.min(MAX_SHELF_COUNT, Math.max(0, rawCabinet.shelfCount as number)),
+        shelfPositionsMm: shelfPositionsMm?.length ? shelfPositionsMm : undefined,
       };
     } else if (legacyAxes) {
       // Label/member-count inference is only for schema-3 saves that predate
@@ -286,6 +320,7 @@ function normalizeSnapshot(value: unknown, legacyAxes = false): DocumentSnapshot
         height: cabinet.height,
         depth: cabinet.depth,
         shelfCount: cabinet.shelfCount,
+        shelfPositionsMm: cabinet.shelfPositionsMm,
         icon: 'cabinet',
       });
       partIds.forEach((id, index) => {

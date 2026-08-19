@@ -6,7 +6,7 @@ export function csvHeaders(unit: DisplayUnit): readonly string[] {
     'Type',
     'Part',
     'Qty',
-    'Finish',
+    'Color',
     `W (${unit})`,
     `H (${unit})`,
     `D (${unit})`,

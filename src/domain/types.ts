@@ -16,20 +16,37 @@ export type EdgeBandSide =
 /** The wood/substrate a part is made of — independent of any stain or paint applied to it. */
 export type MaterialId = 'walnut' | 'oak' | 'ash' | 'metal';
 /** A stain or paint applied over a material. 'natural' leaves the material's own look untouched. */
-export type ColorId = 'natural' | 'ebony' | 'white' | 'brass' | 'matte-black' | 'steel';
-export type FinishId = 'walnut' | 'white-oak' | 'ash' | 'ebony' | 'white-lacquer';
-export type HardwareFinishId = 'brushed-brass' | 'matte-black' | 'brushed-steel';
+export type ColorId =
+  | 'natural'
+  | 'ebony'
+  | 'dark-gray'
+  | 'dark-gray-green'
+  | 'white'
+  | 'brass'
+  | 'matte-black'
+  | 'steel';
+/** Panel colors exposed in the UI. */
+export type FinishId = 'oak' | 'dark-gray' | 'dark-gray-green' | 'white';
+export type HardwareFinishId = 'brushed-brass' | 'matte-black' | 'brushed-steel' | 'matte-white';
 export type AppearanceFinishId = FinishId | HardwareFinishId;
-export type PanelPresetId = 'flat' | 'shelf' | 'divider' | 'back' | 'door' | 'knob';
+export type PanelPresetId =
+  | 'flat'
+  | 'shelf'
+  | 'divider'
+  | 'back'
+  | 'door'
+  | 'knob'
+  | 'bagganas'
+  | 'eneryda';
 export type CabinetPresetId =
-  | 'base-450'
+  | 'base-400'
   | 'base-600'
-  | 'base-900'
+  | 'base-800'
   | 'wall-600'
-  | 'wall-900'
-  | 'tall-600';
-/** Every part renders as one of two shared unit geometries, scaled per instance. */
-export type PanelShape = 'box' | 'cylinder';
+  | 'wall-800'
+  | 'high-600';
+/** Every part renders as one of a few shared unit geometries, scaled per instance. */
+export type PanelShape = 'box' | 'cylinder' | 'bagganas' | 'eneryda';
 
 export type Material = {
   id: MaterialId;
@@ -85,6 +102,11 @@ export type CabinetPreset = {
   depth: number;
   shelfCount: number;
   icon: string;
+  /**
+   * Underside height in mm when the cabinet is inserted onto the floor.
+   * Wall cabinets hang above the grid; base and tall units omit this (0).
+   */
+  bottomMm?: number;
 };
 
 export type CabinetConfig = {
@@ -93,6 +115,11 @@ export type CabinetConfig = {
   height: number;
   depth: number;
   shelfCount: number;
+  /**
+   * Explicit shelf centreline heights in mm from the cabinet bottom, sorted
+   * ascending. Absent for the default even distribution driven by shelfCount.
+   */
+  shelfPositionsMm?: number[];
 };
 
 /** A user-inserted or cabinet-generated part. Placement lives in Transforms. */

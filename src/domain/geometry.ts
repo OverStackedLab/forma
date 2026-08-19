@@ -1,5 +1,6 @@
 import { resolveAppearance } from './catalog';
-import type { PartSpec } from './types';
+import { createOakGrainCanvas } from './oakGrain';
+import type { PanelShape, PartSpec } from './types';
 
 /**
  * three.js is injected rather than imported so this module stays unit-testable
@@ -10,19 +11,21 @@ type TObject3D = import('three').Object3D;
 type TMesh = import('three').Mesh;
 type TBufferGeometry = import('three').BufferGeometry;
 type TMaterial = import('three').MeshStandardMaterial;
+type TTexture = import('three').Texture;
 
 /** Millimetres to three.js world units (metres). */
 const MM = 1 / 1000;
 
 /**
- * Every part is either a box (panels) or a cylinder (round hardware like
- * knobs), sharing one unit geometry per shape scaled per instance, so
+ * Every part shares one unit geometry per shape, scaled per instance, so
  * changing a dimension is a scale write rather than a geometry allocation.
  * The cache owns the geometry; never dispose it from a rebuild loop.
  */
 export class GeometryCache {
   private box: TBufferGeometry | null = null;
   private cylinder: TBufferGeometry | null = null;
+  private bagganas: TBufferGeometry | null = null;
+  private eneryda: TBufferGeometry | null = null;
 
   constructor(private readonly THREE: ThreeModule) {}
 
@@ -32,24 +35,182 @@ export class GeometryCache {
     return this.box;
   }
 
-  /** Rounded unit knob centred on the origin, projecting along world Z. */
+  /** Soft rounded knob centred on the origin, projecting along world Z. */
   unitCylinder(): TBufferGeometry {
     if (!this.cylinder) {
-      const profile = [
-        new this.THREE.Vector2(0, -0.5),
-        new this.THREE.Vector2(0.42, -0.5),
-        new this.THREE.Vector2(0.48, -0.45),
-        new this.THREE.Vector2(0.5, -0.35),
-        new this.THREE.Vector2(0.5, 0.35),
-        new this.THREE.Vector2(0.48, 0.45),
-        new this.THREE.Vector2(0.42, 0.5),
-        new this.THREE.Vector2(0, 0.5),
-      ];
-      this.cylinder = new this.THREE.LatheGeometry(profile, 48);
-      this.cylinder.rotateX(Math.PI / 2);
-      this.cylinder.computeVertexNormals();
+      this.cylinder = this.lathe([
+        [0, -0.5],
+        [0.42, -0.5],
+        [0.48, -0.45],
+        [0.5, -0.35],
+        [0.5, 0.35],
+        [0.48, 0.45],
+        [0.42, 0.5],
+        [0, 0.5],
+      ]);
     }
     return this.cylinder;
+  }
+
+  /**
+   * IKEA BAGGANÄS (903.384.17): flat Ø21 mm disc, long concave trumpet neck,
+   * and a Ø5 mm mounting stem. Unit space maps diameter→X/Y and projection→Z.
+   */
+  unitBagganas(): TBufferGeometry {
+    if (!this.bagganas) {
+      const stem = (5 / 21) * 0.5;
+      this.bagganas = this.lathe([
+        [0, -0.5],
+        [stem, -0.5],
+        [stem, -0.22],
+        [stem * 1.05, -0.1],
+        [0.18, 0.02],
+        [0.28, 0.14],
+        [0.4, 0.24],
+        [0.48, 0.3],
+        [0.5, 0.34],
+        [0.5, 0.5],
+        [0, 0.5],
+      ], 64);
+    }
+    return this.bagganas;
+  }
+
+  /**
+   * IKEA ENERYDA (703.475.16): bow pull with Ø feet, 96 mm centres, 30 mm
+   * projection and 112 mm overall length. Built in mm, then normalized into
+   * the unit box so anisotropic part scale recovers the real proportions.
+   */
+  unitEneryda(): TBufferGeometry {
+    if (!this.eneryda) {
+      const length = 112;
+      const projection = 30;
+      const height = 17;
+      const centres = 96;
+      const half = centres / 2;
+      const tubeR = 5.2;
+      const footR = 7;
+      const footH = 2.4;
+
+      const curve = new this.THREE.CatmullRomCurve3([
+        new this.THREE.Vector3(-half, 0, tubeR * 0.6),
+        new this.THREE.Vector3(-half, 0, projection * 0.38),
+        new this.THREE.Vector3(-half * 0.72, 0, projection * 0.88),
+        new this.THREE.Vector3(0, 0, projection - tubeR * 0.55),
+        new this.THREE.Vector3(half * 0.72, 0, projection * 0.88),
+        new this.THREE.Vector3(half, 0, projection * 0.38),
+        new this.THREE.Vector3(half, 0, tubeR * 0.6),
+      ], false, 'catmullrom', 0.35);
+
+      const tube = new this.THREE.TubeGeometry(curve, 72, tubeR, 20, false);
+      const foot = new this.THREE.CylinderGeometry(footR, footR, footH, 28);
+      foot.rotateX(Math.PI / 2);
+
+      const leftFoot = foot.clone();
+      leftFoot.translate(-half, 0, footH / 2);
+      const rightFoot = foot.clone();
+      rightFoot.translate(half, 0, footH / 2);
+      foot.dispose();
+
+      const merged = this.mergeGeometries([tube, leftFoot, rightFoot]);
+      tube.dispose();
+      leftFoot.dispose();
+      rightFoot.dispose();
+
+      this.normalizeToUnitBox(merged, length, height, projection);
+      this.eneryda = merged;
+    }
+    return this.eneryda;
+  }
+
+  forShape(shape: PanelShape): TBufferGeometry {
+    if (shape === 'bagganas') return this.unitBagganas();
+    if (shape === 'eneryda') return this.unitEneryda();
+    if (shape === 'cylinder') return this.unitCylinder();
+    return this.unitBox();
+  }
+
+  private lathe(
+    points: readonly (readonly [number, number])[],
+    segments = 48,
+  ): TBufferGeometry {
+    const profile = points.map(([x, y]) => new this.THREE.Vector2(x, y));
+    const geometry = new this.THREE.LatheGeometry(profile, segments);
+    geometry.rotateX(Math.PI / 2);
+    geometry.computeVertexNormals();
+    return geometry;
+  }
+
+  /** Packs mm-space geometry into the shared unit cube centred on the origin. */
+  private normalizeToUnitBox(
+    geometry: TBufferGeometry,
+    length: number,
+    height: number,
+    projection: number,
+  ): void {
+    geometry.translate(0, 0, -projection / 2);
+    geometry.scale(1 / length, 1 / height, 1 / projection);
+    geometry.computeVertexNormals();
+  }
+
+  private mergeGeometries(geometries: TBufferGeometry[]): TBufferGeometry {
+    let vertexCount = 0;
+    let indexCount = 0;
+    for (const geometry of geometries) {
+      const position = geometry.getAttribute('position');
+      vertexCount += position.count;
+      const index = geometry.getIndex();
+      indexCount += index ? index.count : position.count;
+    }
+
+    const positions = new Float32Array(vertexCount * 3);
+    const normals = new Float32Array(vertexCount * 3);
+    const indices = new Uint32Array(indexCount);
+    const normal = new this.THREE.Vector3();
+    let vertexOffset = 0;
+    let indexOffset = 0;
+
+    for (const geometry of geometries) {
+      geometry.computeVertexNormals();
+      const position = geometry.getAttribute('position');
+      const normalAttr = geometry.getAttribute('normal');
+      for (let i = 0; i < position.count; i++) {
+        const dst = (vertexOffset + i) * 3;
+        positions[dst] = position.getX(i);
+        positions[dst + 1] = position.getY(i);
+        positions[dst + 2] = position.getZ(i);
+        if (normalAttr) {
+          normals[dst] = normalAttr.getX(i);
+          normals[dst + 1] = normalAttr.getY(i);
+          normals[dst + 2] = normalAttr.getZ(i);
+        } else {
+          normal.set(0, 0, 1);
+          normals[dst] = normal.x;
+          normals[dst + 1] = normal.y;
+          normals[dst + 2] = normal.z;
+        }
+      }
+
+      const index = geometry.getIndex();
+      if (index) {
+        for (let i = 0; i < index.count; i++) {
+          indices[indexOffset + i] = index.getX(i) + vertexOffset;
+        }
+        indexOffset += index.count;
+      } else {
+        for (let i = 0; i < position.count; i++) {
+          indices[indexOffset + i] = vertexOffset + i;
+        }
+        indexOffset += position.count;
+      }
+      vertexOffset += position.count;
+    }
+
+    const merged = new this.THREE.BufferGeometry();
+    merged.setAttribute('position', new this.THREE.BufferAttribute(positions, 3));
+    merged.setAttribute('normal', new this.THREE.BufferAttribute(normals, 3));
+    merged.setIndex(new this.THREE.BufferAttribute(indices, 1));
+    return merged;
   }
 
   dispose(): void {
@@ -57,6 +218,10 @@ export class GeometryCache {
     this.box = null;
     this.cylinder?.dispose();
     this.cylinder = null;
+    this.bagganas?.dispose();
+    this.bagganas = null;
+    this.eneryda?.dispose();
+    this.eneryda = null;
   }
 }
 
@@ -67,6 +232,7 @@ export class GeometryCache {
  */
 export class MaterialCache {
   private readonly cache = new Map<string, TMaterial>();
+  private oakMap: TTexture | null = null;
 
   constructor(private readonly THREE: ThreeModule) {}
 
@@ -75,8 +241,11 @@ export class MaterialCache {
     const key = `${materialId ?? ''}:${colorId ?? ''}`;
     let m = this.cache.get(key);
     if (!m) {
+      const texturedOak = materialId === 'oak' && (colorId === 'natural' || !colorId);
       m = new this.THREE.MeshStandardMaterial({
-        color: appearance.color,
+        // Texture already carries the oak color; keep white so the map reads true.
+        color: texturedOak ? '#ffffff' : appearance.color,
+        map: texturedOak ? this.oakTexture() : null,
         roughness: appearance.roughness,
         metalness: appearance.metalness,
       });
@@ -85,9 +254,23 @@ export class MaterialCache {
     return m;
   }
 
+  private oakTexture(): TTexture {
+    if (!this.oakMap) {
+      const texture = new this.THREE.CanvasTexture(createOakGrainCanvas());
+      texture.colorSpace = this.THREE.SRGBColorSpace;
+      texture.wrapS = this.THREE.RepeatWrapping;
+      texture.wrapT = this.THREE.RepeatWrapping;
+      texture.anisotropy = 8;
+      this.oakMap = texture;
+    }
+    return this.oakMap;
+  }
+
   dispose(): void {
     for (const m of this.cache.values()) m.dispose();
     this.cache.clear();
+    this.oakMap?.dispose();
+    this.oakMap = null;
   }
 }
 
@@ -113,7 +296,7 @@ export function createPartNode(
   material: TMaterial,
 ): PartNode {
   const root = new THREE.Group();
-  const geometry = spec.shape === 'cylinder' ? geometries.unitCylinder() : geometries.unitBox();
+  const geometry = geometries.forShape(spec.shape);
   const mesh = new THREE.Mesh(geometry, material);
   mesh.castShadow = true;
   mesh.receiveShadow = true;

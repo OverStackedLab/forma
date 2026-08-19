@@ -22,7 +22,7 @@ describe('document history', () => {
     };
     state.setVersions([version], version.id);
 
-    commit(() => useDocumentStore.setState({ defaultMaterialId: 'ash' }));
+    commit(() => useDocumentStore.setState({ defaultMaterialId: 'oak' }));
     expect(useDocumentStore.getState().currentVersionId).toBeNull();
 
     expect(undo()).toBe(true);
@@ -56,7 +56,7 @@ describe('document history', () => {
     expect(state.currentVersionId).toBe(state.versions[0]!.id);
 
     // A further edit must not resurrect a path that deletes the checkpoint.
-    commit(() => useDocumentStore.setState({ defaultMaterialId: 'ash' }));
+    commit(() => useDocumentStore.setState({ defaultMaterialId: 'oak' }));
     expect(redo()).toBe(false);
     expect(useDocumentStore.getState().versions).toHaveLength(1);
   });

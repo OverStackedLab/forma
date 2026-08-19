@@ -1,8 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import {
   addCabinetPreset,
+  setCustomPartDim,
   setPartGrainAxis,
-  setPositionAxis,
   togglePartEdgeBand,
 } from './actions';
 import { createDefaultDocument, useDocumentStore } from './documentStore';
@@ -17,6 +17,19 @@ describe('persistence.migrate', () => {
     expect(result?.defaultMaterialId).toBe(doc.defaultMaterialId);
     expect(result?.defaultColorId).toBe(doc.defaultColorId);
     expect(result?.defaultHardwareFinishId).toBe(doc.defaultHardwareFinishId);
+  });
+
+  it('resets appearance defaults when migrating schema 4 to the current catalog', () => {
+    const doc = {
+      ...createDefaultDocument(),
+      defaultMaterialId: 'ash' as const,
+      defaultColorId: 'dark-gray' as const,
+      defaultHardwareFinishId: 'brushed-brass' as const,
+    };
+    const result = migrate({ schemaVersion: 4, doc });
+    expect(result?.defaultMaterialId).toBe('ash');
+    expect(result?.defaultColorId).toBe('white');
+    expect(result?.defaultHardwareFinishId).toBe('matte-black');
   });
 
   it('migrates schema-3 side panels and knobs into world-axis dimensions', () => {
@@ -66,7 +79,7 @@ describe('persistence.normalize', () => {
     expect(result.hiddenIds).toEqual([]);
     expect(result.transforms).toEqual({});
     expect(result.versions).toEqual([]);
-    expect(result.defaultHardwareFinishId).toBe('brushed-brass');
+    expect(result.defaultHardwareFinishId).toBe('matte-black');
   });
 
   it('keeps a valid defaultMaterialId and defaultColorId', () => {
@@ -134,7 +147,7 @@ describe('persistence.normalize', () => {
     clearHistory();
     addCabinetPreset('base-600');
     const group = useDocumentStore.getState().groups[0]!;
-    setPositionAxis(group.partIds[0]!, 'x', 1500);
+    setCustomPartDim(group.partIds[0]!, 'h', 700);
     expect(useDocumentStore.getState().groups[0]?.cabinet).toBeUndefined();
 
     const saved = useDocumentStore.getState();

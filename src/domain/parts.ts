@@ -33,6 +33,21 @@ export function groupContaining(groups: readonly Group[], partId: string): Group
   return groups.find((g) => g.partIds.includes(partId));
 }
 
+/**
+ * The unique generated cabinet that fully contains this selection. A single
+ * side panel, a partial multi-select, or the whole group all resolve to the
+ * same carcass so shelf controls stay available without an exact group match.
+ */
+export function cabinetContainingSelection(
+  groups: readonly Group[],
+  selectedIds: readonly string[],
+): Group | undefined {
+  if (!selectedIds.length) return undefined;
+  return groups.find(
+    (group) => Boolean(group.cabinet) && selectedIds.every((id) => group.partIds.includes(id)),
+  );
+}
+
 export type SelectionUnit = {
   kind: 'group' | 'part';
   id: string;

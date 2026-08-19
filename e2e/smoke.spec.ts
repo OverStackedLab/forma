@@ -18,6 +18,17 @@ async function insertShelf(page: Page): Promise<void> {
   await expect(page.getByText('Shelf added to scene')).toBeVisible();
 }
 
+/**
+ * Force the plain-download fallback. Chromium exposes showSaveFilePicker,
+ * which Playwright cannot drive as a native dialog.
+ */
+async function gotoWithDownloadFallback(page: Page): Promise<void> {
+  await page.addInitScript(() => {
+    Reflect.deleteProperty(window, 'showSaveFilePicker');
+  });
+  await page.goto('/');
+}
+
 // Playwright gives each test a fresh browser context, so localStorage starts
 // empty without an init script — and an init script would also wipe it on the
 // reload the persistence test depends on.
@@ -37,7 +48,11 @@ test('boots to an empty scene with no starting model', async ({ page }) => {
   await expect(page.getByText('Leg Style')).toHaveCount(0);
   await expect(page.getByText('Handle Style')).toHaveCount(0);
   await expect(page.getByText('Base Style')).toHaveCount(0);
+  await expect(page.getByRole('heading', { name: 'Panels' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Fronts' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Hardware' })).toBeVisible();
   await expect(page.getByRole('button', { name: 'Shelf' })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Door' })).toBeVisible();
 
   expect(errors).toEqual([]);
 });
@@ -77,6 +92,40 @@ test('inserting a prebuilt cabinet creates one grouped open carcass and six cut-
   await expect(page.getByText('Base 600 Door', { exact: true })).toHaveCount(0);
 });
 
+test('cabinet shelves can be added at a position and distributed by spacing', async ({ page }) => {
+  await page.goto('/');
+  await page.getByRole('tab', { name: 'Library' }).click();
+  await page.getByRole('button', { name: /Base 600/ }).click();
+  await expect(page.getByText('6 parts').first()).toBeVisible();
+
+  // The preset's single shelf sits at the interior centre.
+  await expect(page.getByLabel('Shelf 1 position in millimetres')).toHaveValue('400');
+
+  // "I need one panel at 30 cm."
+  await page.getByLabel('New shelf position in millimetres').fill('300');
+  await page.getByRole('button', { name: 'Add Shelf' }).click();
+  await expect(page.getByText('Shelf added at 300 mm')).toBeVisible();
+  await expect(page.getByText('7 parts').first()).toBeVisible();
+  await expect(page.getByLabel('Shelf 1 position in millimetres')).toHaveValue('300');
+  await expect(page.getByLabel('Shelf 2 position in millimetres')).toHaveValue('400');
+
+  // "I need n panels at a distance of n cm" — 3 shelves every 200 mm.
+  await page.getByLabel('Shelf count').fill('3');
+  await page.getByLabel('Shelf spacing in millimetres').fill('200');
+  await page.getByRole('button', { name: 'Apply' }).click();
+  await expect(page.getByText('3 shelves every 200 mm')).toBeVisible();
+  await expect(page.getByText('8 parts').first()).toBeVisible();
+  await expect(page.getByLabel('Shelf 3 position in millimetres')).toHaveValue('618');
+
+  // A shelf can be removed, and the whole edit history unwinds.
+  await page.getByRole('button', { name: 'Remove shelf 1' }).click();
+  await expect(page.getByText('Shelf removed')).toBeVisible();
+  await expect(page.getByText('7 parts').first()).toBeVisible();
+
+  await page.getByRole('button', { name: 'Undo' }).click();
+  await expect(page.getByText('8 parts').first()).toBeVisible();
+});
+
 test('deleting a panel updates the tree, the count and the cut list together', async ({ page }) => {
   await page.goto('/');
   await insertShelf(page);
@@ -98,13 +147,13 @@ test('a prebuilt cabinet resizes from nominal dimensions without changing panel 
 
   const width = page.getByLabel('Cabinet Width in millimetres');
   await expect(width).toHaveValue('600');
-  await width.fill('900');
+  await width.fill('800');
   await width.blur();
-  await expect(width).toHaveValue('900');
+  await expect(width).toHaveValue('800');
 
   await page.getByRole('tab', { name: 'Cut List' }).click();
-  await expect(page.getByText('Base 900 Side', { exact: true }).last()).toBeVisible();
-  await expect(page.getByText('864', { exact: true }).first()).toBeVisible();
+  await expect(page.getByText('Base 800 Side', { exact: true }).last()).toBeVisible();
+  await expect(page.getByText('764', { exact: true }).first()).toBeVisible();
   await expect(page.getByText('18', { exact: true }).first()).toBeVisible();
 });
 
@@ -115,12 +164,12 @@ test('round hardware has purpose-built dimensions, finish and purchasing output'
 
   await expect(page.getByLabel('Diameter in millimetres')).toHaveValue('32');
   await expect(page.getByLabel('Projection in millimetres')).toHaveValue('25');
-  await expect(page.getByRole('button', { name: 'Brushed Brass' })).toHaveAttribute('aria-pressed', 'true');
+  await expect(page.getByRole('button', { name: 'Matte Black' })).toHaveAttribute('aria-pressed', 'true');
 
   await page.getByRole('tab', { name: 'Cut List' }).click();
   await expect(page.getByRole('heading', { name: 'Purchased Hardware' })).toBeVisible();
   await expect(page.getByText('Knob', { exact: true }).last()).toBeVisible();
-  await expect(page.getByText('Brushed Brass', { exact: true }).last()).toBeVisible();
+  await expect(page.getByText('Matte Black', { exact: true }).last()).toBeVisible();
   await expect(page.getByText('Sheet Goods', { exact: true })).toHaveCount(0);
 });
 
@@ -214,33 +263,33 @@ test('the Properties tab has its own finish picker, in sync with Finish', async 
   await expect(page.getByRole('tab', { name: 'Properties' })).toHaveAttribute('aria-selected', 'true');
 
   // Apply a finish without ever visiting the Finish tab.
-  await page.getByRole('button', { name: 'Ebony Stain' }).click();
-  await expect(page.getByRole('button', { name: 'Ebony Stain' })).toHaveAttribute('aria-pressed', 'true');
+  await page.getByRole('button', { name: 'Dark Gray' }).click();
+  await expect(page.getByRole('button', { name: 'Dark Gray' })).toHaveAttribute('aria-pressed', 'true');
 
   // Finish reflects the same override for the same part — one shared
   // FinishPicker, not two copies that could drift apart.
-  await page.getByRole('tab', { name: 'Finish' }).click();
+  await page.getByRole('tab', { name: 'Color' }).click();
   await expect(page.getByText('Editing: Shelf')).toBeVisible();
-  await expect(page.getByRole('button', { name: 'Ebony Stain' })).toHaveAttribute('aria-pressed', 'true');
-  await expect(page.getByText('Use design finish')).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Dark Gray' })).toHaveAttribute('aria-pressed', 'true');
+  await expect(page.getByText('Use design color')).toBeVisible();
 });
 
 test('a mixed-finish selection is clear and can be unified in one click', async ({ page }) => {
   await page.goto('/');
   await insertShelf(page);
-  await page.getByRole('button', { name: 'Walnut' }).click();
+  await page.getByRole('button', { name: 'Oak', exact: true }).click();
   await insertShelf(page);
-  await page.getByRole('button', { name: 'Ash' }).click();
+  await page.getByRole('button', { name: 'Dark Gray' }).click();
   await page.getByRole('tab', { name: 'Assembly' }).click();
 
   const shelves = page.getByRole('treeitem', { name: 'Shelf Hide Shelf' });
   await shelves.nth(0).click();
   await shelves.nth(1).click({ modifiers: ['Shift'] });
 
-  await expect(page.getByText('Mixed finishes')).toBeVisible();
-  await page.getByRole('button', { name: 'White Lacquer' }).click();
-  await expect(page.getByText('Mixed finishes')).toHaveCount(0);
-  await expect(page.getByRole('button', { name: 'White Lacquer' })).toHaveAttribute(
+  await expect(page.getByText('Mixed colors')).toBeVisible();
+  await page.getByRole('button', { name: 'White', exact: true }).click();
+  await expect(page.getByText('Mixed colors')).toHaveCount(0);
+  await expect(page.getByRole('button', { name: 'White', exact: true })).toHaveAttribute(
     'aria-pressed',
     'true',
   );
@@ -337,12 +386,14 @@ test('viewport clicks select one grouped piece while the Assembly group row sele
 
   await expect(page.getByLabel('Part name')).toBeVisible();
   await expect(page.getByLabel('Cabinet Width in millimetres')).toHaveCount(0);
+  await expect(page.getByRole('button', { name: 'Add Shelf' })).toBeVisible();
 
   await page.getByRole('tab', { name: 'Assembly' }).click();
   await expect(page.getByText('1 selected')).toBeVisible();
   await page.getByRole('treeitem', { name: /Collapse group Base 600 6 Hide Base 600/ }).click();
   await expect(page.getByText('Editing: Base 600')).toBeVisible();
   await expect(page.getByText('Configurable cabinet · 6 pieces')).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Add Shelf' })).toBeVisible();
   await expect(page.getByLabel('Group X Position in millimetres')).toHaveValue('0');
 });
 
@@ -405,10 +456,10 @@ test('duplicating a group creates an independently editable grouped copy', async
   // The copied cabinet keeps its parametric controls and can change without
   // rebuilding the original group.
   const width = page.getByLabel('Cabinet Width in millimetres');
-  await width.fill('900');
+  await width.fill('800');
   await width.blur();
   await expect(page.getByRole('treeitem', { name: /Base 600/ }).first()).toBeVisible();
-  await expect(page.getByRole('treeitem', { name: /Base 900/ }).first()).toBeVisible();
+  await expect(page.getByRole('treeitem', { name: /Base 800/ }).first()).toBeVisible();
 
   // One undo restores the copy's dimensions; a second removes the duplicate.
   await page.getByRole('button', { name: 'Undo' }).click();
@@ -497,10 +548,10 @@ test('a saved version stops being Current after the design changes', async ({ pa
 test('the whole-piece finish applies without creating a fake override', async ({ page }) => {
   await page.goto('/');
   await expect(page.getByText('Editing: Whole Piece')).toBeVisible();
-  await page.getByRole('button', { name: 'Ash' }).click();
+  await page.getByRole('button', { name: 'Oak', exact: true }).click();
   await insertShelf(page);
-  await expect(page.getByRole('button', { name: 'Ash' })).toHaveAttribute('aria-pressed', 'true');
-  await expect(page.getByText('Use design finish')).toHaveCount(0);
+  await expect(page.getByRole('button', { name: 'Oak', exact: true })).toHaveAttribute('aria-pressed', 'true');
+  await expect(page.getByText('Use design color')).toHaveCount(0);
 });
 
 test('a freshly inserted Shelf lies flat, not standing upright', async ({ page }) => {
@@ -706,8 +757,8 @@ test('resizing a cabinet with the scale gizmo updates its parametric dimensions'
 
   const width = page.getByLabel('Cabinet Width in millimetres');
   await expect(width).toHaveValue('600');
-  await expect(page.getByLabel('Cabinet Height in millimetres')).toHaveValue('720');
-  await expect(page.getByLabel('Cabinet Depth in millimetres')).toHaveValue('560');
+  await expect(page.getByLabel('Cabinet Height in millimetres')).toHaveValue('800');
+  await expect(page.getByLabel('Cabinet Depth in millimetres')).toHaveValue('600');
 
   const canvasBox = await page.locator('canvas').boundingBox();
   if (!canvasBox) throw new Error('viewport canvas has no bounding box');
@@ -722,8 +773,8 @@ test('resizing a cabinet with the scale gizmo updates its parametric dimensions'
 
   await expect(page.getByText('Cabinet dimensions updated')).toBeVisible();
   await expect(width).not.toHaveValue('600');
-  await expect(page.getByLabel('Cabinet Height in millimetres')).toHaveValue('720');
-  await expect(page.getByLabel('Cabinet Depth in millimetres')).toHaveValue('560');
+  await expect(page.getByLabel('Cabinet Height in millimetres')).toHaveValue('800');
+  await expect(page.getByLabel('Cabinet Depth in millimetres')).toHaveValue('600');
 
   // The gesture rebuilds the cabinet instead of stretching sheet thickness.
   await page.getByRole('tab', { name: 'Cut List' }).click();
@@ -735,7 +786,7 @@ test('resizing a cabinet with the scale gizmo updates its parametric dimensions'
 });
 
 test('saving to a file and opening it round-trips the document', async ({ page }) => {
-  await page.goto('/');
+  await gotoWithDownloadFallback(page);
   await insertShelf(page);
   await page.getByLabel('Part name').fill('Kitchen Shelf');
   await page.getByLabel('Part name').blur();
@@ -798,8 +849,10 @@ test('creating a new file can be cancelled and then starts a clean persisted des
   await expect(page.getByText('No parts yet.')).toBeVisible();
 });
 
-test('renaming the document updates the header and the saved filename', async ({ page }) => {
-  await page.goto('/');
+test('renaming the document drives the downloaded filename without extra dialogs', async ({
+  page,
+}) => {
+  await gotoWithDownloadFallback(page);
 
   const title = page.getByText('Untitled Design', { exact: true });
   await title.dblclick();
@@ -808,17 +861,47 @@ test('renaming the document updates the header and the saved filename', async ({
   await input.blur();
   await expect(page.getByText('Kitchen Remodel', { exact: true })).toBeVisible();
 
+  // No prompt is expected here — any dialog would fail the test by hanging the click.
+  page.on('dialog', () => {
+    throw new Error('Save to File must not open a JS dialog');
+  });
   const downloadPromise = page.waitForEvent('download');
   await page.getByRole('button', { name: 'Save to File' }).click();
   const download = await downloadPromise;
   expect(download.suggestedFilename()).toBe('Kitchen Remodel.forma.json');
 
-  // Not undoable — the title isn't part of the piece being designed.
-  await expect(page.getByRole('button', { name: 'Undo' })).toBeDisabled();
-
   // Survives a reload like the rest of the document.
   await page.reload();
   await expect(page.getByText('Kitchen Remodel', { exact: true })).toBeVisible();
+});
+
+test('opening a file sets the header from the on-disk filename', async ({ page }) => {
+  await page.goto('/');
+
+  const path = test.info().outputPath('From Disk.forma.json');
+  await writeFile(
+    path,
+    JSON.stringify({
+      schemaVersion: 4,
+      doc: {
+        defaultMaterialId: 'ash',
+        defaultColorId: 'white',
+        defaultHardwareFinishId: 'matte-black',
+        overrides: {},
+        customParts: [],
+        hiddenIds: [],
+        transforms: {},
+        groups: [],
+        docTitle: 'Inside JSON',
+        versions: [],
+        currentVersionId: null,
+      },
+    }),
+  );
+
+  await page.locator('input[type="file"]').setInputFiles(path);
+  await expect(page.getByText('From Disk', { exact: true })).toBeVisible();
+  await expect(page.getByText('Inside JSON', { exact: true })).toHaveCount(0);
 });
 
 test('a blank document rename is discarded, keeping the previous title', async ({ page }) => {

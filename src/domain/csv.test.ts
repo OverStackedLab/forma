@@ -7,7 +7,7 @@ const row = (overrides: Partial<BomRow> = {}): BomRow => ({
   source: 'sheet',
   label: 'Shelf',
   qty: 1,
-  finish: 'Walnut',
+  finish: 'Oak',
   w: 800,
   h: 18,
   d: 300,
@@ -25,7 +25,7 @@ describe('csvHeaders', () => {
       'Type',
       'Part',
       'Qty',
-      'Finish',
+      'Color',
       'W (mm)',
       'H (mm)',
       'D (mm)',
@@ -40,18 +40,18 @@ describe('csvHeaders', () => {
 describe('toCSV', () => {
   it('emits the manufacturing category and explicit panel metadata', () => {
     const lines = toCSV([row()], 'mm').split('\r\n');
-    expect(lines[0]).toBe('Type,Part,Qty,Finish,W (mm),H (mm),D (mm),Thickness (mm),Edge Band,Grain');
-    expect(lines[1]).toBe('Sheet Good,Shelf,1,Walnut,800,18,300,18,Front,Along width');
+    expect(lines[0]).toBe('Type,Part,Qty,Color,W (mm),H (mm),D (mm),Thickness (mm),Edge Band,Grain');
+    expect(lines[1]).toBe('Sheet Good,Shelf,1,Oak,800,18,300,18,Front,Along width');
   });
 
   it('converts dimensions and thickness into the display unit', () => {
     const lines = toCSV([row()], 'cm').split('\r\n');
-    expect(lines[1]).toBe('Sheet Good,Shelf,1,Walnut,80,1.8,30,1.8,Front,Along width');
+    expect(lines[1]).toBe('Sheet Good,Shelf,1,Oak,80,1.8,30,1.8,Front,Along width');
   });
 
   it('leaves thickness blank for purchased hardware', () => {
     const csv = toCSV([row({ source: 'hardware', label: 'Knob', thickness: null, edgeBand: 'None', grain: '—' })], 'mm');
-    expect(csv).toContain('Hardware,Knob,1,Walnut,800,18,300,,None,—');
+    expect(csv).toContain('Hardware,Knob,1,Oak,800,18,300,,None,—');
   });
 
   it('quotes commas, quotes and newlines in user-editable labels', () => {
@@ -71,9 +71,9 @@ describe('toCSV', () => {
       customParts,
       overrides: {},
       transforms: {},
-      defaultMaterialId: 'walnut',
-      defaultColorId: 'natural',
-      defaultHardwareFinishId: 'brushed-brass',
+      defaultMaterialId: 'ash',
+      defaultColorId: 'white',
+      defaultHardwareFinishId: 'matte-black',
     });
     expect(toCSV(bom.rows, 'mm').split('\r\n').slice(1)).toHaveLength(bom.rows.length);
   });

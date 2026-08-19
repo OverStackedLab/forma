@@ -1,4 +1,11 @@
-import { buildCabinetLayout } from '@/domain/cabinets';
+import {
+  buildCabinetLayout,
+  distributedShelfPositions,
+  MAX_SHELF_COUNT,
+  shelfPositionRange,
+  shelfPositions,
+  type CabinetLayoutPart,
+} from '@/domain/cabinets';
 import {
   CABINET_DIM_LIMITS,
   CABINET_PRESETS,
@@ -18,6 +25,7 @@ import {
 import type {
   AppearanceFinishId,
   CabinetConfig,
+  CabinetPreset,
   CustomPart,
   DimensionAxis,
   EdgeBandSide,
@@ -55,6 +63,11 @@ export function liveIds(): string[] {
   return livePartIds(doc().customParts);
 }
 
+/**
+ * Clears `cabinet` when an independent size edit hits some but not all
+ * members. Translate, rotate and rename do not demote — moving a carcass
+ * (or one panel) must not hide shelf controls.
+ */
 function invalidatePartiallyEditedCabinets(groups: readonly Group[], changedIds: readonly string[]): Group[] {
   const changed = new Set(changedIds);
   return groups.map((group) => {
@@ -101,7 +114,7 @@ export function resetOverrides(partIds: readonly string[]): void {
       return { overrides };
     });
   });
-  ui().showToast('Using design finish');
+  ui().showToast('Using design color');
 }
 
 // ─── Panels ──────────────────────────────────────────────────────────────────
@@ -172,6 +185,24 @@ export function addCustomPanel(presetId: string, placement?: DropPlacement): voi
   u.showToast(`${preset.label} added to scene`);
 }
 
+/**
+ * Bottom-centre origin for a newly inserted cabinet. Floor insertions (click
+ * or a ground drop) honour `preset.bottomMm` so wall units hang instead of
+ * sitting on the grid; drops onto a vertical face keep the hit height.
+ */
+function cabinetInsertionOrigin(
+  preset: CabinetPreset,
+  centre: [number, number, number],
+  placement?: DropPlacement,
+): [number, number, number] {
+  const hangMm = !placement || placement.normal.y > 0.5 ? (preset.bottomMm ?? 0) : 0;
+  return [
+    centre[0],
+    centre[1] - preset.height / 2000 + hangMm / 1000,
+    centre[2],
+  ];
+}
+
 /** Adds a complete open-front cabinet as one named, selectable group. */
 export function addCabinetPreset(presetId: string, placement?: DropPlacement): void {
   const preset = CABINET_PRESETS.find((candidate) => candidate.id === presetId) ?? CABINET_PRESETS[0]!;
@@ -189,7 +220,7 @@ export function addCabinetPreset(presetId: string, placement?: DropPlacement): v
         placement.point.z + placement.normal.z * supportMm / 1000,
       ]
     : [nextInsertionX(state, preset.width / 2), preset.height / 2000, 0];
-  const origin: [number, number, number] = [centre[0], centre[1] - preset.height / 2000, centre[2]];
+  const origin = cabinetInsertionOrigin(preset, centre, placement);
   const ids = layout.map(() => nextCustomId());
   const newParts: CustomPart[] = layout.map((item, index) => ({
     id: ids[index]!,
@@ -261,7 +292,6 @@ export function renamePart(id: string, label: string): void {
       customParts: s.customParts.map((p) =>
         p.id === id ? { ...p, label: trimmed, bomLabel: undefined } : p,
       ),
-      groups: invalidatePartiallyEditedCabinets(s.groups, [id]),
     }));
   });
 }
@@ -408,7 +438,14 @@ export function duplicateSelected(): void {
         id: nextGroupId(),
         label: sourceGroup.label,
         partIds: sourceGroup.partIds.map((id) => cloneIdBySource.get(id)!),
-        cabinet: sourceGroup.cabinet ? { ...sourceGroup.cabinet } : undefined,
+        cabinet: sourceGroup.cabinet
+          ? {
+              ...sourceGroup.cabinet,
+              shelfPositionsMm: sourceGroup.cabinet.shelfPositionsMm
+                ? [...sourceGroup.cabinet.shelfPositionsMm]
+                : undefined,
+            }
+          : undefined,
       }
     : undefined;
 
@@ -599,7 +636,6 @@ export function commitTransforms(next: Record<string, Transform>): void {
   commit(() => {
     useDocumentStore.setState((s) => ({
       transforms: { ...s.transforms, ...sanitized },
-      groups: invalidatePartiallyEditedCabinets(s.groups, Object.keys(sanitized)),
     }));
   });
 }
@@ -612,6 +648,7 @@ function cabinetPreset(group: Group, config: CabinetConfig) {
     height: config.height,
     depth: config.depth,
     shelfCount: config.shelfCount,
+    shelfPositionsMm: config.shelfPositionsMm,
     icon: 'cabinet',
   } as const;
 }
@@ -674,16 +711,19 @@ function cabinetResizeMetadata(group: Group, requested: CabinetConfig): {
 } {
   const config = { ...requested };
   const currentPreset = CABINET_PRESETS.find((preset) => preset.id === group.cabinet?.presetId);
-  const matchingPreset = CABINET_PRESETS.find(
-    (preset) =>
-      preset.width === config.width &&
-      preset.height === config.height &&
-      preset.depth === config.depth &&
-      preset.shelfCount === config.shelfCount,
-  );
+  // Custom shelf positions mean the cabinet is no longer any catalog preset.
+  const matchingPreset = config.shelfPositionsMm?.length
+    ? undefined
+    : CABINET_PRESETS.find(
+        (preset) =>
+          preset.width === config.width &&
+          preset.height === config.height &&
+          preset.depth === config.depth &&
+          preset.shelfCount === config.shelfCount,
+      );
   config.presetId = matchingPreset?.id;
   const generatedLabel =
-    currentPreset?.label === group.label || /^(Base|Wall|Tall) \d+×\d+×\d+$/.test(group.label);
+    currentPreset?.label === group.label || /^(Base|Wall|Tall|High) \d+×\d+×\d+$/.test(group.label);
   const family = currentPreset?.label.split(' ')[0] ?? group.label.split(' ')[0] ?? 'Cabinet';
   const label = generatedLabel
     ? matchingPreset?.label ??
@@ -692,6 +732,12 @@ function cabinetResizeMetadata(group: Group, requested: CabinetConfig): {
   return { config, label };
 }
 
+/**
+ * Rebuilds a cabinet from its parametric config. The generated layout keeps a
+ * stable order (carcass first, shelves after), so existing member ids are
+ * reused by index; a longer layout mints ids for the added shelves and a
+ * shorter one deletes the surplus members.
+ */
 function commitCabinetResize(
   group: Group,
   requested: CabinetConfig,
@@ -700,57 +746,95 @@ function commitCabinetResize(
   const { config, label } = cabinetResizeMetadata(group, requested);
   const nextGroup = { ...group, label };
   const layout = buildCabinetLayout(cabinetPreset(nextGroup, config));
-  const indexById = new Map(group.partIds.map((id, index) => [id, index]));
+  const nextIds = layout.map((_, index) => group.partIds[index] ?? nextCustomId());
+  const removedIds = group.partIds.slice(layout.length);
+  const indexById = new Map(nextIds.map((id, index) => [id, index]));
+
+  const layoutTransform = (item: CabinetLayoutPart): Transform => {
+    const offset = rotateVectorByQuaternion(
+      {
+        x: item.positionMm[0] / 1000,
+        y: item.positionMm[1] / 1000,
+        z: item.positionMm[2] / 1000,
+      },
+      placement.quaternion,
+    );
+    return {
+      position: [
+        placement.origin[0] + offset.x,
+        placement.origin[1] + offset.y,
+        placement.origin[2] + offset.z,
+      ],
+      quaternion: [...placement.quaternion],
+      scale: [1, 1, 1],
+    };
+  };
 
   commit(() => {
     useDocumentStore.setState((previous) => {
       const transforms = { ...previous.transforms };
-      for (const [index, id] of group.partIds.entries()) {
-        const item = layout[index];
-        if (!item) continue;
-        const offset = rotateVectorByQuaternion(
-          {
-            x: item.positionMm[0] / 1000,
-            y: item.positionMm[1] / 1000,
-            z: item.positionMm[2] / 1000,
-          },
-          placement.quaternion,
-        );
-        transforms[id] = {
-          position: [
-            placement.origin[0] + offset.x,
-            placement.origin[1] + offset.y,
-            placement.origin[2] + offset.z,
-          ],
-          quaternion: [...placement.quaternion],
-          scale: [1, 1, 1],
-        };
+      const overrides = { ...previous.overrides };
+      for (const [index, id] of nextIds.entries()) transforms[id] = layoutTransform(layout[index]!);
+      for (const id of removedIds) {
+        delete transforms[id];
+        delete overrides[id];
       }
+
+      const existing = new Set(group.partIds);
+      const addedParts: CustomPart[] = nextIds
+        .map((id, index) => ({ id, item: layout[index]! }))
+        .filter(({ id }) => !existing.has(id))
+        .map(({ id, item }) => ({
+          id,
+          label: item.label,
+          w: item.w,
+          h: item.h,
+          d: item.d,
+          shape: item.shape,
+          category: item.category,
+          bomLabel: item.bomLabel,
+          thicknessAxis: item.thicknessAxis,
+          grainAxis: item.grainAxis,
+          edgeBanding: [...item.edgeBanding],
+        }));
+
       return {
-        customParts: previous.customParts.map((part) => {
-          const index = indexById.get(part.id);
-          const item = index === undefined ? undefined : layout[index];
-          if (!item) return part;
-          return {
-            ...part,
-            label: item.label,
-            bomLabel: item.bomLabel,
-            w: item.w,
-            h: item.h,
-            d: item.d,
-            category: item.category,
-            thicknessAxis: item.thicknessAxis,
-          };
-        }),
+        customParts: [
+          ...previous.customParts
+            .filter((part) => !removedIds.includes(part.id))
+            .map((part) => {
+              const index = indexById.get(part.id);
+              const item = index === undefined ? undefined : layout[index];
+              if (!item) return part;
+              return {
+                ...part,
+                label: item.label,
+                bomLabel: item.bomLabel,
+                w: item.w,
+                h: item.h,
+                d: item.d,
+                category: item.category,
+                thicknessAxis: item.thicknessAxis,
+              };
+            }),
+          ...addedParts,
+        ],
+        hiddenIds: previous.hiddenIds.filter((id) => !removedIds.includes(id)),
         transforms,
+        overrides,
         groups: previous.groups.map((candidate) =>
           candidate.id === group.id
-            ? { ...candidate, label, cabinet: config }
+            ? { ...candidate, label, partIds: nextIds, cabinet: config }
             : candidate,
         ),
       };
     });
   });
+
+  // Keep the whole cabinet selected through membership changes, so the
+  // parametric controls stay on screen and stale ids never linger.
+  const selected = new Set(ui().selectedPartIds);
+  if (group.partIds.some((id) => selected.has(id))) ui().setSelection(nextIds);
 }
 
 /** Rebuilds a generated cabinet while keeping its bottom-centre placement. */
@@ -770,6 +854,78 @@ export function setCabinetDim(
   };
   const placement = cabinetPlacement(group, group.cabinet);
   commitCabinetResize(group, nextConfig, placement);
+}
+
+/**
+ * Replaces a cabinet's shelves with explicit centreline heights (mm from the
+ * cabinet bottom). Positions are clamped into the interior, sorted, and
+ * capped at MAX_SHELF_COUNT; the carcass is rebuilt in place.
+ */
+export function setCabinetShelfPositions(groupId: string, positionsMm: readonly number[]): void {
+  const group = doc().groups.find((candidate) => candidate.id === groupId);
+  if (!group?.cabinet) return;
+  const sorted = shelfPositions({
+    height: group.cabinet.height,
+    shelfCount: positionsMm.length,
+    shelfPositionsMm: positionsMm.filter((y) => Number.isFinite(y)),
+  });
+  const nextConfig: CabinetConfig = {
+    ...group.cabinet,
+    shelfCount: sorted.length,
+    shelfPositionsMm: sorted,
+  };
+  const placement = cabinetPlacement(group, group.cabinet);
+  commitCabinetResize(group, nextConfig, placement);
+}
+
+/** Adds one shelf at the given centreline height, keeping the existing ones. */
+export function addCabinetShelf(groupId: string, positionMm: number): void {
+  const group = doc().groups.find((candidate) => candidate.id === groupId);
+  if (!group?.cabinet || !Number.isFinite(positionMm)) return;
+  const current = shelfPositions(group.cabinet);
+  if (current.length >= MAX_SHELF_COUNT) {
+    ui().showToast(`A cabinet holds at most ${MAX_SHELF_COUNT} shelves`);
+    return;
+  }
+  setCabinetShelfPositions(groupId, [...current, positionMm]);
+  const range = shelfPositionRange(group.cabinet.height);
+  const clamped = Math.min(range.max, Math.max(range.min, Math.round(positionMm)));
+  ui().showToast(
+    clamped === Math.round(positionMm)
+      ? `Shelf added at ${clamped} mm`
+      : `Shelf clamped into the cabinet at ${clamped} mm`,
+  );
+}
+
+/** Removes the shelf at the given index (bottom-up) of the effective shelf list. */
+export function removeCabinetShelf(groupId: string, index: number): void {
+  const group = doc().groups.find((candidate) => candidate.id === groupId);
+  if (!group?.cabinet) return;
+  const current = shelfPositions(group.cabinet);
+  if (index < 0 || index >= current.length) return;
+  setCabinetShelfPositions(groupId, current.filter((_, i) => i !== index));
+  ui().showToast('Shelf removed');
+}
+
+/**
+ * Replaces all shelves with `count` shelves spaced `spacingMm` apart (centre
+ * to centre, starting one spacing above the cabinet floor). Shelves that
+ * would not fit the interior are dropped.
+ */
+export function distributeCabinetShelves(groupId: string, count: number, spacingMm: number): void {
+  const group = doc().groups.find((candidate) => candidate.id === groupId);
+  if (!group?.cabinet) return;
+  const positions = distributedShelfPositions(group.cabinet, count, spacingMm);
+  if (!positions.length) {
+    ui().showToast('No shelf fits that spacing');
+    return;
+  }
+  setCabinetShelfPositions(groupId, positions);
+  ui().showToast(
+    positions.length < count
+      ? `Only ${positions.length} of ${count} shelves fit`
+      : `${positions.length} ${positions.length === 1 ? 'shelf' : 'shelves'} every ${Math.round(spacingMm)} mm`,
+  );
 }
 
 /**
@@ -835,10 +991,7 @@ export function resetTransforms(ids: readonly string[]): void {
         const t = transforms[id];
         if (t) transforms[id] = { ...t, quaternion: [0, 0, 0, 1], scale: [1, 1, 1] };
       }
-      return {
-        transforms,
-        groups: invalidatePartiallyEditedCabinets(prev.groups, ids),
-      };
+      return { transforms };
     });
   });
   ui().showToast('Transform reset');
@@ -859,7 +1012,6 @@ export function setPositionAxis(id: string, axis: 'x' | 'y' | 'z', millimetres: 
   commit(() => {
     useDocumentStore.setState((s) => ({
       transforms: { ...s.transforms, [id]: { ...current, position } },
-      groups: invalidatePartiallyEditedCabinets(s.groups, [id]),
     }));
   });
 }
@@ -925,7 +1077,6 @@ export function setRotationAxis(id: string, axis: 'x' | 'y' | 'z', degrees: numb
   commit(() => {
     useDocumentStore.setState((s) => ({
       transforms: { ...s.transforms, [id]: { ...current, quaternion } },
-      groups: invalidatePartiallyEditedCabinets(s.groups, [id]),
     }));
   });
 }
@@ -1052,25 +1203,114 @@ function sanitizeFilename(title: string): string {
 }
 
 /**
- * Downloads the whole document — geometry, materials, groups and version
- * history — as a .forma.json file, using the same schema-versioned envelope
- * as localStorage autosave. This is a separate file on disk, distinct from a
- * Save Version snapshot, which stays inside this one document.
+ * Derives the document title from an on-disk filename. Strips a trailing
+ * `.forma.json` or `.json`, then applies the same sanitization used when saving.
  */
-export function saveToFile(): void {
-  const s = doc();
+export function titleFromFilename(filename: string): string {
+  const base = filename.replace(/^.*[/\\]/, '').trim();
+  const stem = base.replace(/\.forma\.json$/i, '').replace(/\.json$/i, '');
+  return sanitizeFilename(stem);
+}
+
+type SaveFilePickerWindow = Window & {
+  showSaveFilePicker?: (options?: {
+    suggestedName?: string;
+    types?: Array<{
+      description?: string;
+      accept: Record<string, string[]>;
+    }>;
+  }) => Promise<FileSystemFileHandle>;
+};
+
+/** Guards against a second Save while the picker is open (e.g. a double-click). */
+let isSavingToFile = false;
+
+/**
+ * Saves the whole document — geometry, materials, groups and version
+ * history — as a .forma.json file, using the same schema-versioned envelope
+ * as localStorage autosave. Prefers the File System Access save picker, where
+ * the chosen on-disk name drives `docTitle` so the header matches the file.
+ * Where the picker is unavailable, downloads under the current title with no
+ * extra dialog — the browser may still show its own save dialog, and that is
+ * the only one the user sees. Distinct from Save Version, which stays inside
+ * this one document.
+ */
+export async function saveToFile(): Promise<void> {
+  if (isSavingToFile) return;
+  isSavingToFile = true;
+  try {
+    await saveToFileOnce();
+  } finally {
+    isSavingToFile = false;
+  }
+}
+
+async function saveToFileOnce(): Promise<void> {
+  const title = sanitizeFilename(doc().docTitle);
+  const pickerWindow = typeof window !== 'undefined' ? (window as SaveFilePickerWindow) : undefined;
+
+  if (typeof pickerWindow?.showSaveFilePicker === 'function') {
+    let handle: FileSystemFileHandle;
+    try {
+      handle = await pickerWindow.showSaveFilePicker({
+        suggestedName: `${title}.forma.json`,
+        types: [
+          {
+            description: 'Forma design',
+            accept: { 'application/json': ['.json'] },
+          },
+        ],
+      });
+    } catch (error) {
+      // User dismissed the picker — not a save, so change nothing.
+      if (error instanceof DOMException && error.name === 'AbortError') return;
+      // The API exists but refused to show a dialog (embedded frame, browser
+      // policy). Nothing was shown yet, so the download below is the only dialog.
+      await writeDocumentToFile(title);
+      return;
+    }
+
+    // The picker was already shown — never stack a second save dialog on top
+    // of it. If the write fails, report it rather than falling back.
+    try {
+      await writeDocumentToFile(titleFromFilename(handle.name), handle);
+    } catch (error) {
+      console.error('Save to file failed', error);
+      ui().showToast('Could not save the file');
+    }
+    return;
+  }
+
+  await writeDocumentToFile(title);
+}
+
+async function writeDocumentToFile(
+  title: string,
+  handle?: FileSystemFileHandle,
+): Promise<void> {
+  renameDocument(title);
+
+  const state = doc();
   const document: FormaDocument = {
-    ...snapshotDocument(s),
-    docTitle: s.docTitle,
-    versions: s.versions,
-    currentVersionId: s.currentVersionId,
+    ...snapshotDocument(state),
+    docTitle: title,
+    versions: state.versions,
+    currentVersionId: state.currentVersionId,
   };
-  const envelope = { schemaVersion: SCHEMA_VERSION, doc: document };
-  downloadBlob(
-    new Blob([JSON.stringify(envelope, null, 2)], { type: 'application/json' }),
-    `${sanitizeFilename(s.docTitle)}.forma.json`,
+  const payload = JSON.stringify(
+    { schemaVersion: SCHEMA_VERSION, doc: document },
+    null,
+    2,
   );
-  ui().showToast('Saved to file');
+
+  if (handle) {
+    const writable = await handle.createWritable();
+    await writable.write(payload);
+    await writable.close();
+  } else {
+    downloadBlob(new Blob([payload], { type: 'application/json' }), `${title}.forma.json`);
+  }
+  ui().showToast(`Saved ${title}`);
 }
 
 /** Reads a .forma.json file and replaces the current document with it, as one undo step. */
@@ -1089,15 +1329,17 @@ export async function openFile(file: File): Promise<void> {
     return;
   }
 
+  // The on-disk name is the source of truth for the header once a file is opened.
+  const title = titleFromFilename(file.name);
   commit(() => {
     useDocumentStore.getState().replaceSnapshot(structuredClone(next));
     useDocumentStore.setState({
-      docTitle: next.docTitle,
+      docTitle: title,
       versions: next.versions,
       currentVersionId: next.currentVersionId,
     });
   });
   ui().clearSelection();
   useUiStore.setState({ historyOpen: false });
-  ui().showToast(`Opened ${next.docTitle}`);
+  ui().showToast(`Opened ${title}`);
 }

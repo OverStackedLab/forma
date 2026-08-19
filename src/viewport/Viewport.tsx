@@ -16,7 +16,6 @@ import { ModelBuilder } from './ModelBuilder';
 import { PickController } from './PickController';
 import { SceneManager } from './SceneManager';
 import { SelectionOverlay } from './SelectionOverlay';
-import { snapSelectionToNearbyFaces } from './faceSnap';
 import { computeFloorSnapTransforms } from './floorSnap';
 import { computeGroupResizeTransforms } from './groupResize';
 import { computeSnapTogetherTransforms } from './snapTogether';
@@ -60,17 +59,12 @@ export function Viewport() {
     measure.setLabelElement(measureLabelRef.current);
 
     const gizmo = new GizmoController(scene, builder, (transforms, context) => {
-      const state = useUiStore.getState();
       if (
         context.mode === 'scale' &&
         context.groupScale &&
         resizeCabinetFromGizmo(Object.keys(transforms), context.groupScale)
       ) return;
-      const next =
-        state.snapEnabled && state.gizmoMode === 'translate'
-          ? snapSelectionToNearbyFaces(builder, Object.keys(transforms), transforms)
-          : transforms;
-      commitTransforms(next);
+      commitTransforms(transforms);
     });
 
     const pick = new PickController(scene, builder, {

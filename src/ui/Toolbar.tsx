@@ -23,6 +23,10 @@ export function Toolbar() {
   const toggleMeasure = useUiStore((s) => s.toggleMeasure);
   const historyOpen = useUiStore((s) => s.historyOpen);
   const toggleHistory = useUiStore((s) => s.toggleHistory);
+  const leftSidebarOpen = useUiStore((s) => s.leftSidebarOpen);
+  const toggleLeftSidebar = useUiStore((s) => s.toggleLeftSidebar);
+  const rightSidebarOpen = useUiStore((s) => s.rightSidebarOpen);
+  const toggleRightSidebar = useUiStore((s) => s.toggleRightSidebar);
   const hasDocumentContent = useDocumentStore(
     (s) => s.customParts.length > 0 || s.versions.length > 0 || s.docTitle !== 'Untitled Design',
   );
@@ -99,6 +103,23 @@ export function Toolbar() {
         <IconButton icon="redo" label="Redo" onClick={redo} disabled={!canRedo()} />
         <div className="h-5 w-px flex-none bg-white/10" />
         <IconButton
+          icon="sidebar_left"
+          label="Toggle left sidebar"
+          toggle
+          active={leftSidebarOpen}
+          disabled={viewMode === 'render'}
+          onClick={toggleLeftSidebar}
+        />
+        <IconButton
+          icon="sidebar_right"
+          label="Toggle right sidebar"
+          toggle
+          active={rightSidebarOpen}
+          disabled={viewMode === 'render'}
+          onClick={toggleRightSidebar}
+        />
+        <div className="h-5 w-px flex-none bg-white/10" />
+        <IconButton
           icon="measure"
           label="Measure"
           toggle
@@ -115,13 +136,13 @@ export function Toolbar() {
         />
         <div className="h-5 w-px flex-none bg-white/10" />
         <IconButton icon="new_file" label="New File" onClick={createNewFile} />
-        <IconButton icon="save_file" label="Save to File" onClick={saveToFile} />
+        <IconButton icon="save_file" label="Save to File" onClick={() => void saveToFile()} />
         <OpenFileButton />
         <div className="h-5 w-px flex-none bg-white/10" />
         <button
           type="button"
           onClick={saveVersion}
-          className="h-8 rounded-[7px] bg-accent px-3.5 text-[12.5px] font-bold text-canvas"
+          className="flex h-8 shrink-0 items-center whitespace-nowrap rounded-[7px] bg-accent px-3.5 text-[12.5px] font-bold text-canvas"
         >
           Save Version
         </button>

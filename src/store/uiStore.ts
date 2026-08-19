@@ -25,6 +25,8 @@ export type UiStore = {
   measurePoints: MeasurePoint[];
   marquee: Marquee | null;
   historyOpen: boolean;
+  leftSidebarOpen: boolean;
+  rightSidebarOpen: boolean;
   toast: Toast | null;
   saveStatus: SaveStatus;
   lastSavedAt: number | null;
@@ -46,6 +48,8 @@ export type UiStore = {
   addMeasurePoint: (point: MeasurePoint) => void;
   setMarquee: (marquee: Marquee | null) => void;
   toggleHistory: () => void;
+  toggleLeftSidebar: () => void;
+  toggleRightSidebar: () => void;
   showToast: (message: string) => void;
   dismissToast: (id: string) => void;
   setSaveStatus: (status: SaveStatus, at?: number) => void;
@@ -68,6 +72,8 @@ export const useUiStore = create<UiStore>()(
     measurePoints: [],
     marquee: null,
     historyOpen: false,
+    leftSidebarOpen: true,
+    rightSidebarOpen: true,
     toast: null,
     saveStatus: 'idle',
     lastSavedAt: null,
@@ -102,6 +108,8 @@ export const useUiStore = create<UiStore>()(
       })),
     setMarquee: (marquee) => set({ marquee }),
     toggleHistory: () => set((s) => ({ historyOpen: !s.historyOpen })),
+    toggleLeftSidebar: () => set((s) => ({ leftSidebarOpen: !s.leftSidebarOpen })),
+    toggleRightSidebar: () => set((s) => ({ rightSidebarOpen: !s.rightSidebarOpen })),
     showToast: (message) => set({ toast: { id: `t${++toastSeq}`, message } }),
     dismissToast: (id) => set((s) => (s.toast?.id === id ? { toast: null } : {})),
     setSaveStatus: (saveStatus, at) =>

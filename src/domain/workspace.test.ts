@@ -26,8 +26,8 @@ describe('viewportScale', () => {
     });
   });
 
-  // The visible cell must stay one gizmo translate-snap step (0.1) at every
-  // size, or the grid stops meaning anything when you drag a part.
+  // The visible cell must stay one Shift-held gizmo translate-snap step (0.1) at
+  // every size, or the grid stops meaning anything when you drag a part.
   it('keeps 100 mm cells at every preset size', () => {
     for (const g of GRID_SIZES_M) {
       expect(g / viewportScale(g).divisions).toBeCloseTo(0.1, 12);

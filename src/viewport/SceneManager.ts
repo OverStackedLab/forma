@@ -118,7 +118,7 @@ export class SceneManager {
     this.scale = next;
 
     // Divisions change with size, so the helper is rebuilt rather than scaled —
-    // scaling would stretch the 100 mm cells that match the gizmo's snap.
+    // scaling would stretch the 100 mm cells that match Shift-held gizmo snap.
     // Visibility is carried across, or changing size in Render mode (or with
     // the grid toggled off) would pop the grid back on.
     const visible = this.grid?.visible ?? true;
