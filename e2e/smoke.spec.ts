@@ -18,6 +18,16 @@ async function insertShelf(page: Page): Promise<void> {
   await expect(page.getByText('Shelf added to scene')).toBeVisible();
 }
 
+/** Fresh contexts start in cm. Tests that fill millimetre fields opt into mm. */
+async function useMm(page: Page): Promise<void> {
+  await page.getByRole('tab', { name: 'mm' }).click();
+}
+
+async function gotoMm(page: Page): Promise<void> {
+  await page.goto('/');
+  await useMm(page);
+}
+
 /**
  * Force the plain-download fallback. Chromium exposes showSaveFilePicker,
  * which Playwright cannot drive as a native dialog.
@@ -37,6 +47,7 @@ test('boots to an empty scene with no starting model', async ({ page }) => {
   const errors = failOnConsoleErrors(page);
   await page.goto('/');
 
+  await expect(page.getByRole('tab', { name: 'cm' })).toHaveAttribute('aria-selected', 'true');
   await expect(page.getByRole('tab', { name: 'Model' })).toHaveAttribute('aria-selected', 'true');
   await expect(page.locator('canvas')).toBeVisible();
   await expect(page.getByText('0 parts').first()).toBeVisible();
@@ -50,7 +61,7 @@ test('boots to an empty scene with no starting model', async ({ page }) => {
   await expect(page.getByText('Base Style')).toHaveCount(0);
   await expect(page.getByRole('heading', { name: 'Panels' })).toBeVisible();
   await expect(page.getByRole('heading', { name: 'Fronts' })).toBeVisible();
-  await expect(page.getByRole('heading', { name: 'Hardware' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Hardware' }).first()).toBeVisible();
   await expect(page.getByRole('button', { name: 'Shelf' })).toBeVisible();
   await expect(page.getByRole('button', { name: 'Door' })).toBeVisible();
   await expect(page.getByRole('button', { name: /ENHET/ })).toBeVisible();
@@ -94,7 +105,7 @@ test('inserting a prebuilt cabinet creates one grouped open carcass and six cut-
 });
 
 test('cabinet shelves can be added at a position and distributed by spacing', async ({ page }) => {
-  await page.goto('/');
+  await gotoMm(page);
   await page.getByRole('tab', { name: 'Library' }).click();
   await page.getByRole('button', { name: /Base 600/ }).click();
   await expect(page.getByText('6 parts').first()).toBeVisible();
@@ -113,7 +124,7 @@ test('cabinet shelves can be added at a position and distributed by spacing', as
   // "I need n panels at a distance of n cm" — 3 shelves every 200 mm.
   await page.getByLabel('Shelf count').fill('3');
   await page.getByLabel('Shelf spacing in millimetres').fill('200');
-  await page.getByRole('button', { name: 'Apply' }).click();
+  await page.getByRole('button', { name: 'Apply', exact: true }).click();
   await expect(page.getByText('3 shelves every 200 mm')).toBeVisible();
   await expect(page.getByText('8 parts').first()).toBeVisible();
   await expect(page.getByLabel('Shelf 3 position in millimetres')).toHaveValue('618');
@@ -125,6 +136,33 @@ test('cabinet shelves can be added at a position and distributed by spacing', as
 
   await page.getByRole('button', { name: 'Undo' }).click();
   await expect(page.getByText('8 parts').first()).toBeVisible();
+});
+
+test('cabinet panels can be added at a position and distributed by spacing', async ({ page }) => {
+  await gotoMm(page);
+  await page.getByRole('tab', { name: 'Library' }).click();
+  await page.getByRole('button', { name: /Base 600/ }).click();
+  await expect(page.getByText('6 parts').first()).toBeVisible();
+
+  await page.getByLabel('New panel position in millimetres').fill('300');
+  await page.getByRole('button', { name: 'Add Panel' }).click();
+  await expect(page.getByText('Panel added at 300 mm')).toBeVisible();
+  await expect(page.getByText('8 parts').first()).toBeVisible();
+  await expect(page.getByLabel('Panel 1 position in millimetres')).toHaveValue('300');
+
+  await page.getByLabel('Panel count').fill('3');
+  await page.getByLabel('Panel spacing in millimetres').fill('200');
+  await page.getByRole('button', { name: 'Apply Panels' }).click();
+  await expect(page.getByText('Only 2 of 3 panels fit')).toBeVisible();
+  await expect(page.getByText('10 parts').first()).toBeVisible();
+  await expect(page.getByLabel('Panel 2 position in millimetres')).toHaveValue('418');
+
+  await page.getByRole('button', { name: 'Remove panel 1' }).click();
+  await expect(page.getByText('Panel removed')).toBeVisible();
+  await expect(page.getByText('8 parts').first()).toBeVisible();
+
+  await page.getByRole('button', { name: 'Undo' }).click();
+  await expect(page.getByText('10 parts').first()).toBeVisible();
 });
 
 test('deleting a panel updates the tree, the count and the cut list together', async ({ page }) => {
@@ -142,7 +180,7 @@ test('deleting a panel updates the tree, the count and the cut list together', a
 });
 
 test('a prebuilt cabinet resizes from nominal dimensions without changing panel thickness', async ({ page }) => {
-  await page.goto('/');
+  await gotoMm(page);
   await page.getByRole('tab', { name: 'Library' }).click();
   await page.getByRole('button', { name: /Base 600/ }).click();
 
@@ -159,7 +197,7 @@ test('a prebuilt cabinet resizes from nominal dimensions without changing panel 
 });
 
 test('round hardware has purpose-built dimensions, finish and purchasing output', async ({ page }) => {
-  await page.goto('/');
+  await gotoMm(page);
   await page.getByRole('tab', { name: 'Library' }).click();
   await page.getByRole('button', { name: 'Knob' }).click();
 
@@ -175,7 +213,7 @@ test('round hardware has purpose-built dimensions, finish and purchasing output'
 });
 
 test('ENHET legs insert as purchased hardware with diameter and height', async ({ page }) => {
-  await page.goto('/');
+  await gotoMm(page);
   await page.getByRole('tab', { name: 'Library' }).click();
   await page.getByRole('button', { name: /ENHET/ }).click();
   await expect(page.getByText('ENHET added to scene')).toBeVisible();
@@ -221,7 +259,7 @@ test('switching gizmo tools preserves the current selection', async ({ page }) =
 });
 
 test('a panel dimension change is undoable and redoable', async ({ page }) => {
-  await page.goto('/');
+  await gotoMm(page);
   await insertShelf(page);
 
   const widthInput = page.getByLabel('Width in millimetres');
@@ -320,7 +358,7 @@ test('render mode hides the sidebars and exposes camera presets', async ({ page 
 });
 
 test('grouping two panels lets you reselect and ungroup them as one unit', async ({ page }) => {
-  await page.goto('/');
+  await gotoMm(page);
   await insertShelf(page);
   await insertShelf(page);
   await page.getByRole('tab', { name: 'Assembly' }).click();
@@ -356,7 +394,7 @@ test('grouping two panels lets you reselect and ungroup them as one unit', async
 test('a regular group resizes its members and spacing together from exact dimensions', async ({
   page,
 }) => {
-  await page.goto('/');
+  await gotoMm(page);
   await insertShelf(page);
   await insertShelf(page);
   await page.getByRole('tab', { name: 'Assembly' }).click();
@@ -390,7 +428,7 @@ test('a regular group resizes its members and spacing together from exact dimens
 test('viewport clicks select one grouped piece while the Assembly group row selects the group', async ({
   page,
 }) => {
-  await page.goto('/');
+  await gotoMm(page);
   await page.getByRole('tab', { name: 'Library' }).click();
   await page.getByRole('button', { name: /Base 600/ }).click();
   await page.getByRole('button', { name: 'Clear', exact: true }).click();
@@ -413,7 +451,7 @@ test('viewport clicks select one grouped piece while the Assembly group row sele
 });
 
 test('Snap Together connects two pieces and is undoable', async ({ page }) => {
-  await page.goto('/');
+  await gotoMm(page);
   await insertShelf(page);
   await insertShelf(page);
   await page.getByRole('tab', { name: 'Assembly' }).click();
@@ -437,7 +475,7 @@ test('Snap Together connects two pieces and is undoable', async ({ page }) => {
 test('Snap Together moves a whole group without breaking its cabinet configuration', async ({
   page,
 }) => {
-  await page.goto('/');
+  await gotoMm(page);
   await page.getByRole('tab', { name: 'Library' }).click();
   await page.getByRole('button', { name: /Base 600/ }).click();
   await page.getByRole('button', { name: /Base 600/ }).click();
@@ -458,7 +496,7 @@ test('Snap Together moves a whole group without breaking its cabinet configurati
 });
 
 test('duplicating a group creates an independently editable grouped copy', async ({ page }) => {
-  await page.goto('/');
+  await gotoMm(page);
   await page.getByRole('tab', { name: 'Library' }).click();
   await page.getByRole('button', { name: /Base 600/ }).click();
 
@@ -495,7 +533,7 @@ test('snap to floor reports nothing to do when a panel is already grounded', asy
 });
 
 test('snap to floor preserves a fully selected cabinet structure', async ({ page }) => {
-  await page.goto('/');
+  await gotoMm(page);
   await page.getByRole('tab', { name: 'Library' }).click();
   await page.getByRole('button', { name: /Base 600/ }).click();
   await page.getByRole('tab', { name: 'Assembly' }).click();
@@ -514,7 +552,7 @@ test('snap to floor preserves a fully selected cabinet structure', async ({ page
 test('changing a panel height keeps its grounded face anchored', async ({
   page,
 }) => {
-  await page.goto('/');
+  await gotoMm(page);
   await insertShelf(page);
   // The viewport is lazy-loaded; wait for it before driving anything that
   // depends on the live three.js scene (like Snap to Floor).
@@ -532,7 +570,7 @@ test('changing a panel height keeps its grounded face anchored', async ({
 });
 
 test('exact position fields accept furniture-scale offsets', async ({ page }) => {
-  await page.goto('/');
+  await gotoMm(page);
   await insertShelf(page);
 
   const xPosition = page.getByLabel('X Position in millimetres');
@@ -545,7 +583,7 @@ test('exact position fields accept furniture-scale offsets', async ({ page }) =>
 });
 
 test('a saved version stops being Current after the design changes', async ({ page }) => {
-  await page.goto('/');
+  await gotoMm(page);
   await insertShelf(page);
   await page.getByRole('button', { name: 'Save Version' }).click();
   await expect(page.getByText('Saved Version 1')).toBeVisible();
@@ -576,7 +614,7 @@ test('the whole-piece finish applies without creating a fake override', async ({
 });
 
 test('a freshly inserted Shelf lies flat, not standing upright', async ({ page }) => {
-  await page.goto('/');
+  await gotoMm(page);
   await insertShelf(page);
 
   // Height is the panel's thickness for a Shelf (18mm) — if it were still the
@@ -612,32 +650,31 @@ test('rotation fields set an exact angle and support undo', async ({ page }) => 
   await expect(page.getByLabel('Y Angle in degrees')).toHaveValue('0');
 });
 
-test('switching to cm converts the dimension fields and round-trips back to mm', async ({
+test('switching to mm converts the dimension fields and round-trips back to cm', async ({
   page,
 }) => {
   await page.goto('/');
   await insertShelf(page);
 
-  const widthInput = page.getByLabel('Width in millimetres');
-  await expect(widthInput).toHaveValue('800');
-
-  await page.getByRole('tab', { name: 'cm' }).click();
-  const widthInputCm = page.getByLabel('Width in centimetres');
-  await expect(widthInputCm).toHaveValue('80');
-
-  // Editing in cm mode must still commit the correct millimetre value.
-  await widthInputCm.fill('90');
-  await widthInputCm.blur();
-  await expect(widthInputCm).toHaveValue('90');
+  const widthInput = page.getByLabel('Width in centimetres');
+  await expect(widthInput).toHaveValue('80');
 
   await page.getByRole('tab', { name: 'mm' }).click();
-  await expect(page.getByLabel('Width in millimetres')).toHaveValue('900');
+  const widthInputMm = page.getByLabel('Width in millimetres');
+  await expect(widthInputMm).toHaveValue('800');
+
+  // Editing in mm mode must still commit the correct millimetre value.
+  await widthInputMm.fill('900');
+  await widthInputMm.blur();
+  await expect(widthInputMm).toHaveValue('900');
+
+  await page.getByRole('tab', { name: 'cm' }).click();
+  await expect(page.getByLabel('Width in centimetres')).toHaveValue('90');
 });
 
 test('the cm setting carries through to the Cut List table and CSV headers', async ({ page }) => {
   await page.goto('/');
   await insertShelf(page);
-  await page.getByRole('tab', { name: 'cm' }).click();
 
   await page.getByRole('tab', { name: 'Cut List' }).click();
   await expect(page.getByText('W (cm)')).toBeVisible();
@@ -711,7 +748,7 @@ test('a blank rename is discarded, keeping the previous name', async ({ page }) 
 });
 
 test('resizing with the scale gizmo updates the Dimensions fields to match', async ({ page }) => {
-  await page.goto('/');
+  await gotoMm(page);
   await insertShelf(page);
   await expect(page.locator('canvas')).toBeVisible();
 
@@ -766,7 +803,7 @@ test('resizing with the scale gizmo updates the Dimensions fields to match', asy
 test('resizing a cabinet with the scale gizmo updates its parametric dimensions', async ({
   page,
 }) => {
-  await page.goto('/');
+  await gotoMm(page);
   await page.getByRole('tab', { name: 'Library' }).click();
   await page.getByRole('button', { name: /Base 600/ }).click();
   await expect(page.locator('canvas')).toBeVisible();
@@ -839,7 +876,6 @@ test('creating a new file can be cancelled and then starts a clean persisted des
 }) => {
   await page.goto('/');
   await insertShelf(page);
-  await page.getByRole('tab', { name: 'cm' }).click();
   const gridSize = page.getByLabel('Grid size in centimetres');
   await expect(gridSize).toHaveValue('400');
   await gridSize.fill('600');
@@ -957,28 +993,28 @@ test('the grid size preference survives a reload', async ({ page }) => {
   const errors = failOnConsoleErrors(page);
   await page.goto('/');
 
-  const gridSize = page.getByLabel('Grid size in millimetres');
-  await expect(gridSize).toHaveValue('4000');
+  const gridSize = page.getByLabel('Grid size in centimetres');
+  await expect(gridSize).toHaveValue('400');
 
   // Unlike the old preset selector, the field accepts custom grid extents.
-  await gridSize.fill('5500');
+  await gridSize.fill('550');
   await gridSize.blur();
-  await expect(gridSize).toHaveValue('5500');
+  await expect(gridSize).toHaveValue('550');
 
   // It follows the same global mm/cm display preference as other dimensions.
-  await page.getByRole('tab', { name: 'cm' }).click();
-  const gridSizeCm = page.getByLabel('Grid size in centimetres');
-  await expect(gridSizeCm).toHaveValue('550');
-  await gridSizeCm.fill('600');
-  await gridSizeCm.blur();
-  await expect(gridSizeCm).toHaveValue('600');
-
   await page.getByRole('tab', { name: 'mm' }).click();
-  await expect(page.getByLabel('Grid size in millimetres')).toHaveValue('6000');
+  const gridSizeMm = page.getByLabel('Grid size in millimetres');
+  await expect(gridSizeMm).toHaveValue('5500');
+  await gridSizeMm.fill('6000');
+  await gridSizeMm.blur();
+  await expect(gridSizeMm).toHaveValue('6000');
+
+  await page.getByRole('tab', { name: 'cm' }).click();
+  await expect(page.getByLabel('Grid size in centimetres')).toHaveValue('600');
   await expect(page.locator('canvas')).toBeVisible();
 
   await page.reload();
-  await expect(page.getByLabel('Grid size in millimetres')).toHaveValue('6000');
+  await expect(page.getByLabel('Grid size in centimetres')).toHaveValue('600');
   await expect(page.locator('canvas')).toBeVisible();
 
   expect(errors).toEqual([]);
@@ -986,7 +1022,7 @@ test('the grid size preference survives a reload', async ({ page }) => {
 
 test('changing grid size keeps a hidden grid hidden and leaves parts alone', async ({ page }) => {
   const errors = failOnConsoleErrors(page);
-  await page.goto('/');
+  await gotoMm(page);
   await insertShelf(page);
 
   // A rebuilt GridHelper defaults to visible, so the toggle state has to be

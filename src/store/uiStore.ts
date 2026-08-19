@@ -77,7 +77,7 @@ export const useUiStore = create<UiStore>()(
     toast: null,
     saveStatus: 'idle',
     lastSavedAt: null,
-    displayUnit: 'mm',
+    displayUnit: 'cm',
     gridSizeM: DEFAULT_GRID_SIZE_M,
 
     setSelection: (ids) => set({ selectedPartIds: ids, rightTab: 'properties' }),

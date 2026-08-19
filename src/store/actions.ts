@@ -1,6 +1,10 @@
 import {
   buildCabinetLayout,
+  distributedDividerPositions,
   distributedShelfPositions,
+  dividerPositionRange,
+  dividerPositions,
+  MAX_DIVIDER_COUNT,
   MAX_SHELF_COUNT,
   shelfPositionRange,
   shelfPositions,
@@ -455,6 +459,9 @@ export function duplicateSelected(): void {
               shelfPositionsMm: sourceGroup.cabinet.shelfPositionsMm
                 ? [...sourceGroup.cabinet.shelfPositionsMm]
                 : undefined,
+              dividerPositionsMm: sourceGroup.cabinet.dividerPositionsMm
+                ? [...sourceGroup.cabinet.dividerPositionsMm]
+                : undefined,
             }
           : undefined,
       }
@@ -660,6 +667,7 @@ function cabinetPreset(group: Group, config: CabinetConfig) {
     depth: config.depth,
     shelfCount: config.shelfCount,
     shelfPositionsMm: config.shelfPositionsMm,
+    dividerPositionsMm: config.dividerPositionsMm,
     icon: 'cabinet',
   } as const;
 }
@@ -722,16 +730,17 @@ function cabinetResizeMetadata(group: Group, requested: CabinetConfig): {
 } {
   const config = { ...requested };
   const currentPreset = CABINET_PRESETS.find((preset) => preset.id === group.cabinet?.presetId);
-  // Custom shelf positions mean the cabinet is no longer any catalog preset.
-  const matchingPreset = config.shelfPositionsMm?.length
-    ? undefined
-    : CABINET_PRESETS.find(
-        (preset) =>
-          preset.width === config.width &&
-          preset.height === config.height &&
-          preset.depth === config.depth &&
-          preset.shelfCount === config.shelfCount,
-      );
+  // Custom shelf or panel positions mean the cabinet is no longer any catalog preset.
+  const matchingPreset =
+    config.shelfPositionsMm?.length || config.dividerPositionsMm?.length
+      ? undefined
+      : CABINET_PRESETS.find(
+          (preset) =>
+            preset.width === config.width &&
+            preset.height === config.height &&
+            preset.depth === config.depth &&
+            preset.shelfCount === config.shelfCount,
+        );
   config.presetId = matchingPreset?.id;
   const generatedLabel =
     currentPreset?.label === group.label || /^(Base|Wall|Tall|High) \d+×\d+×\d+$/.test(group.label);
@@ -745,9 +754,9 @@ function cabinetResizeMetadata(group: Group, requested: CabinetConfig): {
 
 /**
  * Rebuilds a cabinet from its parametric config. The generated layout keeps a
- * stable order (carcass first, shelves after), so existing member ids are
- * reused by index; a longer layout mints ids for the added shelves and a
- * shorter one deletes the surplus members.
+ * stable order (carcass first, then shelves, then vertical panels), so existing
+ * member ids are reused by index; a longer layout mints ids for added members
+ * and a shorter one deletes the surplus.
  */
 function commitCabinetResize(
   group: Group,
@@ -936,6 +945,76 @@ export function distributeCabinetShelves(groupId: string, count: number, spacing
     positions.length < count
       ? `Only ${positions.length} of ${count} shelves fit`
       : `${positions.length} ${positions.length === 1 ? 'shelf' : 'shelves'} every ${Math.round(spacingMm)} mm`,
+  );
+}
+
+/**
+ * Replaces a cabinet's vertical panels with explicit centreline offsets (mm
+ * from the cabinet left). Positions are clamped into the interior, sorted,
+ * and capped at MAX_DIVIDER_COUNT; the carcass is rebuilt in place.
+ */
+export function setCabinetDividerPositions(groupId: string, positionsMm: readonly number[]): void {
+  const group = doc().groups.find((candidate) => candidate.id === groupId);
+  if (!group?.cabinet) return;
+  const sorted = dividerPositions({
+    width: group.cabinet.width,
+    dividerPositionsMm: positionsMm.filter((x) => Number.isFinite(x)),
+  });
+  const nextConfig: CabinetConfig = {
+    ...group.cabinet,
+    dividerPositionsMm: sorted.length ? sorted : undefined,
+  };
+  const placement = cabinetPlacement(group, group.cabinet);
+  commitCabinetResize(group, nextConfig, placement);
+}
+
+/** Adds one vertical panel at the given centreline, keeping the existing ones. */
+export function addCabinetDivider(groupId: string, positionMm: number): void {
+  const group = doc().groups.find((candidate) => candidate.id === groupId);
+  if (!group?.cabinet || !Number.isFinite(positionMm)) return;
+  const current = dividerPositions(group.cabinet);
+  if (current.length >= MAX_DIVIDER_COUNT) {
+    ui().showToast(`A cabinet holds at most ${MAX_DIVIDER_COUNT} panels`);
+    return;
+  }
+  setCabinetDividerPositions(groupId, [...current, positionMm]);
+  const range = dividerPositionRange(group.cabinet.width);
+  const clamped = Math.min(range.max, Math.max(range.min, Math.round(positionMm)));
+  ui().showToast(
+    clamped === Math.round(positionMm)
+      ? `Panel added at ${clamped} mm`
+      : `Panel clamped into the cabinet at ${clamped} mm`,
+  );
+}
+
+/** Removes the vertical panel at the given index (left-to-right). */
+export function removeCabinetDivider(groupId: string, index: number): void {
+  const group = doc().groups.find((candidate) => candidate.id === groupId);
+  if (!group?.cabinet) return;
+  const current = dividerPositions(group.cabinet);
+  if (index < 0 || index >= current.length) return;
+  setCabinetDividerPositions(groupId, current.filter((_, i) => i !== index));
+  ui().showToast('Panel removed');
+}
+
+/**
+ * Replaces all vertical panels with `count` panels spaced `spacingMm` apart
+ * (centre to centre, starting one spacing in from the left inner face).
+ * Panels that would not fit the interior are dropped.
+ */
+export function distributeCabinetDividers(groupId: string, count: number, spacingMm: number): void {
+  const group = doc().groups.find((candidate) => candidate.id === groupId);
+  if (!group?.cabinet) return;
+  const positions = distributedDividerPositions(group.cabinet, count, spacingMm);
+  if (!positions.length) {
+    ui().showToast('No panel fits that spacing');
+    return;
+  }
+  setCabinetDividerPositions(groupId, positions);
+  ui().showToast(
+    positions.length < count
+      ? `Only ${positions.length} of ${count} panels fit`
+      : `${positions.length} ${positions.length === 1 ? 'panel' : 'panels'} every ${Math.round(spacingMm)} mm`,
   );
 }
 
