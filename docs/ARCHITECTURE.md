@@ -68,8 +68,8 @@ the lazy chunk may not be loaded yet.
 **Persistence is schema-versioned.** Autosave is debounced into `localStorage`
 under a versioned envelope (currently schema 4), with a migration path from
 schema 3 and defensive validation. Save to File writes the same envelope as
-`.forma.json`. Saved Versions are checkpoints *inside* one document, separate
-from files on disk.
+`.forma.json`. Saved Versions are checkpoints *inside* one document (and
+autosave). Version History can download a `{title} - Version N.forma.json` file.
 
 ---
 
