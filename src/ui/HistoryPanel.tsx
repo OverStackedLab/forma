@@ -1,5 +1,5 @@
 import { resolveAppearance } from '@/domain/catalog';
-import { restoreVersion } from '@/store/actions';
+import { downloadVersion, restoreVersion } from '@/store/actions';
 import { useDocumentStore } from '@/store/documentStore';
 import { useUiStore } from '@/store/uiStore';
 import { relativeTime } from './format';
@@ -33,7 +33,8 @@ export function HistoryPanel() {
       <div className="overflow-y-auto p-3">
         {versions.length === 0 && (
           <p className="px-1 py-6 text-center text-[11.5px] text-ink/35">
-            No versions yet. Use Save Version to capture the current design.
+            No versions yet. Use Save Version to capture the current design in
+            this browser. Download a .forma.json copy from a version's row.
           </p>
         )}
 
@@ -58,6 +59,14 @@ export function HistoryPanel() {
                   {version.doc.customParts.length === 1 ? 'part' : 'parts'}
                 </div>
               </div>
+              <button
+                type="button"
+                aria-label={`Download ${version.label}`}
+                onClick={() => downloadVersion(version.id)}
+                className="flex h-7 w-7 flex-none items-center justify-center rounded-md text-ink/45 hover:bg-white/5 hover:text-ink"
+              >
+                <Icon name="download" size={15} />
+              </button>
               {isCurrent ? (
                 <span className="flex-none rounded-md bg-success/15 px-2 py-1 text-[10.5px] font-semibold text-success">
                   Current

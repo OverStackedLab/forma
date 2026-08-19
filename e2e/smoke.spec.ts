@@ -548,8 +548,14 @@ test('a saved version stops being Current after the design changes', async ({ pa
   await page.goto('/');
   await insertShelf(page);
   await page.getByRole('button', { name: 'Save Version' }).click();
+  await expect(page.getByText('Saved Version 1')).toBeVisible();
   await page.getByRole('button', { name: 'Version history' }).click();
   await expect(page.getByText('Current', { exact: true })).toBeVisible();
+
+  const downloadPromise = page.waitForEvent('download');
+  await page.getByRole('button', { name: 'Download Version 1' }).click();
+  const download = await downloadPromise;
+  expect(download.suggestedFilename()).toBe('Untitled Design - Version 1.forma.json');
   await page.getByRole('button', { name: 'Close version history' }).click();
 
   const width = page.getByLabel('Width in millimetres');

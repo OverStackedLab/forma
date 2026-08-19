@@ -296,7 +296,9 @@ Mesh identity: `root.name` and `userData.partId` equal the part id.
 - On current-schema load: do **not** overwrite user grain/edge banding; do **not**
   infer cabinets from labels when `cabinet` was intentionally cleared
 
-File save/open uses the same envelope (`.forma.json`).
+- Save Version keeps a checkpoint in this browser. Version History can download
+  `{title} - Version N.forma.json` using the same envelope as Save to File.
+  File save/open uses the same envelope (`.forma.json`).
 
 ---
 
