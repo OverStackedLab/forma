@@ -7,6 +7,7 @@ import {
   addCustomPanel,
   commitTransforms,
   distributeCabinetShelves,
+  downloadVersion,
   duplicateSelected,
   newDocument,
   openFile,
@@ -393,6 +394,34 @@ describe('save and open title', () => {
     expect(titleFromFilename('Kitchen Remodel.forma.json')).toBe('Kitchen Remodel');
     expect(titleFromFilename('/tmp/From Disk.json')).toBe('From Disk');
     expect(titleFromFilename('bad:name*.forma.json')).toBe('bad-name-');
+  });
+
+  it('keeps a Save Version checkpoint in the document without downloading', () => {
+    renameDocument('Kitchen');
+    const downloadBlob = vi.spyOn(download, 'downloadBlob').mockImplementation(() => undefined);
+
+    saveVersion();
+
+    const state = useDocumentStore.getState();
+    expect(state.versions).toHaveLength(1);
+    expect(state.versions[0]?.label).toBe('Version 1');
+    expect(state.currentVersionId).toBe(state.versions[0]?.id);
+    expect(downloadBlob).not.toHaveBeenCalled();
+    expect(useUiStore.getState().toast?.message).toBe('Saved Version 1');
+    downloadBlob.mockRestore();
+  });
+
+  it('downloads a named version file from Version History', () => {
+    renameDocument('Kitchen');
+    saveVersion();
+    const id = useDocumentStore.getState().versions[0]!.id;
+    const downloadBlob = vi.spyOn(download, 'downloadBlob').mockImplementation(() => undefined);
+
+    downloadVersion(id);
+
+    expect(downloadBlob).toHaveBeenCalledWith(expect.any(Blob), 'Kitchen - Version 1.forma.json');
+    expect(useUiStore.getState().toast?.message).toBe('Downloaded Version 1');
+    downloadBlob.mockRestore();
   });
 
   it('downloads under the current title without any prompt when the picker is unavailable', async () => {

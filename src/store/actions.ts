@@ -1143,6 +1143,10 @@ export function selectAll(): void {
 
 // ─── Versions ────────────────────────────────────────────────────────────────
 
+/**
+ * Snapshots the live design into Version History. The checkpoint lives in
+ * this browser (autosave); download a local copy from the history panel.
+ */
 export function saveVersion(): void {
   const s = doc();
   const id = `v${Date.now().toString(36)}`;
@@ -1169,6 +1173,31 @@ export function restoreVersion(id: string): void {
   ui().clearSelection();
   useUiStore.setState({ historyOpen: false });
   ui().showToast(`Restored ${version.label}`);
+}
+
+/** Downloads one checkpoint as a .forma.json file Open File can reload. */
+export function downloadVersion(id: string): void {
+  const version = doc().versions.find((candidate) => candidate.id === id);
+  if (!version) return;
+  const filename = `${sanitizeFilename(doc().docTitle)} - ${version.label}.forma.json`;
+  const document: FormaDocument = {
+    ...structuredClone(version.doc),
+    docTitle: doc().docTitle,
+    versions: [],
+    currentVersionId: null,
+  };
+  try {
+    downloadBlob(
+      new Blob(
+        [JSON.stringify({ schemaVersion: SCHEMA_VERSION, doc: document }, null, 2)],
+        { type: 'application/json' },
+      ),
+      filename,
+    );
+    ui().showToast(`Downloaded ${version.label}`);
+  } catch {
+    ui().showToast('Could not download the file');
+  }
 }
 
 /**
@@ -1244,7 +1273,7 @@ let isSavingToFile = false;
  * Where the picker is unavailable, downloads under the current title with no
  * extra dialog — the browser may still show its own save dialog, and that is
  * the only one the user sees. Distinct from Save Version, which stays inside
- * this one document.
+ * this one document until downloaded from Version History.
  */
 export async function saveToFile(): Promise<void> {
   if (isSavingToFile) return;
@@ -1300,28 +1329,32 @@ async function writeDocumentToFile(
   handle?: FileSystemFileHandle,
 ): Promise<void> {
   renameDocument(title);
-
-  const state = doc();
-  const document: FormaDocument = {
-    ...snapshotDocument(state),
-    docTitle: title,
-    versions: state.versions,
-    currentVersionId: state.currentVersionId,
-  };
-  const payload = JSON.stringify(
-    { schemaVersion: SCHEMA_VERSION, doc: document },
-    null,
-    2,
-  );
+  const payload = serializeCurrentDocument();
 
   if (handle) {
     const writable = await handle.createWritable();
     await writable.write(payload);
     await writable.close();
   } else {
-    downloadBlob(new Blob([payload], { type: 'application/json' }), `${title}.forma.json`);
+    try {
+      downloadBlob(new Blob([payload], { type: 'application/json' }), `${title}.forma.json`);
+    } catch {
+      throw new Error('Could not download the file');
+    }
   }
   ui().showToast(`Saved ${title}`);
+}
+
+/** Same schema-versioned envelope as localStorage autosave and Open File. */
+function serializeCurrentDocument(): string {
+  const state = doc();
+  const document: FormaDocument = {
+    ...snapshotDocument(state),
+    docTitle: state.docTitle,
+    versions: state.versions,
+    currentVersionId: state.currentVersionId,
+  };
+  return JSON.stringify({ schemaVersion: SCHEMA_VERSION, doc: document }, null, 2);
 }
 
 /** Reads a .forma.json file and replaces the current document with it, as one undo step. */
