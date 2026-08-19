@@ -13,6 +13,8 @@ const IDENTITY: Transform['quaternion'] = [0, 0, 0, 1];
 
 export const MAX_SHELF_COUNT = 20;
 export const MAX_DIVIDER_COUNT = 20;
+/** Left, right, bottom, top, back — always first in `buildCabinetLayout`. */
+export const CABINET_CARCASS_COUNT = 5;
 
 export type CabinetLayoutPart = Omit<CustomPart, 'id'> & {
   positionMm: [number, number, number];

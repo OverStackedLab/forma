@@ -1,5 +1,6 @@
 import {
   buildCabinetLayout,
+  CABINET_CARCASS_COUNT,
   distributedDividerPositions,
   distributedShelfPositions,
   dividerPositionRange,
@@ -495,8 +496,76 @@ export function duplicateSelected(): void {
 
 // ─── Deletion and visibility ─────────────────────────────────────────────────
 
+/**
+ * If every deleted member is a generated shelf or interior panel, returns a
+ * config that drops those members. Deleting a carcass piece (side / top /
+ * bottom / back) returns null so the caller demotes — a rebuild would remap
+ * surviving ids onto the wrong generated roles.
+ */
+function configAfterInteriorDelete(group: Group, deletedIds: Set<string>): CabinetConfig | null {
+  const cabinet = group.cabinet;
+  if (!cabinet) return null;
+  const layout = buildCabinetLayout(cabinetPreset(group, cabinet));
+  if (layout.length !== group.partIds.length) return null;
+
+  const panelCount = dividerPositions(cabinet).length;
+  const shelfPartCount = layout.length - CABINET_CARCASS_COUNT - panelCount;
+  if (shelfPartCount < 0) return null;
+  const shelfYs = shelfPositions(cabinet);
+  const bayCount = shelfYs.length === 0 ? 1 : shelfPartCount / shelfYs.length;
+  if (shelfYs.length > 0 && (bayCount < 1 || !Number.isInteger(bayCount))) return null;
+
+  const removedShelfHeights = new Set<number>();
+  const removedPanelIndices = new Set<number>();
+  for (const [index, id] of group.partIds.entries()) {
+    if (!deletedIds.has(id)) continue;
+    if (index < CABINET_CARCASS_COUNT) return null;
+    if (index < CABINET_CARCASS_COUNT + shelfPartCount) {
+      removedShelfHeights.add(Math.floor((index - CABINET_CARCASS_COUNT) / bayCount));
+    } else {
+      removedPanelIndices.add(index - CABINET_CARCASS_COUNT - shelfPartCount);
+    }
+  }
+  if (!removedShelfHeights.size && !removedPanelIndices.size) return cabinet;
+
+  const nextShelves = shelfYs.filter((_, index) => !removedShelfHeights.has(index));
+  const nextPanels = dividerPositions(cabinet).filter((_, index) => !removedPanelIndices.has(index));
+  return {
+    ...cabinet,
+    shelfCount: removedShelfHeights.size ? nextShelves.length : cabinet.shelfCount,
+    shelfPositionsMm: removedShelfHeights.size
+      ? nextShelves.length
+        ? nextShelves
+        : undefined
+      : cabinet.shelfPositionsMm,
+    dividerPositionsMm: removedPanelIndices.size
+      ? nextPanels.length
+        ? nextPanels
+        : undefined
+      : cabinet.dividerPositionsMm,
+  };
+}
+
 export function deleteParts(ids: readonly string[]): void {
   if (!ids.length) return;
+
+  const deleted = new Set(ids);
+  const state = doc();
+  const hit = state.groups.filter(
+    (group) => group.cabinet && group.partIds.some((id) => deleted.has(id)),
+  );
+  if (hit.length === 1) {
+    const group = hit[0];
+    if (group?.cabinet && ids.every((id) => group.partIds.includes(id))) {
+      const nextConfig = configAfterInteriorDelete(group, deleted);
+      if (nextConfig) {
+        const placement = cabinetPlacement(group, group.cabinet);
+        commitCabinetResize(group, nextConfig, placement);
+        ui().showToast(ids.length > 1 ? `${ids.length} parts deleted` : 'Part deleted');
+        return;
+      }
+    }
+  }
 
   commit(() => {
     useDocumentStore.setState((prev) => {

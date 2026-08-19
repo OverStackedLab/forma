@@ -52,8 +52,10 @@ material + colour — which is why removing a single part must never dispose the
 generates ordinary panels bundled into a `Group` carrying a `cabinet` config.
 Because the config survives, changing the cabinet's width rebuilds the carcass
 parametrically while preserving the 18 mm panels and 8 mm back. Changing only some
-members' size clears the config — the group demotes to a plain group, because it
-can no longer be regenerated faithfully. Moving or renaming members does not.
+members' size, or deleting a side/top/bottom/back, clears the config — the group
+demotes to a plain group, because it can no longer be regenerated faithfully.
+Moving or renaming members does not, and deleting a generated shelf or interior
+panel updates the config instead of demoting.
 
 **Gizmo drags commit once, on release.** The scene is mutated freely during the
 drag; `commitTransforms` fires on pointer-up. One undo entry per gesture, and the

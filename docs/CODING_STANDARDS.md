@@ -134,8 +134,10 @@ count, Select All, and BOM. Do not maintain a parallel “fixed parts” list.
 - Generated cabinets carry `group.cabinet` config; parametric rebuilds go through
   `setCabinetDim` / `resizeCabinetFromGizmo` / `commitCabinetResize`
 - Changing a **subset** of members' **size** clears `cabinet` (demotion). Moving,
-  rotating or renaming members does not. Persistence must not resurrect stock
-  configs from labels on current-schema loads (BUG-009)
+  rotating or renaming members does not. Deleting a generated shelf or interior
+  panel updates the config and rebuilds; deleting a carcass piece still demotes.
+  Persistence must not resurrect stock configs from labels on current-schema
+  loads (BUG-009)
 - Grain / edge banding on cabinet panels are user-editable and must survive
   reload (BUG-008)
 
