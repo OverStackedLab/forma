@@ -15,6 +15,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - Cabinet shelf placement by explicit height or even spacing.
 - Cabinet vertical panels by explicit offset from the left or even spacing. Shelves split into bays around them.
 - Favicon from the toolbar F mark.
+- Google Analytics 4 (`G-X3H2JF8SQN`) on production builds.
 - Toolbar buttons to hide the left and right sidebars.
 - Live object-face snapping while moving (60 mm capture, on-face guide). Hold Shift for the 100 mm grid.
 - Document title derived from the on-disk save/open filename.
