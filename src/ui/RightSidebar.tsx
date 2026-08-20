@@ -13,12 +13,13 @@ import {
 import { oakGrainDataUrl } from '@/domain/oakGrain';
 import { cabinetContainingSelection, groupMatching, selectionUnits } from '@/domain/parts';
 import { quaternionToEulerDegrees } from '@/domain/rotation';
-import type { CabinetConfig, Group } from '@/domain/types';
+import type { CabinetConfig } from '@/domain/types';
 import { convertedValue, convertRange, fromMm, toMm, type DisplayUnit } from '@/domain/units';
 import { dividerPositions, shelfPositions } from '@/domain/cabinets';
 import {
   addCabinetDivider,
   addCabinetShelf,
+  alignSelected,
   applyFinish,
   deleteParts,
   distributeCabinetDividers,
@@ -36,8 +37,9 @@ import {
   setCabinetShelfPositions,
   setCustomPartDim,
   setHardwareDiameter,
-  setGroupPositionAxis,
-  setGroupSizeAxis,
+  setSelectionPositionAxis,
+  setSelectionRotationAxis,
+  setSelectionSizeAxis,
   setPartGrainAxis,
   setPositionAxis,
   setRotationAxis,
@@ -122,6 +124,15 @@ const EDGE_OPTIONS = [
   { id: 'd-min', label: 'Back' },
   { id: 'd-max', label: 'Front' },
 ] as const;
+const ALIGN_EDGES = [
+  { id: 'left', label: 'Align Left' },
+  { id: 'center-x', label: 'Align Centres' },
+  { id: 'right', label: 'Align Right' },
+  { id: 'back', label: 'Align Back' },
+  { id: 'front', label: 'Align Front' },
+  { id: 'bottom', label: 'Align Bottoms' },
+  { id: 'top', label: 'Align Tops' },
+] as const;
 
 function PositionFields({ partId }: { partId: string }) {
   const transform = useDocumentStore((s) => s.transforms[partId]) ?? IDENTITY_TRANSFORM;
@@ -148,68 +159,113 @@ function PositionFields({ partId }: { partId: string }) {
   );
 }
 
-function GroupPositionFields({ group }: { group: Group }) {
+function SelectionPositionFields({
+  partIds,
+  asGroup,
+}: {
+  partIds: readonly string[];
+  asGroup: boolean;
+}) {
   const transforms = useDocumentStore((state) => state.transforms);
   const unit = useUiStore((state) => state.displayUnit);
   const range = convertRange(POSITION_LIMITS, unit);
-  const members = group.partIds.map((id) => transforms[id] ?? IDENTITY_TRANSFORM);
+  const members = partIds.map((id) => transforms[id] ?? IDENTITY_TRANSFORM);
   const pivot = POSITION_AXES.map(({ index }) =>
     members.reduce((sum, transform) => sum + transform.position[index], 0) /
     Math.max(members.length, 1),
   );
+  const prefix = asGroup ? 'Group ' : '';
 
   return (
     <>
-      <SectionHeader>Group Position</SectionHeader>
+      <SectionHeader>{asGroup ? 'Group Position' : 'Position'}</SectionHeader>
       {POSITION_AXES.map(({ axis, label, index }) => (
         <SliderField
           key={axis}
-          label={`Group ${label}`}
+          label={`${prefix}${label}`}
           value={convertedValue(pivot[index]! * 1000, unit)}
           min={range.min}
           max={range.max}
           step={range.step}
           unit={unit}
           unitName={UNIT_NAMES[unit]}
-          onChange={(value) => setGroupPositionAxis(group.id, axis, toMm(value, unit))}
+          onChange={(value) => setSelectionPositionAxis(partIds, axis, toMm(value, unit))}
         />
       ))}
       <p className="mb-4 text-[10.5px] leading-relaxed text-ink/35">
-        Position uses the shared group pivot; every member moves by the same amount.
+        Position uses the shared pivot; every selected part moves by the same amount.
       </p>
       <hr className="my-4 border-hairline" />
     </>
   );
 }
 
-function GroupSizeFields({
-  group,
-  size,
+function SelectionRotationFields({
+  partIds,
+  asGroup,
 }: {
-  group: Group;
+  partIds: readonly string[];
+  asGroup: boolean;
+}) {
+  const transforms = useDocumentStore((state) => state.transforms);
+  const reference = transforms[partIds[0] ?? ''] ?? IDENTITY_TRANSFORM;
+  const euler = quaternionToEulerDegrees(reference.quaternion);
+  const prefix = asGroup ? 'Group ' : '';
+
+  return (
+    <>
+      <SectionHeader>{asGroup ? 'Group Rotation' : 'Rotation'}</SectionHeader>
+      {ROTATION_AXES.map(({ axis, label }) => (
+        <SliderField
+          key={axis}
+          label={`${prefix}${label}`}
+          value={Math.round(euler[axis] * 10) / 10}
+          min={ROTATION_LIMITS.min}
+          max={ROTATION_LIMITS.max}
+          step={ROTATION_LIMITS.step}
+          unit="°"
+          unitName="degrees"
+          onChange={(value) => setSelectionRotationAxis(partIds, axis, value)}
+        />
+      ))}
+      <p className="mb-4 text-[10.5px] leading-relaxed text-ink/35">
+        Rotation uses the shared pivot; every selected part turns together.
+      </p>
+      <hr className="my-4 border-hairline" />
+    </>
+  );
+}
+
+function SelectionSizeFields({
+  partIds,
+  size,
+  asGroup,
+}: {
+  partIds: readonly string[];
   size: { w: number; h: number; d: number };
+  asGroup: boolean;
 }) {
   const unit = useUiStore((state) => state.displayUnit);
   const range = convertRange(GROUP_SIZE_LIMITS, unit);
 
   return (
     <>
-      <SectionHeader>Group Dimensions</SectionHeader>
+      <SectionHeader>{asGroup ? 'Group Dimensions' : 'Dimensions'}</SectionHeader>
       {GROUP_SIZE_AXES.map(({ axis, key, label }) => (
         <SliderField
           key={axis}
-          label={label}
+          label={asGroup ? label : label.replace('Group ', '')}
           value={fromMm(size[key], unit)}
           min={range.min}
           max={range.max}
           step={range.step}
           unit={unit}
           unitName={UNIT_NAMES[unit]}
-          onChange={(value) => setGroupSizeAxis(group.id, axis, toMm(value, unit))}
+          onChange={(value) => setSelectionSizeAxis(partIds, axis, toMm(value, unit))}
         />
       ))}
       <p className="mb-4 text-[10.5px] leading-relaxed text-ink/35">
-        Resizing uses the shared group pivot; every member and the spacing between members scale together.
+        Resizing uses the shared pivot; every selected part and the spacing between them scale together.
       </p>
       <hr className="my-4 border-hairline" />
     </>
@@ -608,6 +664,9 @@ function PropertiesTab() {
   const units = selectionUnits(groups, selectedPartIds);
   const canSnapTogether = units.length === 2;
   const containsSavedGroup = units.some((selectionUnit) => selectionUnit.kind === 'group');
+  const hasCabinet = groups.some(
+    (group) => group.cabinet && selectedPartIds.some((id) => group.partIds.includes(id)),
+  );
   const unit = useUiStore((s) => s.displayUnit);
   const shelfEditor = cabinetGroup?.cabinet ? (
     <>
@@ -779,10 +838,14 @@ function PropertiesTab() {
       {selection.kind === 'multi' && !matchedGroup?.cabinet && shelfEditor}
 
       {selection.kind === 'multi' && matchedGroup && !matchedGroup.cabinet && selection.size && (
-        <GroupSizeFields group={matchedGroup} size={selection.size} />
+        <SelectionSizeFields partIds={matchedGroup.partIds} size={selection.size} asGroup />
       )}
 
-      {selection.kind === 'multi' && !matchedGroup && selection.size && (
+      {selection.kind === 'multi' && !matchedGroup && !hasCabinet && selection.size && (
+        <SelectionSizeFields partIds={selectedPartIds} size={selection.size} asGroup={false} />
+      )}
+
+      {selection.kind === 'multi' && !matchedGroup && hasCabinet && selection.size && (
         <>
           <SectionHeader>Dimensions</SectionHeader>
           <div className="flex gap-2">
@@ -794,7 +857,12 @@ function PropertiesTab() {
         </>
       )}
 
-      {matchedGroup && <GroupPositionFields group={matchedGroup} />}
+      {selection.kind === 'multi' && selectedPartIds.length >= 2 && (
+        <>
+          <SelectionPositionFields partIds={selectedPartIds} asGroup={Boolean(matchedGroup)} />
+          <SelectionRotationFields partIds={selectedPartIds} asGroup={Boolean(matchedGroup)} />
+        </>
+      )}
 
       <FinishPicker />
 
@@ -809,9 +877,25 @@ function PropertiesTab() {
       ) : (
         <>
           {canSnapTogether && (
-            <p className="mt-3 text-[10.5px] leading-relaxed text-ink/40">
-              Snap Together keeps the first selected item fixed and moves the second to its nearest face.
-            </p>
+            <>
+              <hr className="my-4 border-hairline" />
+              <SectionHeader>Align</SectionHeader>
+              <p className="mb-3 text-[10.5px] leading-relaxed text-ink/40">
+                The first selected item stays fixed. The second matches one edge; other axes do not
+                move.
+              </p>
+              <div className="mb-3 flex flex-wrap gap-2">
+                {ALIGN_EDGES.map((edge) => (
+                  <Button key={edge.id} onClick={() => alignSelected(edge.id)}>
+                    {edge.label}
+                  </Button>
+                ))}
+              </div>
+              <p className="text-[10.5px] leading-relaxed text-ink/40">
+                Snap Together keeps the first selected item fixed and moves the second to its
+                nearest face.
+              </p>
+            </>
           )}
           <div className="mt-3.5 flex flex-wrap gap-2">
             <Button onClick={clearSelection}>Clear</Button>

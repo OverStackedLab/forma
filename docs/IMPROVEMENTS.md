@@ -89,3 +89,10 @@ feature, show up in profiling, or sit next to related work.
 - **Area:**
 - **Why it matters:**
 - **Direction:**
+
+## Resolved improvements
+
+| ID | Summary | Resolution | Verified |
+| --- | --- | --- | --- |
+| IMP-008 | Align one object to another without forcing contact | Added Align Left / Centres / Right, Front / Back, and Tops / Bottoms for two selection units. The first stays fixed; the second matches one world AABB bound and other axes do not move, so a hanging wall cabinet can share a floor cabinet's edge. Covered by align unit tests and a Base 600 + Wall 600 browser regression. | 2026-08-20 |
+| IMP-009 | Front, top and side camera views while modelling | Model mode now has Front / Side / Top next to Frame. Render already had Front and Top (plus ¾ Angle); it now includes Side too, looking down −X at the same height as Front. Preset distances stay inside the orbit envelope. Covered by camera-preset unit tests and model/render browser checks. | 2026-08-20 |

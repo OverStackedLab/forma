@@ -27,8 +27,11 @@ import {
   setCabinetShelfPositions,
   setCustomPartDim,
   setGroupPositionAxis,
+  setGroupRotationAxis,
   setHardwareDiameter,
   setPositionAxis,
+  setSelectionPositionAxis,
+  setSelectionRotationAxis,
   titleFromFilename,
 } from './actions';
 import { createDefaultDocument, useDocumentStore } from './documentStore';
@@ -477,6 +480,81 @@ describe('library construction actions', () => {
       expect(value - after[0]!).toBeCloseTo(before[index]! - before[0]!, 8);
     });
     expect(state.groups[0]?.cabinet?.width).toBe(600);
+  });
+
+  it('rotates a group around its shared pivot without changing cabinet metadata', () => {
+    addCabinetPreset('base-600');
+    const group = useDocumentStore.getState().groups[0]!;
+    const before = group.partIds.map((id) => useDocumentStore.getState().transforms[id]!.position);
+    const pivot = [0, 1, 2].map(
+      (index) => before.reduce((sum, position) => sum + position[index]!, 0) / before.length,
+    );
+
+    setGroupRotationAxis(group.id, 'y', 90);
+
+    const state = useDocumentStore.getState();
+    const after = group.partIds.map((id) => state.transforms[id]!.position);
+    const nextPivot = [0, 1, 2].map(
+      (index) => after.reduce((sum, position) => sum + position[index]!, 0) / after.length,
+    );
+    nextPivot.forEach((value, index) => expect(value).toBeCloseTo(pivot[index]!, 8));
+    after.forEach((position, memberIndex) => {
+      const dx = before[memberIndex]![0]! - pivot[0]!;
+      const dz = before[memberIndex]![2]! - pivot[2]!;
+      expect(position[0]! - nextPivot[0]!).toBeCloseTo(dz, 8);
+      expect(position[1]).toBeCloseTo(before[memberIndex]![1]!, 8);
+      expect(position[2]! - nextPivot[2]!).toBeCloseTo(-dx, 8);
+    });
+    const quaternion = state.transforms[group.partIds[0]!]!.quaternion;
+    expect(quaternion[0]).toBeCloseTo(0, 8);
+    expect(quaternion[1]).toBeCloseTo(Math.SQRT1_2, 8);
+    expect(quaternion[2]).toBeCloseTo(0, 8);
+    expect(quaternion[3]).toBeCloseTo(Math.SQRT1_2, 8);
+    expect(state.groups[0]?.cabinet?.width).toBe(600);
+  });
+
+  it('moves several groups together from the shared selection pivot', () => {
+    addCabinetPreset('base-600');
+    addCabinetPreset('base-600');
+    const ids = useDocumentStore.getState().customParts.map((part) => part.id);
+    const before = ids.map((id) => useDocumentStore.getState().transforms[id]!.position[0]);
+    const pivot = before.reduce((sum, value) => sum + value, 0) / before.length;
+
+    setSelectionPositionAxis(ids, 'x', 1000);
+
+    const after = ids.map((id) => useDocumentStore.getState().transforms[id]!.position[0]);
+    expect(after.reduce((sum, value) => sum + value, 0) / after.length).toBeCloseTo(1, 8);
+    after.forEach((value, index) => {
+      expect(value - after[0]!).toBeCloseTo(before[index]! - before[0]!, 8);
+    });
+    expect(after[0]! - before[0]!).toBeCloseTo(1 - pivot, 8);
+    expect(useDocumentStore.getState().groups.map((group) => group.cabinet?.width)).toEqual([600, 600]);
+  });
+
+  it('rotates several groups together around the shared selection pivot', () => {
+    addCabinetPreset('base-600');
+    addCabinetPreset('base-600');
+    const ids = useDocumentStore.getState().customParts.map((part) => part.id);
+    const before = ids.map((id) => useDocumentStore.getState().transforms[id]!.position);
+    const pivot = [0, 1, 2].map(
+      (index) => before.reduce((sum, position) => sum + position[index]!, 0) / before.length,
+    );
+
+    setSelectionRotationAxis(ids, 'y', 90);
+
+    const after = ids.map((id) => useDocumentStore.getState().transforms[id]!.position);
+    const nextPivot = [0, 1, 2].map(
+      (index) => after.reduce((sum, position) => sum + position[index]!, 0) / after.length,
+    );
+    nextPivot.forEach((value, index) => expect(value).toBeCloseTo(pivot[index]!, 8));
+    after.forEach((position, memberIndex) => {
+      const dx = before[memberIndex]![0]! - pivot[0]!;
+      const dz = before[memberIndex]![2]! - pivot[2]!;
+      expect(position[0]! - nextPivot[0]!).toBeCloseTo(dz, 8);
+      expect(position[1]).toBeCloseTo(before[memberIndex]![1]!, 8);
+      expect(position[2]! - nextPivot[2]!).toBeCloseTo(-dx, 8);
+    });
+    expect(useDocumentStore.getState().groups.map((group) => group.cabinet?.width)).toEqual([600, 600]);
   });
 });
 

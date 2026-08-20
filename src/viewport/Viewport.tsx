@@ -18,6 +18,7 @@ import { SceneManager } from './SceneManager';
 import { SelectionOverlay } from './SelectionOverlay';
 import { computeFloorSnapTransforms } from './floorSnap';
 import { computeGroupResizeTransforms } from './groupResize';
+import { computeAlignTransforms } from './align';
 import { computeSnapTogetherTransforms } from './snapTogether';
 import { setViewportApi } from './viewportApi';
 import { MarqueeRect } from './overlays/MarqueeRect';
@@ -200,6 +201,8 @@ export function Viewport() {
         computeGroupResizeTransforms(builder, ids, axis, targetMillimetres),
       computeSnapTogether: (targetIds, movingIds) =>
         computeSnapTogetherTransforms(builder, targetIds, movingIds),
+      computeAlign: (targetIds, movingIds, edge) =>
+        computeAlignTransforms(builder, targetIds, movingIds, edge),
     });
 
     return () => {

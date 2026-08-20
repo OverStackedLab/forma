@@ -3,13 +3,24 @@ import { combinedWorldBounds } from './bounds';
 import type { ModelBuilder } from './ModelBuilder';
 import type { SceneManager } from './SceneManager';
 
-export type CameraPreset = 'front' | 'angle' | 'top';
+export type CameraPreset = 'front' | 'side' | 'top' | 'angle';
 
-const PRESETS: Record<CameraPreset, { pos: [number, number, number]; target: [number, number, number] }> = {
+export const CAMERA_PRESETS: Record<
+  CameraPreset,
+  { pos: [number, number, number]; target: [number, number, number] }
+> = {
+  // Front looks down −Z, side down −X, top down −Y. Distances stay inside
+  // OrbitControls' envelope (see PRESET_REACH_M in workspace.ts).
   front: { pos: [0, 0.55, 3.1], target: [0, 0.42, 0] },
-  angle: { pos: [2.5, 1.5, 2.7], target: [0, 0.4, 0] },
+  side: { pos: [3.1, 0.55, 0], target: [0, 0.42, 0] },
   top: { pos: [0.1, 3.4, 0.1], target: [0, 0.3, 0] },
+  angle: { pos: [2.5, 1.5, 2.7], target: [0, 0.4, 0] },
 };
+
+export function cameraPresetDistance(preset: CameraPreset): number {
+  const { pos, target } = CAMERA_PRESETS[preset];
+  return Math.hypot(pos[0] - target[0], pos[1] - target[1], pos[2] - target[2]);
+}
 
 /** Fraction of the remaining distance covered per frame. */
 const EASE = 0.08;
@@ -49,7 +60,7 @@ export class CameraController {
   }
 
   goTo(preset: CameraPreset): void {
-    const p = PRESETS[preset];
+    const p = CAMERA_PRESETS[preset];
     this.flyTo(new THREE.Vector3(...p.pos), new THREE.Vector3(...p.target));
   }
 

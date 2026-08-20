@@ -354,7 +354,19 @@ test('render mode hides the sidebars and exposes camera presets', async ({ page 
 
   await expect(page.getByRole('tab', { name: 'Assembly' })).toHaveCount(0);
   await expect(page.getByRole('button', { name: 'Export Image' })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Front', exact: true })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Side', exact: true })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Top', exact: true })).toBeVisible();
   await expect(page.getByRole('button', { name: '¾ Angle' })).toBeVisible();
+});
+
+test('model mode offers front, side and top views', async ({ page }) => {
+  await page.goto('/');
+  await expect(page.locator('canvas')).toBeVisible();
+  await page.getByRole('button', { name: 'Front', exact: true }).click();
+  await page.getByRole('button', { name: 'Side', exact: true }).click();
+  await page.getByRole('button', { name: 'Top', exact: true }).click();
+  await expect(page.getByRole('button', { name: 'Frame' })).toBeVisible();
 });
 
 test('grouping two panels lets you reselect and ungroup them as one unit', async ({ page }) => {
@@ -372,6 +384,7 @@ test('grouping two panels lets you reselect and ungroup them as one unit', async
   await expect(page.getByText('Editing: Group 1')).toBeVisible();
   await expect(page.getByText('Rigid group · 2 pieces')).toBeVisible();
   await expect(page.getByLabel('Group X Position in millimetres')).toHaveValue('440');
+  await expect(page.getByLabel('Group Y Angle in degrees')).toHaveValue('0');
   await expect(page.getByRole('treeitem', { name: /Group 1/ })).toBeVisible();
   // Members are still individually present, just nested under the group.
   await expect(shelves).toHaveCount(2);
@@ -493,6 +506,43 @@ test('Snap Together moves a whole group without breaking its cabinet configurati
   await cabinets.nth(1).click();
   await expect(page.getByLabel('Group X Position in millimetres')).toHaveValue('600');
   await expect(page.getByLabel('Cabinet Width in millimetres')).toHaveValue('600');
+});
+
+test('Align Left lines a wall cabinet up with a floor cabinet without dropping it', async ({
+  page,
+}) => {
+  await gotoMm(page);
+  await page.getByRole('tab', { name: 'Library' }).click();
+  await page.getByRole('button', { name: /Base 600/ }).click();
+  await page.getByRole('button', { name: /Wall 600/ }).click();
+  await page.getByRole('tab', { name: 'Assembly' }).click();
+
+  const base = page.getByRole('treeitem', {
+    name: /Collapse group Base 600 6 Hide Base 600/,
+  });
+  const wall = page.getByRole('treeitem', {
+    name: /Collapse group Wall 600 6 Hide Wall 600/,
+  });
+  await wall.click();
+  const wallY = page.getByLabel('Group Y Position in millimetres');
+  const hangHeight = await wallY.inputValue();
+  const wallX = page.getByLabel('Group X Position in millimetres');
+  const offsetX = await wallX.inputValue();
+  expect(offsetX).not.toBe('0');
+
+  await base.click();
+  await wall.click({ modifiers: ['Shift'] });
+  await expect(page.locator('canvas')).toBeVisible();
+  await page.getByRole('button', { name: 'Align Left' }).click();
+  await expect(page.getByText('Wall 600 aligned left with Base 600')).toBeVisible();
+
+  await wall.click();
+  await expect(wallX).toHaveValue('0');
+  await expect(wallY).toHaveValue(hangHeight);
+
+  await page.getByRole('button', { name: 'Undo' }).click();
+  await expect(wallX).toHaveValue(offsetX);
+  await expect(wallY).toHaveValue(hangHeight);
 });
 
 test('duplicating a group creates an independently editable grouped copy', async ({ page }) => {
@@ -647,6 +697,51 @@ test('rotation fields set an exact angle and support undo', async ({ page }) => 
 
   // Reset transform zeroes rotation back out too.
   await page.getByRole('button', { name: 'Reset transform' }).click();
+  await expect(page.getByLabel('Y Angle in degrees')).toHaveValue('0');
+});
+
+test('group rotation fields turn every member around the shared pivot', async ({ page }) => {
+  await page.goto('/');
+  await insertShelf(page);
+  await insertShelf(page);
+  await page.getByRole('tab', { name: 'Assembly' }).click();
+  const shelves = page.getByRole('treeitem', { name: 'Shelf Hide Shelf' });
+  await shelves.nth(0).click();
+  await shelves.nth(1).click({ modifiers: ['Shift'] });
+  await page.getByRole('button', { name: 'Group' }).click();
+
+  const yAngle = page.getByLabel('Group Y Angle in degrees');
+  await expect(yAngle).toHaveValue('0');
+  await yAngle.fill('45');
+  await yAngle.blur();
+  await expect(yAngle).toHaveValue('45');
+
+  await page.getByRole('button', { name: 'Undo' }).click();
+  await expect(page.getByLabel('Group Y Angle in degrees')).toHaveValue('0');
+});
+
+test('selecting two groups shows shared position and rotation sliders', async ({ page }) => {
+  await gotoMm(page);
+  await page.getByRole('tab', { name: 'Library' }).click();
+  await page.getByRole('button', { name: /Base 600/ }).click();
+  await page.getByRole('button', { name: /Base 600/ }).click();
+  await page.getByRole('tab', { name: 'Assembly' }).click();
+
+  const cabinets = page.getByRole('treeitem', {
+    name: /Collapse group Base 600 6 Hide Base 600/,
+  });
+  await cabinets.nth(0).click();
+  await cabinets.nth(1).click({ modifiers: ['Shift'] });
+  await expect(page.getByText('12 selected')).toBeVisible();
+
+  await expect(page.getByLabel('X Position in millimetres')).toBeVisible();
+  const yAngle = page.getByLabel('Y Angle in degrees');
+  await expect(yAngle).toHaveValue('0');
+  await yAngle.fill('45');
+  await yAngle.blur();
+  await expect(yAngle).toHaveValue('45');
+
+  await page.getByRole('button', { name: 'Undo' }).click();
   await expect(page.getByLabel('Y Angle in degrees')).toHaveValue('0');
 });
 
