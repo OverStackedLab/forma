@@ -20,6 +20,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - Live object-face snapping while moving (60 mm capture, on-face guide). Hold Shift for the 100 mm grid.
 - Document title derived from the on-disk save/open filename.
 - Save Version keeps a checkpoint in this browser. Version History can download `{title} - Version N.forma.json`.
+- Align Left / Centres / Right, Front / Back, and Tops / Bottoms for two selected pieces or groups. The first stays fixed and only that axis moves, so a wall cabinet can share a floor cabinet's edge without leaving its hang height (IMP-008).
+- Front, Side and Top camera views while modelling, plus Side in Render next to Front / Top / ¾ Angle (IMP-009).
 
 ### Changed
 
@@ -37,4 +39,6 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - Wall cabinets no longer sit on the floor when inserted; they hang so their top lines up with High 2200.
 - Moving, rotating, or renaming a cabinet panel no longer strips shelf controls. Add Shelf stays available when any piece of that cabinet is selected.
 - Deleting a generated shelf or interior panel keeps the cabinet configurable (BUG-014); only removing a carcass piece (side, top, bottom, or back) demotes it.
+- Rotation sliders appear when a group or cabinet is selected and turn every member around the shared pivot (BUG-015).
+- Position and rotation sliders stay available when several groups are selected together (BUG-016).
 - Add shelf and Space evenly fields show defaults (300 mm, 3 every 200 mm) and are wide enough to read.

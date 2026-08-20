@@ -1,6 +1,9 @@
 import type { Transform } from '@/domain/types';
 import type { CameraPreset } from './CameraController';
 
+/** One bound of the first selection that the second selection should match. */
+export type AlignEdge = 'left' | 'right' | 'center-x' | 'front' | 'back' | 'top' | 'bottom';
+
 /**
  * A tiny imperative surface onto the single live viewport, so toolbar and
  * render-bar buttons can drive the camera and export a PNG without threading
@@ -25,6 +28,12 @@ export type ViewportApi = {
   computeSnapTogether: (
     targetIds: readonly string[],
     movingIds: readonly string[],
+  ) => Record<string, Transform> | null;
+  /** Matches one bound of the second rigid unit to the first, leaving other axes still. */
+  computeAlign: (
+    targetIds: readonly string[],
+    movingIds: readonly string[],
+    edge: AlignEdge,
   ) => Record<string, Transform> | null;
 };
 

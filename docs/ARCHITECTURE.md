@@ -61,8 +61,8 @@ panel updates the config instead of demoting.
 drag; `commitTransforms` fires on pointer-up. One undo entry per gesture, and the
 store isn't churned at 60 fps.
 
-**`viewportApi` is a deliberate escape hatch.** Framing, PNG export, floor-snap
-and group-resize need live meshes to compute bounds. Rather than threading refs
+**`viewportApi` is a deliberate escape hatch.** Framing, PNG export, floor-snap,
+group-resize, snap-together and align need live meshes to compute bounds. Rather than threading refs
 through the React tree, the viewport registers a small imperative API as a module
 singleton on mount and clears it on unmount; callers use optional chaining since
 the lazy chunk may not be loaded yet.

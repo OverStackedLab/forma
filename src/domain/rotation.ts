@@ -64,3 +64,23 @@ export function eulerDegreesToQuaternion(euler: EulerDegrees): Transform['quater
     c1 * c2 * c3 - s1 * s2 * s3,
   ];
 }
+
+/** Hamilton product `a * b`. World rotation `a` applied to orientation `b` is `a * b`. */
+export function multiplyQuaternions(
+  a: Transform['quaternion'],
+  b: Transform['quaternion'],
+): Transform['quaternion'] {
+  const [ax, ay, az, aw] = a;
+  const [bx, by, bz, bw] = b;
+  return [
+    aw * bx + ax * bw + ay * bz - az * by,
+    aw * by - ax * bz + ay * bw + az * bx,
+    aw * bz + ax * by - ay * bx + az * bw,
+    aw * bw - ax * bx - ay * by - az * bz,
+  ];
+}
+
+/** Inverse of a unit quaternion (the conjugate). */
+export function invertQuaternion(q: Transform['quaternion']): Transform['quaternion'] {
+  return [-q[0], -q[1], -q[2], q[3]];
+}

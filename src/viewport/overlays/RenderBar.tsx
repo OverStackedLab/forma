@@ -6,8 +6,9 @@ import { viewportApi } from '../viewportApi';
 
 const PRESETS: { id: CameraPreset; label: string }[] = [
   { id: 'front', label: 'Front' },
-  { id: 'angle', label: '¾ Angle' },
+  { id: 'side', label: 'Side' },
   { id: 'top', label: 'Top' },
+  { id: 'angle', label: '¾ Angle' },
 ];
 
 export function RenderBar() {

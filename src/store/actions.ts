@@ -21,7 +21,7 @@ import {
   PANEL_PRESETS,
 } from '@/domain/catalog';
 import { groupMatching, livePartIds, selectionUnits } from '@/domain/parts';
-import { eulerDegreesToQuaternion, quaternionToEulerDegrees } from '@/domain/rotation';
+import { eulerDegreesToQuaternion, invertQuaternion, multiplyQuaternions, quaternionToEulerDegrees } from '@/domain/rotation';
 import {
   halfExtentAlongNormalMm,
   orientedHalfExtentsMm,
@@ -41,7 +41,7 @@ import type {
   Transform,
 } from '@/domain/types';
 import { downloadBlob } from '@/ui/download';
-import { viewportApi } from '@/viewport/viewportApi';
+import { viewportApi, type AlignEdge } from '@/viewport/viewportApi';
 import {
   createDefaultDocument,
   IDENTITY_TRANSFORM,
@@ -51,6 +51,8 @@ import {
 import { clearHistory, commit, syncHistoryDocumentMeta } from './history';
 import { migrate, SCHEMA_VERSION } from './persistence';
 import { useUiStore } from './uiStore';
+
+export type { AlignEdge };
 
 const doc = () => useDocumentStore.getState();
 const ui = () => useUiStore.getState();
@@ -1175,17 +1177,15 @@ export function setPositionAxis(id: string, axis: 'x' | 'y' | 'z', millimetres: 
   });
 }
 
-/** Sets the multi-select pivot position by translating every group member equally. */
-export function setGroupPositionAxis(
-  groupId: string,
+/** Sets the multi-select pivot position by translating every selected part equally. */
+export function setSelectionPositionAxis(
+  ids: readonly string[],
   axis: 'x' | 'y' | 'z',
   millimetres: number,
 ): void {
-  if (!Number.isFinite(millimetres)) return;
-  const group = doc().groups.find((candidate) => candidate.id === groupId);
-  if (!group?.partIds.length) return;
+  if (!Number.isFinite(millimetres) || ids.length < 1) return;
   const index = POSITION_AXIS_INDEX[axis];
-  const transforms = group.partIds.map((id) => ({ id, transform: transformOf(id) }));
+  const transforms = ids.map((id) => ({ id, transform: transformOf(id) }));
   const current = transforms.reduce((sum, item) => sum + item.transform.position[index], 0) /
     transforms.length;
   const requested = millimetres / 1000 - current;
@@ -1203,23 +1203,99 @@ export function setGroupPositionAxis(
   commitTransforms(next);
 }
 
+/** Sets the multi-select pivot position by translating every group member equally. */
+export function setGroupPositionAxis(
+  groupId: string,
+  axis: 'x' | 'y' | 'z',
+  millimetres: number,
+): void {
+  const group = doc().groups.find((candidate) => candidate.id === groupId);
+  if (!group?.partIds.length) return;
+  setSelectionPositionAxis(group.partIds, axis, millimetres);
+}
+
+/**
+ * Sets one axis of a selection's rotation, turning every part around the shared
+ * pivot — the numeric counterpart to dragging the rotate gizmo.
+ */
+export function setSelectionRotationAxis(
+  ids: readonly string[],
+  axis: 'x' | 'y' | 'z',
+  degrees: number,
+): void {
+  if (!Number.isFinite(degrees) || ids.length < 1) return;
+  const members = ids.map((id) => ({ id, transform: transformOf(id) }));
+  const reference = members[0]?.transform.quaternion;
+  if (!reference) return;
+  const euler = quaternionToEulerDegrees(reference);
+  if (Math.abs(euler[axis] - degrees) < 1e-6) return;
+  euler[axis] = degrees;
+  const delta = multiplyQuaternions(eulerDegreesToQuaternion(euler), invertQuaternion(reference));
+  const count = members.length;
+  const pivot = [0, 1, 2].map(
+    (index) => members.reduce((sum, item) => sum + item.transform.position[index]!, 0) / count,
+  );
+  const next: Record<string, Transform> = {};
+  for (const { id, transform } of members) {
+    const rotated = rotateVectorByQuaternion(
+      {
+        x: transform.position[0] - pivot[0]!,
+        y: transform.position[1] - pivot[1]!,
+        z: transform.position[2] - pivot[2]!,
+      },
+      delta,
+    );
+    next[id] = {
+      ...transform,
+      position: [pivot[0]! + rotated.x, pivot[1]! + rotated.y, pivot[2]! + rotated.z],
+      quaternion: multiplyQuaternions(delta, transform.quaternion),
+    };
+  }
+  commitTransforms(next);
+}
+
+/**
+ * Sets one axis of a group's rotation, turning every member around the shared
+ * pivot — the numeric counterpart to dragging the rotate gizmo on a group.
+ */
+export function setGroupRotationAxis(
+  groupId: string,
+  axis: 'x' | 'y' | 'z',
+  degrees: number,
+): void {
+  const group = doc().groups.find((candidate) => candidate.id === groupId);
+  if (!group?.partIds.length) return;
+  setSelectionRotationAxis(group.partIds, axis, degrees);
+}
+
+/** Sets one exact overall dimension of a regular (non-cabinet) selection as one rigid resize. */
+export function setSelectionSizeAxis(
+  ids: readonly string[],
+  axis: 'x' | 'y' | 'z',
+  millimetres: number,
+): void {
+  if (!Number.isFinite(millimetres) || ids.length < 2) return;
+  const selected = new Set(ids);
+  if (doc().groups.some((group) => group.cabinet && group.partIds.some((id) => selected.has(id)))) {
+    return;
+  }
+  const api = viewportApi();
+  if (!api) return;
+  const target = Math.min(20_000, Math.max(1, millimetres));
+  const next = api.computeGroupResize(ids, axis, target);
+  if (!next) return;
+  commitTransforms(next);
+}
+
 /** Sets one exact overall dimension of a regular group as one rigid resize. */
 export function setGroupSizeAxis(
   groupId: string,
   axis: 'x' | 'y' | 'z',
   millimetres: number,
 ): void {
-  if (!Number.isFinite(millimetres)) return;
   const group = doc().groups.find((candidate) => candidate.id === groupId);
-  // Generated cabinets have dimensional rules such as fixed panel thickness;
-  // their dedicated cabinet controls must rebuild them parametrically instead.
-  if (!group?.partIds.length || group.cabinet) return;
-  const api = viewportApi();
-  if (!api) return;
-  const target = Math.min(20_000, Math.max(1, millimetres));
-  const next = api.computeGroupResize(group.partIds, axis, target);
-  if (!next) return;
-  commitTransforms(next);
+  if (!group?.partIds.length) return;
+  setSelectionSizeAxis(group.partIds, axis, millimetres);
 }
 
 /**
@@ -1258,6 +1334,25 @@ export function snapToFloor(ids: readonly string[]): void {
   ui().showToast(ids.length > 1 ? `${ids.length} parts snapped to floor` : 'Snapped to floor');
 }
 
+const ALIGN_EDGE_PHRASE: Record<AlignEdge, string> = {
+  left: 'left',
+  right: 'right',
+  'center-x': 'centres',
+  front: 'front',
+  back: 'back',
+  top: 'top',
+  bottom: 'bottom',
+};
+
+function selectionUnitLabel(
+  state: FormaDocument,
+  unit: { kind: 'group' | 'part'; id: string },
+): string {
+  if (unit.kind === 'group')
+    return state.groups.find((group) => group.id === unit.id)?.label ?? 'Group';
+  return state.customParts.find((part) => part.id === unit.id)?.label ?? 'Piece';
+}
+
 /** Keeps the first selected piece/group fixed and snaps the second one to it. */
 export function snapSelectedTogether(): void {
   const state = doc();
@@ -1267,20 +1362,43 @@ export function snapSelectedTogether(): void {
     return;
   }
   const api = viewportApi();
-  if (!api) return;
-  const [target, moving] = units;
-  const next = api.computeSnapTogether(target!.partIds, moving!.partIds);
+  const target = units[0];
+  const moving = units[1];
+  if (!api || !target || !moving) return;
+  const next = api.computeSnapTogether(target.partIds, moving.partIds);
   if (!next) {
     ui().showToast('The selected items are already touching');
     return;
   }
   commitTransforms(next);
+  ui().showToast(`${selectionUnitLabel(state, moving)} snapped to ${selectionUnitLabel(state, target)}`);
+}
 
-  const unitLabel = (unit: (typeof units)[number]) =>
-    unit.kind === 'group'
-      ? state.groups.find((group) => group.id === unit.id)?.label ?? 'Group'
-      : state.customParts.find((part) => part.id === unit.id)?.label ?? 'Piece';
-  ui().showToast(`${unitLabel(moving!)} snapped to ${unitLabel(target!)}`);
+/**
+ * Keeps the first selected piece/group fixed and matches one bound of the
+ * second, leaving the other axes unchanged — so a wall cabinet can share a
+ * floor cabinet's left edge without leaving its hang height.
+ */
+export function alignSelected(edge: AlignEdge): void {
+  const state = doc();
+  const units = selectionUnits(state.groups, ui().selectedPartIds);
+  if (units.length !== 2) {
+    ui().showToast('Select a target, then Shift-select one piece or group to move');
+    return;
+  }
+  const api = viewportApi();
+  const target = units[0];
+  const moving = units[1];
+  if (!api || !target || !moving) return;
+  const next = api.computeAlign(target.partIds, moving.partIds, edge);
+  if (!next) {
+    ui().showToast('The selected items are already aligned');
+    return;
+  }
+  commitTransforms(next);
+  ui().showToast(
+    `${selectionUnitLabel(state, moving)} aligned ${ALIGN_EDGE_PHRASE[edge]} with ${selectionUnitLabel(state, target)}`,
+  );
 }
 
 // ─── Selection helpers ───────────────────────────────────────────────────────
