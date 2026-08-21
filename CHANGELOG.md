@@ -21,7 +21,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - Document title derived from the on-disk save/open filename.
 - Save Version keeps a checkpoint in this browser. Version History can download `{title} - Version N.forma.json`.
 - Align Left / Centres / Right, Front / Back, and Tops / Bottoms for two selected pieces or groups. The first stays fixed and only that axis moves, so a wall cabinet can share a floor cabinet's edge without leaving its hang height (IMP-008).
-- Front, Side and Top camera views while modelling, plus Side in Render next to Front / Top / ¾ Angle (IMP-009).
+- True orthographic Front, Side and Top views (no perspective foreshortening). ¾ Angle and Frame stay in perspective. Left-drag pans in those elevations (IMP-009).
 
 ### Changed
 
@@ -41,4 +41,5 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - Deleting a generated shelf or interior panel keeps the cabinet configurable (BUG-014); only removing a carcass piece (side, top, bottom, or back) demotes it.
 - Rotation sliders appear when a group or cabinet is selected and turn every member around the shared pivot (BUG-015).
 - Position and rotation sliders stay available when several groups are selected together (BUG-016).
+- Front, Side and Top are locked orthographic elevations instead of a perspective camera parked on those axes (IMP-009).
 - Add shelf and Space evenly fields show defaults (300 mm, 3 every 200 mm) and are wide enough to read.

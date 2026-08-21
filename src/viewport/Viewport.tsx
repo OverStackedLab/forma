@@ -186,11 +186,21 @@ export function Viewport() {
       measure.updateLabel();
     });
 
+    const refreshGizmo = () => gizmo.sync(useUiStore.getState().gizmoMode, decorated());
     setViewportApi({
-      frameSelection: (ids) =>
-        ids.length ? camera.frameSelection(ids) : camera.frameAll(),
-      frameAll: () => camera.frameAll(),
-      goToPreset: (preset) => camera.goTo(preset),
+      frameSelection: (ids) => {
+        if (ids.length) camera.frameSelection(ids);
+        else camera.frameAll();
+        refreshGizmo();
+      },
+      frameAll: () => {
+        camera.frameAll();
+        refreshGizmo();
+      },
+      goToPreset: (preset) => {
+        camera.goTo(preset);
+        refreshGizmo();
+      },
       exportImage: () => {
         scene.renderNow();
         return scene.renderer.domElement.toDataURL('image/png');
