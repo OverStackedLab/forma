@@ -42,4 +42,5 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - Rotation sliders appear when a group or cabinet is selected and turn every member around the shared pivot (BUG-015).
 - Position and rotation sliders stay available when several groups are selected together (BUG-016).
 - Front, Side and Top are locked orthographic elevations instead of a perspective camera parked on those axes (IMP-009).
+- A selected group's Y position is the underside on the floor, so a cabinet sitting on the grid reads 0 (BUG-017).
 - Add shelf and Space evenly fields show defaults (300 mm, 3 every 200 mm) and are wide enough to read.

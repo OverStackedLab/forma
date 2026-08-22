@@ -20,7 +20,7 @@ import {
   isLegHardwareShape,
   PANEL_PRESETS,
 } from '@/domain/catalog';
-import { groupMatching, livePartIds, selectionUnits } from '@/domain/parts';
+import { groupMatching, livePartIds, selectionPositionMetres, selectionUnits } from '@/domain/parts';
 import { eulerDegreesToQuaternion, invertQuaternion, multiplyQuaternions, quaternionToEulerDegrees } from '@/domain/rotation';
 import {
   halfExtentAlongNormalMm,
@@ -1186,8 +1186,7 @@ export function setSelectionPositionAxis(
   if (!Number.isFinite(millimetres) || ids.length < 1) return;
   const index = POSITION_AXIS_INDEX[axis];
   const transforms = ids.map((id) => ({ id, transform: transformOf(id) }));
-  const current = transforms.reduce((sum, item) => sum + item.transform.position[index], 0) /
-    transforms.length;
+  const current = selectionPositionMetres(doc().customParts, doc().transforms, ids)[index] ?? 0;
   const requested = millimetres / 1000 - current;
   const minDelta = Math.max(...transforms.map((item) => -10 - item.transform.position[index]));
   const maxDelta = Math.min(...transforms.map((item) => 10 - item.transform.position[index]));

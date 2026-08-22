@@ -5,9 +5,10 @@ import {
   groupContaining,
   groupMatching,
   livePartIds,
+  selectionPositionMetres,
   selectionUnits,
 } from './parts';
-import type { CustomPart, Group } from './types';
+import type { CustomPart, Group, Transform } from './types';
 
 const shelf: CustomPart = {
   id: 'custom-1', label: 'Shelf', w: 800, h: 18, d: 300, shape: 'box',
@@ -130,5 +131,27 @@ describe('selectionUnits', () => {
       { kind: 'part', id: 'a', partIds: ['a'] },
       { kind: 'part', id: 'loose', partIds: ['loose'] },
     ]);
+  });
+});
+
+describe('selectionPositionMetres', () => {
+  const at = (x: number, y: number, z: number): Transform => ({
+    position: [x, y, z],
+    quaternion: [0, 0, 0, 1],
+    scale: [1, 1, 1],
+  });
+
+  it('uses the underside for Y so parts on the grid read 0', () => {
+    const [x, y, z] = selectionPositionMetres(
+      [shelf, divider],
+      {
+        'custom-1': at(0, 0.009, 0),
+        'custom-2': at(0.8, 0.35, 0),
+      },
+      ['custom-1', 'custom-2'],
+    );
+    expect(x).toBeCloseTo(0.4, 8);
+    expect(y).toBeCloseTo(0, 8);
+    expect(z).toBeCloseTo(0, 8);
   });
 });

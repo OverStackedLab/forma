@@ -461,6 +461,7 @@ test('viewport clicks select one grouped piece while the Assembly group row sele
   await expect(page.getByText('Configurable cabinet · 6 pieces')).toBeVisible();
   await expect(page.getByRole('button', { name: 'Add Shelf' })).toBeVisible();
   await expect(page.getByLabel('Group X Position in millimetres')).toHaveValue('0');
+  await expect(page.getByLabel('Group Y Position in millimetres')).toHaveValue('0');
 });
 
 test('Snap Together connects two pieces and is undoable', async ({ page }) => {

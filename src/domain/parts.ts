@@ -1,4 +1,5 @@
-import type { CustomPart, Group, PartSpec } from './types';
+import { orientedHalfExtentsMm } from './spatial';
+import type { CustomPart, Group, PartSpec, Transform, Transforms } from './types';
 
 /**
  * Every panel, front and hardware item maps directly — but this is still the
@@ -80,4 +81,43 @@ export function selectionUnits(
   }
 
   return units;
+}
+
+const FALLBACK_TRANSFORM: Transform = {
+  position: [0, 0, 0],
+  quaternion: [0, 0, 0, 1],
+  scale: [1, 1, 1],
+};
+
+/**
+ * Shared selection position in metres. X and Z are the member-origin
+ * centroid; Y is the underside of the combined AABB so a group sitting on
+ * the grid reads 0, not the mid-height of its panels.
+ */
+export function selectionPositionMetres(
+  parts: readonly CustomPart[],
+  transforms: Transforms,
+  ids: readonly string[],
+): [number, number, number] {
+  if (!ids.length) return [0, 0, 0];
+  const byId = new Map(parts.map((part) => [part.id, part]));
+  let sumX = 0;
+  let sumZ = 0;
+  let minY = Infinity;
+  for (const id of ids) {
+    const transform = transforms[id] ?? FALLBACK_TRANSFORM;
+    const part = byId.get(id);
+    const extents = part
+      ? orientedHalfExtentsMm(
+          { w: part.w, h: part.h, d: part.d },
+          transform.quaternion,
+          transform.scale,
+        )
+      : { x: 0, y: 0, z: 0 };
+    sumX += transform.position[0];
+    sumZ += transform.position[2];
+    minY = Math.min(minY, transform.position[1] - extents.y / 1000);
+  }
+  const count = ids.length;
+  return [sumX / count, Number.isFinite(minY) ? minY : 0, sumZ / count];
 }
