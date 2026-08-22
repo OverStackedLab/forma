@@ -69,7 +69,7 @@ export class GizmoController {
   private dragStart: Record<string, Transform> | null = null;
 
   constructor(
-    scene: SceneManager,
+    private readonly scene: SceneManager,
     private readonly builder: ModelBuilder,
     private readonly onCommit: GizmoCommit,
   ) {
@@ -108,6 +108,7 @@ export class GizmoController {
   }
 
   sync(mode: GizmoMode, selectedIds: readonly string[]): void {
+    this.controls.camera = this.scene.camera;
     const ids = selectedIds.filter((id) => this.builder.getRoot(id));
     this.ids = ids;
     this.mode = mode;

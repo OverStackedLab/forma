@@ -13,7 +13,6 @@ const GRID_LINE_COLOR = 0x6b5f48;
  */
 export class SceneManager {
   readonly scene = new THREE.Scene();
-  readonly camera: THREE.PerspectiveCamera;
   readonly renderer: THREE.WebGLRenderer;
   readonly controls: OrbitControls;
   /** Every manufactured or purchased part shares one selectable scene group. */
@@ -23,6 +22,11 @@ export class SceneManager {
   /** Rebuilt on a grid-size change, since divisions cannot be scaled. */
   private grid!: THREE.GridHelper;
 
+  private readonly perspective: THREE.PerspectiveCamera;
+  private readonly orthographic: THREE.OrthographicCamera;
+  private active: THREE.PerspectiveCamera | THREE.OrthographicCamera;
+  private panMode = false;
+  private orthoFrustumHeight = 2;
   private readonly key: THREE.DirectionalLight;
   private scale: ViewportScale | null = null;
   private readonly resizeObserver: ResizeObserver;
@@ -32,13 +36,15 @@ export class SceneManager {
 
   constructor(private readonly container: HTMLElement) {
     // near/far and every other world-scale number are set by setGridSize below.
-    this.camera = new THREE.PerspectiveCamera(
+    this.perspective = new THREE.PerspectiveCamera(
       35,
       container.clientWidth / container.clientHeight || 1,
       0.1,
       50,
     );
-    this.camera.position.set(2.5, 1.5, 2.7);
+    this.perspective.position.set(2.5, 1.5, 2.7);
+    this.orthographic = new THREE.OrthographicCamera(-1, 1, 1, -1, 0.1, 50);
+    this.active = this.perspective;
 
     this.renderer = new THREE.WebGLRenderer({
       antialias: true,
@@ -53,7 +59,7 @@ export class SceneManager {
     this.renderer.shadowMap.type = THREE.PCFSoftShadowMap;
     container.appendChild(this.renderer.domElement);
 
-    this.controls = new OrbitControls(this.camera, this.renderer.domElement);
+    this.controls = new OrbitControls(this.perspective, this.renderer.domElement);
     this.controls.mouseButtons.LEFT = THREE.MOUSE.ROTATE;
     this.controls.enableDamping = true;
     this.controls.dampingFactor = 0.08;
@@ -100,6 +106,15 @@ export class SceneManager {
 
   setGridVisible(visible: boolean): void {
     this.grid.visible = visible;
+  }
+
+  /** The camera currently driving the renderer, picking, and gizmos. */
+  get camera(): THREE.PerspectiveCamera | THREE.OrthographicCamera {
+    return this.active;
+  }
+
+  get isOrthographic(): boolean {
+    return this.active === this.orthographic;
   }
 
   /** The scale every world-size-dependent number is currently derived from. */
@@ -154,13 +169,74 @@ export class SceneManager {
     this.controls.minDistance = next.minDistance;
     this.controls.maxDistance = next.maxDistance;
 
-    this.camera.far = next.cameraFar;
-    this.camera.updateProjectionMatrix();
+    this.perspective.far = next.cameraFar;
+    this.orthographic.far = next.cameraFar;
+    this.perspective.updateProjectionMatrix();
+    this.orthographic.updateProjectionMatrix();
   }
 
   /** Pan tool swaps the orbit control's left mouse button to panning. */
   setPanMode(pan: boolean): void {
-    this.controls.mouseButtons.LEFT = pan ? THREE.MOUSE.PAN : THREE.MOUSE.ROTATE;
+    this.panMode = pan;
+    this.applyPointerButtons();
+  }
+
+  /**
+   * Restores the perspective ¾ camera. Copies the current viewpoint so a
+   * following flight can ease out of an elevation rather than jumping.
+   */
+  usePerspective(): void {
+    if (this.active === this.perspective) {
+      this.applyPointerButtons();
+      return;
+    }
+    this.perspective.position.copy(this.orthographic.position);
+    this.perspective.up.set(0, 1, 0);
+    this.perspective.lookAt(this.controls.target);
+    this.active = this.perspective;
+    this.controls.object = this.perspective;
+    this.controls.enableRotate = true;
+    this.applyPointerButtons();
+    this.perspective.updateProjectionMatrix();
+  }
+
+  /**
+   * Switches to a locked orthographic elevation/plan. Left-drag pans; orbit
+   * is off so the view cannot tilt back into perspective.
+   */
+  useOrthographic(
+    position: THREE.Vector3,
+    target: THREE.Vector3,
+    up: THREE.Vector3,
+    frustumHeight: number,
+  ): void {
+    this.orthoFrustumHeight = frustumHeight;
+    this.orthographic.up.copy(up);
+    this.orthographic.position.copy(position);
+    this.orthographic.lookAt(target);
+    this.orthographic.zoom = 1;
+    this.controls.target.copy(target);
+    this.applyOrthoFrustum();
+    this.active = this.orthographic;
+    this.controls.object = this.orthographic;
+    this.controls.enableRotate = false;
+    this.applyPointerButtons();
+  }
+
+  private applyPointerButtons(): void {
+    this.controls.mouseButtons.LEFT =
+      this.panMode || this.active === this.orthographic ? THREE.MOUSE.PAN : THREE.MOUSE.ROTATE;
+  }
+
+  private applyOrthoFrustum(): void {
+    const aspect = this.container.clientWidth / this.container.clientHeight || 1;
+    const halfH = this.orthoFrustumHeight / 2;
+    const halfW = halfH * aspect;
+    this.orthographic.left = -halfW;
+    this.orthographic.right = halfW;
+    this.orthographic.top = halfH;
+    this.orthographic.bottom = -halfH;
+    this.orthographic.updateProjectionMatrix();
   }
 
   resize(): void {
@@ -168,8 +244,9 @@ export class SceneManager {
     const h = this.container.clientHeight;
     if (w < 1 || h < 1) return;
     this.renderer.setSize(w, h);
-    this.camera.aspect = w / h;
-    this.camera.updateProjectionMatrix();
+    this.perspective.aspect = w / h;
+    this.perspective.updateProjectionMatrix();
+    this.applyOrthoFrustum();
   }
 
   /** Renders one frame synchronously — used before reading back a PNG. */
