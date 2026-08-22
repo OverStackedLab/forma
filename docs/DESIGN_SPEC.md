@@ -196,10 +196,10 @@ The CSV export must serialize exactly what the table shows, including custom pan
 - **Click** a part in the viewport (raycast against the model group) or a row in the Assembly tree → select it. A viewport click on a grouped piece selects that piece, not the group (BUG-006).
 - **Click empty space** → clear selection.
 - **Shift-click** a part → add/toggle that part. Shift-click (or ⌘/Ctrl-click) a group row, or use the group checkbox, adds or removes every member.
-- **Two selected units** (two parts, two groups, or one of each) draw clearance dimensions in the viewport on axes where the boxes are separated.
+- **Two selected units** (two parts, two groups, or one of each) draw clearance dimensions in the viewport on axes where the boxes are separated. The first stays fixed; the gizmo attaches only to the second, so the gap updates while you move it (same order as Align).
 - **Shift-drag** → marquee box select. Critical detail: the marquee must start **lazily on pointer *move*** once the pointer passes a ~5px threshold, *not* on pointerdown. Committing on pointerdown swallows shift-click additive selection, because a zero-movement shift-click then never reaches the raycast path. While the marquee is active, disable OrbitControls and re-enable on release. Hit test by projecting each visible part's world position to screen space and testing containment. Holding ⌘/Ctrl with the marquee adds to the existing selection instead of replacing it. An empty box clears the selection.
 - **Select All** — the button or ⌘A. Must exclude deleted parts.
-- Selection is always an array, even for one part; the gizmo attaches to a temporary group when more than one part is selected.
+- Selection is always an array, even for one part. The gizmo attaches to a temporary group when more than one part is selected, except for exactly two selection units, where it drives only the second.
 
 ### Transform gizmos
 Backed by three.js `TransformControls`. Modes: translate / rotate / scale, plus a Select mode with no gizmo and a Pan mode that switches OrbitControls' left mouse button to panning. OrbitControls must be disabled while a gizmo drag is in progress (`dragging-changed`). Transforms are persisted per part id in a `manualTransforms` map so they survive model rebuilds.
@@ -210,7 +210,7 @@ Toggle in the gizmo toolbar. When on, translation magnetically snaps to nearby p
 ### Measuring
 Toggle in the toolbar. Click two points on the model; each click raycasts and records a hit point. Renders two 8 mm spheres and a dashed line in `#4FA3FF`, with a DOM label at the projected midpoint showing the distance in the current display unit. A third click starts a fresh measurement.
 
-Selecting exactly two pieces or groups also draws SketchUp-style witnesses and a length label for each axis with a positive clearance (side-by-side, stacked, or front-to-back). Touching or overlapping faces stay quiet. The overlay reads live mesh bounds so a gizmo drag stays truthful, and it hides in Render.
+Selecting exactly two pieces or groups also draws SketchUp-style witnesses and a length label for each axis with a positive clearance (side-by-side, stacked, or front-to-back). Touching or overlapping faces stay quiet. The overlay reads live mesh bounds so a gizmo drag of the second unit stays truthful, and it hides in Render.
 
 ### Keyboard
 | Key | Action |
