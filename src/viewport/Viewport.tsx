@@ -1,5 +1,6 @@
 import { useEffect, useRef } from 'react';
 import { Vector3 } from 'three';
+import { gizmoPartIds } from '@/domain/parts';
 import {
   addCabinetPreset,
   addCustomPanel,
@@ -114,6 +115,12 @@ export function Viewport() {
       return ui.viewMode === 'render' ? [] : ui.selectedPartIds;
     };
 
+    const gizmoSelection = () => {
+      const ui = useUiStore.getState();
+      if (ui.viewMode === 'render') return [];
+      return gizmoPartIds(useDocumentStore.getState().groups, ui.selectedPartIds);
+    };
+
     const syncScene = () => {
       const doc = useDocumentStore.getState();
       const ui = useUiStore.getState();
@@ -127,7 +134,7 @@ export function Viewport() {
         defaultHardwareFinishId: doc.defaultHardwareFinishId,
       });
       overlay.apply(decorated());
-      gizmo.sync(ui.gizmoMode, decorated());
+      gizmo.sync(ui.gizmoMode, gizmoSelection());
     };
 
     syncScene();
@@ -150,13 +157,13 @@ export function Viewport() {
       (s) => s.selectedPartIds,
       () => {
         overlay.apply(decorated());
-        gizmo.sync(useUiStore.getState().gizmoMode, decorated());
+        gizmo.sync(useUiStore.getState().gizmoMode, gizmoSelection());
       },
     );
     const unsubGizmoMode = useUiStore.subscribe(
       (s) => s.gizmoMode,
       (mode) => {
-        gizmo.sync(mode, decorated());
+        gizmo.sync(mode, gizmoSelection());
         scene.setPanMode(mode === 'pan');
       },
     );
@@ -164,7 +171,7 @@ export function Viewport() {
       (s) => s.viewMode,
       () => {
         overlay.apply(decorated());
-        gizmo.sync(useUiStore.getState().gizmoMode, decorated());
+        gizmo.sync(useUiStore.getState().gizmoMode, gizmoSelection());
         syncPresentationVisibility();
         scene.resize();
       },
@@ -199,7 +206,7 @@ export function Viewport() {
       dimensions.updateLabels();
     });
 
-    const refreshGizmo = () => gizmo.sync(useUiStore.getState().gizmoMode, decorated());
+    const refreshGizmo = () => gizmo.sync(useUiStore.getState().gizmoMode, gizmoSelection());
     setViewportApi({
       frameSelection: (ids) => {
         if (ids.length) camera.frameSelection(ids);

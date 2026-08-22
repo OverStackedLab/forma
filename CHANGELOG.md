@@ -29,6 +29,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Changed
 
+- With two pieces or groups selected, the gizmo moves only the second so the first stays put and the clearance updates (same order as Align).
 - Default display unit is centimetres. Domain values stay millimetres.
 - Prebuilt cabinets use IKEA METOD frame sizes: Base 400/600/800 (800 × 600), Wall 600/800 (800 × 370, hung at 1400 mm), High 600 (2200 × 600). Loose side, divider, back, and door presets match the 800 mm carcass. Older library ids still load.
 - Library splits **Panels** and **Fronts** into separate sections.

@@ -4,6 +4,7 @@ import {
   cabinetContainingSelection,
   groupContaining,
   groupInclusion,
+  gizmoPartIds,
   groupMatching,
   livePartIds,
   selectionPositionMetres,
@@ -156,6 +157,27 @@ describe('selectionUnits', () => {
     expect(selectionUnits([first], ['a', 'loose'])).toEqual([
       { kind: 'part', id: 'a', partIds: ['a'] },
       { kind: 'part', id: 'loose', partIds: ['loose'] },
+    ]);
+  });
+});
+
+describe('gizmoPartIds', () => {
+  const first: Group = { id: 'group-1', label: 'First', partIds: ['a', 'b'] };
+  const second: Group = { id: 'group-2', label: 'Second', partIds: ['c', 'd'] };
+
+  it('drives only the second unit when exactly two are selected', () => {
+    expect(gizmoPartIds([first, second], ['a', 'b', 'c', 'd'])).toEqual(['c', 'd']);
+    expect(gizmoPartIds([first], ['a', 'loose'])).toEqual(['loose']);
+  });
+
+  it('drives the whole selection when there are not exactly two units', () => {
+    expect(gizmoPartIds([first], ['a', 'b'])).toEqual(['a', 'b']);
+    expect(gizmoPartIds([first, second], ['a', 'b', 'c', 'd', 'loose'])).toEqual([
+      'a',
+      'b',
+      'c',
+      'd',
+      'loose',
     ]);
   });
 });

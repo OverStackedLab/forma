@@ -880,8 +880,8 @@ function PropertiesTab() {
               <hr className="my-4 border-hairline" />
               <SectionHeader>Align</SectionHeader>
               <p className="mb-3 text-[10.5px] leading-relaxed text-ink/40">
-                The first selected item stays fixed. The second matches one edge; other axes do not
-                move.
+                The first selected item stays fixed. The gizmo drives only the second. Align
+                matches one edge; other axes do not move.
               </p>
               <div className="mb-3 flex flex-wrap gap-2">
                 {ALIGN_EDGES.map((edge) => (

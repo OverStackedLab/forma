@@ -110,6 +110,20 @@ export function selectionUnits(
   return units;
 }
 
+/**
+ * Parts the transform gizmo should drive. Two units use the Align convention:
+ * the first stays fixed and only the second moves, so clearance witnesses stay
+ * live while you place the mover.
+ */
+export function gizmoPartIds(
+  groups: readonly Group[],
+  selectedIds: readonly string[],
+): string[] {
+  const units = selectionUnits(groups, selectedIds);
+  const mover = units.length === 2 ? units[1] : undefined;
+  return mover ? [...mover.partIds] : [...selectedIds];
+}
+
 const FALLBACK_TRANSFORM: Transform = {
   position: [0, 0, 0],
   quaternion: [0, 0, 0, 1],

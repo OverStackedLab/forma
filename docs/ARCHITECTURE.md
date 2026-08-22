@@ -71,6 +71,7 @@ the lazy chunk may not be loaded yet.
 
 **Two selected units show clearance in the scene.** `selectionUnits` collapses a
 flat part selection into rigid groups. When there are exactly two units,
+`gizmoPartIds` hands the gizmo only the second unit so the first stays put.
 `SelectionDimensions` reads live halo-excluding AABBs and `gapsBetweenBoxes`
 draws witnesses on every axis where the boxes are separated. Touching or
 overlapping faces stay quiet. Render mode hides the overlay.
