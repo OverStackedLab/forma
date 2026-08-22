@@ -10,8 +10,9 @@ import {
   isLegHardwareShape,
   resolveAppearance,
 } from '@/domain/catalog';
-import { oakGrainDataUrl } from '@/domain/oakGrain';
-import { cabinetContainingSelection, groupMatching, selectionUnits } from '@/domain/parts';
+import { OAK_GRAIN_URL } from '@/domain/oakGrain';
+import { WALNUT_GRAIN_URL } from '@/domain/walnutGrain';
+import { cabinetContainingSelection, groupMatching, selectionPositionMetres, selectionUnits } from '@/domain/parts';
 import { quaternionToEulerDegrees } from '@/domain/rotation';
 import type { CabinetConfig } from '@/domain/types';
 import { convertedValue, convertRange, fromMm, toMm, type DisplayUnit } from '@/domain/units';
@@ -167,13 +168,10 @@ function SelectionPositionFields({
   asGroup: boolean;
 }) {
   const transforms = useDocumentStore((state) => state.transforms);
+  const customParts = useDocumentStore((state) => state.customParts);
   const unit = useUiStore((state) => state.displayUnit);
   const range = convertRange(POSITION_LIMITS, unit);
-  const members = partIds.map((id) => transforms[id] ?? IDENTITY_TRANSFORM);
-  const pivot = POSITION_AXES.map(({ index }) =>
-    members.reduce((sum, transform) => sum + transform.position[index], 0) /
-    Math.max(members.length, 1),
-  );
+  const pivot = selectionPositionMetres(customParts, transforms, partIds);
   const prefix = asGroup ? 'Group ' : '';
 
   return (
@@ -183,7 +181,7 @@ function SelectionPositionFields({
         <SliderField
           key={axis}
           label={`${prefix}${label}`}
-          value={convertedValue(pivot[index]! * 1000, unit)}
+          value={convertedValue((pivot[index] ?? 0) * 1000, unit)}
           min={range.min}
           max={range.max}
           step={range.step}
@@ -193,7 +191,8 @@ function SelectionPositionFields({
         />
       ))}
       <p className="mb-4 text-[10.5px] leading-relaxed text-ink/35">
-        Position uses the shared pivot; every selected part moves by the same amount.
+        Y is the underside on the floor. X and Z are the shared centre; every selected part moves
+        by the same amount.
       </p>
       <hr className="my-4 border-hairline" />
     </>
@@ -956,6 +955,12 @@ function FinishTab() {
   );
 }
 
+function grainSwatch(finishId: string): string | undefined {
+  if (finishId === 'oak') return `url(${OAK_GRAIN_URL})`;
+  if (finishId === 'walnut') return `url(${WALNUT_GRAIN_URL})`;
+  return undefined;
+}
+
 /**
  * One user-facing finish picker. The existing material/color pair remains an
  * internal storage detail so older saved designs still load, but users only
@@ -1037,7 +1042,7 @@ function FinishPicker() {
               className="block h-7 w-7 flex-none rounded-md border border-white/15 bg-cover bg-center shadow-sm"
               style={{
                 backgroundColor: appearance.color,
-                backgroundImage: finish.id === 'oak' ? `url(${oakGrainDataUrl()})` : undefined,
+                backgroundImage: grainSwatch(finish.id),
               }}
             />
             <span className="text-[11px] leading-tight">{finish.label}</span>

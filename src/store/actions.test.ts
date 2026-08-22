@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { selectionPositionMetres } from '@/domain/parts';
 import type { Transform } from '@/domain/types';
 import * as download from '@/ui/download';
 import {
@@ -480,6 +481,23 @@ describe('library construction actions', () => {
       expect(value - after[0]!).toBeCloseTo(before[index]! - before[0]!, 8);
     });
     expect(state.groups[0]?.cabinet?.width).toBe(600);
+  });
+
+  it('sets group Y from the underside so a floor cabinet starts at 0', () => {
+    addCabinetPreset('base-600');
+    const group = useDocumentStore.getState().groups[0]!;
+    const ids = group.partIds;
+    const snapshot = () => useDocumentStore.getState();
+    expect(
+      selectionPositionMetres(snapshot().customParts, snapshot().transforms, ids)[1],
+    ).toBeCloseTo(0, 6);
+
+    setGroupPositionAxis(group.id, 'y', 100);
+
+    expect(
+      selectionPositionMetres(snapshot().customParts, snapshot().transforms, ids)[1],
+    ).toBeCloseTo(0.1, 6);
+    expect(snapshot().groups[0]?.cabinet?.width).toBe(600);
   });
 
   it('rotates a group around its shared pivot without changing cabinet metadata', () => {

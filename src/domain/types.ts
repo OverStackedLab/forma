@@ -26,7 +26,7 @@ export type ColorId =
   | 'matte-black'
   | 'steel';
 /** Panel colors exposed in the UI. */
-export type FinishId = 'oak' | 'dark-gray' | 'dark-gray-green' | 'white';
+export type FinishId = 'oak' | 'walnut' | 'dark-gray' | 'dark-gray-green' | 'white';
 export type HardwareFinishId = 'brushed-brass' | 'matte-black' | 'brushed-steel' | 'matte-white';
 export type AppearanceFinishId = FinishId | HardwareFinishId;
 export type PanelPresetId =

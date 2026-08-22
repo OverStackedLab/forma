@@ -13,8 +13,8 @@ import type {
 
 /** The wood species a part is milled from. Its own color/roughness shows through when the color is 'natural'. */
 export const MATERIALS: readonly Material[] = [
-  { id: 'walnut', label: 'Walnut', color: '#4b3327', roughness: 0.55, metalness: 0.04 },
-  { id: 'oak', label: 'Oak', color: '#c7a374', roughness: 0.58, metalness: 0.03 },
+  { id: 'walnut', label: 'Walnut', color: '#6b4f3b', roughness: 0.42, metalness: 0 },
+  { id: 'oak', label: 'Oak', color: '#d4b78f', roughness: 0.58, metalness: 0.03 },
   { id: 'ash', label: 'Ash', color: '#d9cdb6', roughness: 0.45, metalness: 0.02 },
   { id: 'metal', label: 'Metal', color: '#9a9a9a', roughness: 0.28, metalness: 0.82 },
 ];
@@ -35,6 +35,7 @@ export const COLORS: readonly Color[] = [
 /** Panel colors. Each resolves to one internal material/color pair. */
 export const FINISHES: readonly Finish[] = [
   { id: 'oak', label: 'Oak', materialId: 'oak', colorId: 'natural' },
+  { id: 'walnut', label: 'Walnut', materialId: 'walnut', colorId: 'natural' },
   { id: 'dark-gray', label: 'Dark Gray', materialId: 'ash', colorId: 'dark-gray' },
   { id: 'dark-gray-green', label: 'Dark Gray-Green', materialId: 'ash', colorId: 'dark-gray-green' },
   { id: 'white', label: 'White', materialId: 'ash', colorId: 'white' },

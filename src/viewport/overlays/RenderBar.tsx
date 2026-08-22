@@ -8,7 +8,7 @@ const PRESETS: { id: CameraPreset; label: string }[] = [
   { id: 'front', label: 'Front' },
   { id: 'side', label: 'Side' },
   { id: 'top', label: 'Top' },
-  { id: 'angle', label: '¾ Angle' },
+  { id: 'angle', label: '3D' },
 ];
 
 export function RenderBar() {
