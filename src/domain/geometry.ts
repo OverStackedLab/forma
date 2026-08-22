@@ -1,5 +1,6 @@
 import { resolveAppearance } from './catalog';
-import { createOakGrainCanvas } from './oakGrain';
+import { OAK_GRAIN_URL } from './oakGrain';
+import { WALNUT_GRAIN_URL } from './walnutGrain';
 import type { PanelShape, PartSpec } from './types';
 
 /**
@@ -288,6 +289,7 @@ export class GeometryCache {
 export class MaterialCache {
   private readonly cache = new Map<string, TMaterial>();
   private oakMap: TTexture | null = null;
+  private walnutMap: TTexture | null = null;
 
   constructor(private readonly THREE: ThreeModule) {}
 
@@ -296,11 +298,11 @@ export class MaterialCache {
     const key = `${materialId ?? ''}:${colorId ?? ''}`;
     let m = this.cache.get(key);
     if (!m) {
-      const texturedOak = materialId === 'oak' && (colorId === 'natural' || !colorId);
+      const grain = this.naturalGrain(materialId, colorId);
       m = new this.THREE.MeshStandardMaterial({
-        // Texture already carries the oak color; keep white so the map reads true.
-        color: texturedOak ? '#ffffff' : appearance.color,
-        map: texturedOak ? this.oakTexture() : null,
+        // Texture already carries the wood color; keep white so the map reads true.
+        color: grain ? '#ffffff' : appearance.color,
+        map: grain,
         roughness: appearance.roughness,
         metalness: appearance.metalness,
       });
@@ -309,23 +311,38 @@ export class MaterialCache {
     return m;
   }
 
-  private oakTexture(): TTexture {
-    if (!this.oakMap) {
-      const texture = new this.THREE.CanvasTexture(createOakGrainCanvas());
-      texture.colorSpace = this.THREE.SRGBColorSpace;
-      texture.wrapS = this.THREE.RepeatWrapping;
-      texture.wrapT = this.THREE.RepeatWrapping;
-      texture.anisotropy = 8;
-      this.oakMap = texture;
-    }
-    return this.oakMap;
+  private naturalGrain(materialId: string | undefined, colorId: string | undefined): TTexture | null {
+    if (colorId && colorId !== 'natural') return null;
+    if (materialId === 'oak') return this.grainTexture('oak');
+    if (materialId === 'walnut') return this.grainTexture('walnut');
+    return null;
+  }
+
+  private grainTexture(species: 'oak' | 'walnut'): TTexture {
+    const existing = species === 'oak' ? this.oakMap : this.walnutMap;
+    if (existing) return existing;
+    const texture = new this.THREE.TextureLoader().load(
+      species === 'oak' ? OAK_GRAIN_URL : WALNUT_GRAIN_URL,
+    );
+    texture.colorSpace = this.THREE.SRGBColorSpace;
+    texture.wrapS = this.THREE.RepeatWrapping;
+    texture.wrapT = this.THREE.RepeatWrapping;
+    texture.anisotropy = 8;
+    // Close-up fills a face once if left at 1×. Walnut's stave joints are
+    // large in that photo, so 2× reads as grain instead of one worktop print.
+    if (species === 'walnut') texture.repeat.set(2, 2);
+    if (species === 'oak') this.oakMap = texture;
+    else this.walnutMap = texture;
+    return texture;
   }
 
   dispose(): void {
     for (const m of this.cache.values()) m.dispose();
     this.cache.clear();
     this.oakMap?.dispose();
+    this.walnutMap?.dispose();
     this.oakMap = null;
+    this.walnutMap = null;
   }
 }
 

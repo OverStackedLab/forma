@@ -10,7 +10,8 @@ import {
   isLegHardwareShape,
   resolveAppearance,
 } from '@/domain/catalog';
-import { oakGrainDataUrl } from '@/domain/oakGrain';
+import { OAK_GRAIN_URL } from '@/domain/oakGrain';
+import { WALNUT_GRAIN_URL } from '@/domain/walnutGrain';
 import { cabinetContainingSelection, groupMatching, selectionPositionMetres, selectionUnits } from '@/domain/parts';
 import { quaternionToEulerDegrees } from '@/domain/rotation';
 import type { CabinetConfig } from '@/domain/types';
@@ -954,6 +955,12 @@ function FinishTab() {
   );
 }
 
+function grainSwatch(finishId: string): string | undefined {
+  if (finishId === 'oak') return `url(${OAK_GRAIN_URL})`;
+  if (finishId === 'walnut') return `url(${WALNUT_GRAIN_URL})`;
+  return undefined;
+}
+
 /**
  * One user-facing finish picker. The existing material/color pair remains an
  * internal storage detail so older saved designs still load, but users only
@@ -1035,7 +1042,7 @@ function FinishPicker() {
               className="block h-7 w-7 flex-none rounded-md border border-white/15 bg-cover bg-center shadow-sm"
               style={{
                 backgroundColor: appearance.color,
-                backgroundImage: finish.id === 'oak' ? `url(${oakGrainDataUrl()})` : undefined,
+                backgroundImage: grainSwatch(finish.id),
               }}
             />
             <span className="text-[11px] leading-tight">{finish.label}</span>

@@ -37,6 +37,7 @@ describe('resolveAppearance', () => {
 describe('finishForAppearance', () => {
   it('maps a natural wood pair to its matching finish', () => {
     expect(finishForAppearance('oak', 'natural').label).toBe('Oak');
+    expect(finishForAppearance('walnut', 'natural').label).toBe('Walnut');
   });
 
   it('maps older mixed pairs to the closest user-facing finish', () => {

@@ -357,7 +357,7 @@ test('render mode hides the sidebars and exposes camera presets', async ({ page 
   await expect(page.getByRole('button', { name: 'Front', exact: true })).toBeVisible();
   await expect(page.getByRole('button', { name: 'Side', exact: true })).toBeVisible();
   await expect(page.getByRole('button', { name: 'Top', exact: true })).toBeVisible();
-  await expect(page.getByRole('button', { name: '¾ Angle' })).toBeVisible();
+  await expect(page.getByRole('button', { name: '3D' })).toBeVisible();
 });
 
 test('model mode offers front, side and top views', async ({ page }) => {
@@ -366,6 +366,7 @@ test('model mode offers front, side and top views', async ({ page }) => {
   await page.getByRole('button', { name: 'Front', exact: true }).click();
   await page.getByRole('button', { name: 'Side', exact: true }).click();
   await page.getByRole('button', { name: 'Top', exact: true }).click();
+  await page.getByRole('button', { name: '3D' }).click();
   await expect(page.getByRole('button', { name: 'Frame' })).toBeVisible();
 });
 

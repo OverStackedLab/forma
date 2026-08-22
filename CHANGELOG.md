@@ -12,6 +12,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - BAGGANÄS knob and ENERYDA bow-pull geometry in the hardware library.
 - ENHET cabinet legs (IKEA 104.490.18, 125 mm) in the hardware library.
 - Oak wood-grain texture for the Oak color.
+- Walnut color with photographed grain, mapped like Oak.
 - Cabinet shelf placement by explicit height or even spacing.
 - Cabinet vertical panels by explicit offset from the left or even spacing. Shelves split into bays around them.
 - Favicon from the toolbar F mark.
@@ -21,7 +22,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - Document title derived from the on-disk save/open filename.
 - Save Version keeps a checkpoint in this browser. Version History can download `{title} - Version N.forma.json`.
 - Align Left / Centres / Right, Front / Back, and Tops / Bottoms for two selected pieces or groups. The first stays fixed and only that axis moves, so a wall cabinet can share a floor cabinet's edge without leaving its hang height (IMP-008).
-- True orthographic Front, Side and Top views (no perspective foreshortening). ¾ Angle and Frame stay in perspective. Left-drag pans in those elevations (IMP-009).
+- True orthographic Front, Side and Top views (no perspective foreshortening). 3D and Frame stay in perspective. Left-drag pans in those elevations (IMP-009).
+- 3D camera button next to Front / Side / Top.
 
 ### Changed
 
@@ -43,4 +45,5 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - Position and rotation sliders stay available when several groups are selected together (BUG-016).
 - Front, Side and Top are locked orthographic elevations instead of a perspective camera parked on those axes (IMP-009).
 - A selected group's Y position is the underside on the floor, so a cabinet sitting on the grid reads 0 (BUG-017).
+- Oak uses the photographed grain (lighter honey oak) instead of the procedural brown swatch.
 - Add shelf and Space evenly fields show defaults (300 mm, 3 every 200 mm) and are wide enough to read.
