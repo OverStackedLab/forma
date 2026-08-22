@@ -14,6 +14,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - Oak wood-grain texture for the Oak color.
 - Walnut color with photographed grain, mapped like Oak.
 - Assembly group checkboxes add or remove a whole group from the selection.
+- Selecting two pieces or groups draws the clearance between them in the viewport.
 - Cabinet shelf placement by explicit height or even spacing.
 - Cabinet vertical panels by explicit offset from the left or even spacing. Shelves split into bays around them.
 - Favicon from the toolbar F mark.

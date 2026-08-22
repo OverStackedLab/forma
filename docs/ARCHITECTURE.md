@@ -15,7 +15,7 @@ derived from the same part list.
 |---|---|
 | `src/domain/` | Framework-free and pure. Never imports React or three.js at module scope — `THREE` is injected — so it unit-tests in Node and three.js stays code-splittable. `computePartSpecs()` is the single flat list of live parts that the mesh builder, assembly tree, part count, Select All and the BOM all consume, which is what keeps deletions honoured everywhere at once. |
 | `src/store/` | `documentStore` holds the undoable, persisted document; `uiStore` holds ephemeral UI state; `history.ts` holds the undo/redo stacks as module-level arrays (not Zustand), read from React via `useSyncExternalStore`. All document mutations go through `commit()`, which snapshots the entire document slice. `actions.ts` is the only place components mutate the design from. `persistence.ts` autosaves to `localStorage` behind a schema version. |
-| `src/viewport/` | The three.js layer, lazy-loaded. Imperative, not declarative: `Viewport.tsx` is a thin shell whose single `useEffect` constructs `SceneManager` (renderer, camera, lights, loop), `ModelBuilder` (document → meshes) and the controllers for picking, gizmos, measuring and camera flight, subscribes them to the stores, and disposes every one of them on unmount. Floating canvas chrome stays React. |
+| `src/viewport/` | The three.js layer, lazy-loaded. Imperative, not declarative: `Viewport.tsx` is a thin shell whose single `useEffect` constructs `SceneManager` (renderer, camera, lights, loop), `ModelBuilder` (document → meshes) and the controllers for picking, gizmos, measuring, selection dimensions and camera flight, subscribes them to the stores, and disposes every one of them on unmount. Floating canvas chrome stays React. |
 | `src/ui/` | Presentational React components — toolbar, sidebars, cut list, status bar, keyboard shortcuts, primitives. Styling is Tailwind classes on components, tokens from `theme.css` — never CSS strings assembled in the state layer. |
 
 ## How a change flows
@@ -47,6 +47,8 @@ can't permanently overwrite a panel's catalog dimensions, and changing a
 dimension is a scale write rather than a geometry allocation. All box parts share
 one `BoxGeometry`, all knobs one lathe geometry, and materials are cached by
 material + colour — which is why removing a single part must never dispose them.
+Natural Oak and Walnut share one photographed grain map each (`public/oak-grain.jpg`,
+`public/walnut-grain.jpg`) used by both the PBR material and the Color swatch.
 
 **Cabinets are groups that remember they are cabinets.** `buildCabinetLayout`
 generates ordinary panels bundled into a `Group` carrying a `cabinet` config.
@@ -66,6 +68,12 @@ group-resize, snap-together and align need live meshes to compute bounds. Rather
 through the React tree, the viewport registers a small imperative API as a module
 singleton on mount and clears it on unmount; callers use optional chaining since
 the lazy chunk may not be loaded yet.
+
+**Two selected units show clearance in the scene.** `selectionUnits` collapses a
+flat part selection into rigid groups. When there are exactly two units,
+`SelectionDimensions` reads live halo-excluding AABBs and `gapsBetweenBoxes`
+draws witnesses on every axis where the boxes are separated. Touching or
+overlapping faces stay quiet. Render mode hides the overlay.
 
 **Persistence is schema-versioned.** Autosave is debounced into `localStorage`
 under a versioned envelope (currently schema 5), with migrations from schema 4
@@ -122,7 +130,8 @@ with it:
   projection controls, metal finishes, rounded geometry, and their own Cut
   List section rather than pretending to be sheet goods.
 - The Assembly tree is flat for loose parts and hierarchical for saved groups
-  and generated cabinets.
+  and generated cabinets. A checkbox on each group row adds or removes every
+  member without replacing the rest of the selection.
 - Saved documents are currently schema 5. Schema 4 applies the current appearance
   defaults. Schema-3 panel designs migrate to world-aligned dimensions and
   explicit manufacturing metadata. A schema-1 save (sideboard dims, leg/handle/base
