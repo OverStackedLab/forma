@@ -3,9 +3,11 @@ import {
   computePartSpecs,
   cabinetContainingSelection,
   groupContaining,
+  groupInclusion,
   groupMatching,
   livePartIds,
   selectionPositionMetres,
+  selectionTogglingGroup,
   selectionUnits,
 } from './parts';
 import type { CustomPart, Group, Transform } from './types';
@@ -50,6 +52,30 @@ describe('livePartIds', () => {
 
   it('is empty for an empty scene', () => {
     expect(livePartIds([])).toEqual([]);
+  });
+});
+
+describe('groupInclusion', () => {
+  const members = ['a', 'b', 'c'];
+
+  it('is none, partial, or all', () => {
+    expect(groupInclusion(members, [])).toBe('none');
+    expect(groupInclusion(members, ['a'])).toBe('partial');
+    expect(groupInclusion(members, ['a', 'b', 'c'])).toBe('all');
+    expect(groupInclusion(members, ['a', 'b', 'c', 'd'])).toBe('all');
+  });
+});
+
+describe('selectionTogglingGroup', () => {
+  const members = ['a', 'b'];
+
+  it('adds the group when it is not fully selected', () => {
+    expect(selectionTogglingGroup(['x'], members)).toEqual(['x', 'a', 'b']);
+    expect(selectionTogglingGroup(['a'], members)).toEqual(['a', 'b']);
+  });
+
+  it('removes only that group when every member is selected', () => {
+    expect(selectionTogglingGroup(['a', 'b', 'x'], members)).toEqual(['x']);
   });
 });
 

@@ -33,7 +33,9 @@ import {
   setPositionAxis,
   setSelectionPositionAxis,
   setSelectionRotationAxis,
+  selectGroup,
   titleFromFilename,
+  toggleGroupSelection,
 } from './actions';
 import { createDefaultDocument, useDocumentStore } from './documentStore';
 import { canUndo, clearHistory, redo, undo } from './history';
@@ -573,6 +575,17 @@ describe('library construction actions', () => {
       expect(position[2]! - nextPivot[2]!).toBeCloseTo(-dx, 8);
     });
     expect(useDocumentStore.getState().groups.map((group) => group.cabinet?.width)).toEqual([600, 600]);
+  });
+
+  it('toggles a group in or out of a multi-group selection', () => {
+    addCabinetPreset('base-600');
+    addCabinetPreset('base-600');
+    const [first, second] = useDocumentStore.getState().groups;
+    selectGroup(first!.id);
+    toggleGroupSelection(second!.id);
+    expect(useUiStore.getState().selectedPartIds).toEqual([...first!.partIds, ...second!.partIds]);
+    toggleGroupSelection(first!.id);
+    expect(useUiStore.getState().selectedPartIds).toEqual(second!.partIds);
   });
 });
 
