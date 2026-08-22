@@ -13,6 +13,7 @@ import { CameraController } from './CameraController';
 import { GizmoController } from './GizmoController';
 import { MeasureController } from './MeasureController';
 import { ModelBuilder } from './ModelBuilder';
+import { SelectionDimensions } from './SelectionDimensions';
 import { PickController } from './PickController';
 import { SceneManager } from './SceneManager';
 import { SelectionOverlay } from './SelectionOverlay';
@@ -46,6 +47,7 @@ function measureBounds(builder: ModelBuilder, ids: readonly string[]) {
 export function Viewport() {
   const containerRef = useRef<HTMLDivElement>(null);
   const measureLabelRef = useRef<HTMLDivElement>(null);
+  const gapLabelsRef = useRef<HTMLDivElement>(null);
   const viewMode = useUiStore((s) => s.viewMode);
 
   useEffect(() => {
@@ -58,6 +60,8 @@ export function Viewport() {
     const camera = new CameraController(scene, builder);
     const measure = new MeasureController(scene);
     measure.setLabelElement(measureLabelRef.current);
+    const dimensions = new SelectionDimensions(scene);
+    dimensions.setLabelRoot(gapLabelsRef.current);
 
     const gizmo = new GizmoController(scene, builder, (transforms, context) => {
       if (
@@ -136,6 +140,7 @@ export function Viewport() {
       const editing = state.viewMode !== 'render';
       scene.setGridVisible(editing && state.gridVisible);
       measure.setVisible(editing);
+      dimensions.setVisible(editing);
     };
     syncPresentationVisibility();
 
@@ -184,6 +189,14 @@ export function Viewport() {
     const unsubFrame = scene.onBeforeRender(() => {
       camera.update();
       measure.updateLabel();
+      const ui = useUiStore.getState();
+      const doc = useDocumentStore.getState();
+      dimensions.sync(
+        builder,
+        ui.viewMode === 'render' ? [] : ui.selectedPartIds,
+        doc.groups,
+      );
+      dimensions.updateLabels();
     });
 
     const refreshGizmo = () => gizmo.sync(useUiStore.getState().gizmoMode, decorated());
@@ -229,6 +242,7 @@ export function Viewport() {
       pick.dispose();
       gizmo.dispose();
       measure.dispose();
+      dimensions.dispose();
       overlay.dispose();
       camera.dispose();
       builder.dispose();
@@ -257,6 +271,7 @@ export function Viewport() {
         ref={measureLabelRef}
         className="pointer-events-none absolute hidden -translate-x-1/2 -translate-y-[130%] rounded-[5px] border border-select/40 bg-canvas px-1.5 py-0.5 font-mono text-[11px] text-select"
       />
+      <div ref={gapLabelsRef} className="pointer-events-none absolute inset-0" />
     </div>
   );
 }

@@ -29,9 +29,9 @@ items or generated cabinet members.
 
 | Path | Responsibility |
 | --- | --- |
-| `src/domain/` | Framework-free domain logic: types, catalog, cabinets, parts, BOM/CSV, geometry builders, units, workspace math |
+| `src/domain/` | Framework-free domain logic: types, catalog, cabinets, parts, BOM/CSV, geometry builders, units, workspace math. Photographed grain URLs live here (`oakGrain.ts`, `walnutGrain.ts`) so the Color swatch and `MaterialCache` share one file from `public/`. |
 | `src/store/` | Zustand stores, `commit()` history, persistence, document mutations (`actions.ts`) |
-| `src/viewport/` | Imperative Three.js scene (lazy-loaded): managers, controllers, `viewportApi`, React overlays |
+| `src/viewport/` | Imperative Three.js scene (lazy-loaded): managers, controllers, selection-gap dimensions, `viewportApi`, React overlays |
 | `src/ui/` | App chrome: toolbar, sidebars, cut list, primitives, keyboard shortcuts |
 | `src/styles/theme.css` | Tailwind v4 `@theme` tokens + `@layer base` resets |
 | `e2e/` | Playwright smoke tests |
@@ -198,8 +198,9 @@ the chunk may not be ready yet.
 
 ### Bounds
 
-Selection halos are scaled ~1.045×. Measurement and camera framing must use
-halo-excluding bounds helpers (`bounds.ts`), not naive `Box3.setFromObject`.
+Selection halos are scaled ~1.045×. Measurement, camera framing, snap/align, and
+selection-gap dimensions must use halo-excluding bounds helpers (`bounds.ts`),
+not naive `Box3.setFromObject`.
 
 ---
 
@@ -360,7 +361,7 @@ Read these before changing picking, history, cabinets, or materials:
 1. **Marquee is lazy** — arm on pointerdown, start after movement threshold
 2. **Pointers on the canvas only** — not the viewport container
 3. **Shared geometries/materials** — dispose only from caches on teardown
-4. **Halos inflate bounds** — exclude them from measure/frame/snap boxes
+4. **Halos inflate bounds** — exclude them from measure/frame/snap/gap boxes
 5. **`preserveDrawingBuffer: true`** — required for PNG export
 6. **Metadata outside `commit()`** — patch history with `syncHistoryDocumentMeta()`
 7. **Demoted cabinets** — missing `cabinet` on a current-schema group means “regular group”

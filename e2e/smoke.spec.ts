@@ -769,6 +769,21 @@ test('Assembly group checkboxes add a second group without replacing the first',
   await expect(page.getByText('Editing: Base 600')).toBeVisible();
 });
 
+test('two selected panels show the clearance between them', async ({ page }) => {
+  await gotoMm(page);
+  await insertShelf(page);
+  await insertShelf(page);
+  await expect(page.locator('canvas')).toBeVisible();
+  const yPosition = page.getByLabel('Y Position in millimetres');
+  await yPosition.fill('200');
+  await yPosition.blur();
+  await page.getByRole('tab', { name: 'Assembly' }).click();
+  const shelves = page.getByRole('treeitem', { name: 'Shelf Hide Shelf' });
+  await shelves.nth(0).click();
+  await shelves.nth(1).click({ modifiers: ['Shift'] });
+  await expect(page.getByTestId('selection-dimension').filter({ hasText: '173 mm' })).toBeVisible();
+});
+
 test('switching to mm converts the dimension fields and round-trips back to cm', async ({
   page,
 }) => {

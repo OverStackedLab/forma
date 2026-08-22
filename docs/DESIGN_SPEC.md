@@ -26,7 +26,7 @@ The task is to **recreate this design in the target codebase's existing environm
 
 Two important exceptions to "don't copy the code":
 
-1. **`furniture-model.js` is real, portable domain logic.** It is a dependency-free ES module containing the parametric layout math, the geometry builder, the part metadata registry, and the BOM/cut-list calculator. It has no framework coupling and only takes `THREE` as an injected argument. This file can and should be lifted more or less as-is — it is the single source of truth that keeps the 3D model and the cut list consistent. Porting it by hand risks silently desynchronizing them.
+1. **`furniture-model.js` was the portable domain module.** Production truth is now `src/domain/` (`catalog.ts`, geometry builders, BOM). The reference file is historical — do not port it again.
 2. **The three.js scene setup** (lighting rig, shadow config, OrbitControls tuning, TransformControls wiring, raycast picking, marquee projection math) is genuine implementation, not a mock. Treat it as a working reference implementation rather than a visual spec.
 
 Everything else — the panel chrome, sidebars, toolbars, typography, the DOM overlay elements — is a visual specification to be rebuilt in the target framework.
@@ -84,7 +84,7 @@ Header row beneath: part count on the left (`{n} selected` when there is a selec
 
 Tree body: `flex:1`, `overflow-y:auto`, `padding:10px 6px`. Five collapsible groups in fixed order — **Carcass, Base, Fronts, Hardware, Custom Parts** (the last only when custom panels exist).
 
-- Group header: `height:30px`, `padding:0 8px`, `border-radius:6px`. Chevron `▾`/`▸` at 10px in a 12px-wide slot; label 12px/600 `rgba(238,233,226,.85)`; count right-aligned, 10.5px IBM Plex Mono `rgba(238,233,226,.35)`.
+- Group header: `height:30px`, `padding:0 8px`, `border-radius:6px`. A 14px checkbox (transparent fill, `#4FA3FF` check) sits left of a 16px `▾`/`▸` chevron; label 12px/600 `rgba(238,233,226,.85)`; count right-aligned, 10.5px IBM Plex Mono `rgba(238,233,226,.35)`. The checkbox adds or removes the whole group without replacing the rest of the selection. A dash means only some members are selected. The row highlight stays on when the group is fully included in a larger multi-select. Clicking the name still selects only that group.
 - Part row: `height:28px`, `padding:0 10px 0 30px`, `border-radius:6px`, 12.5px. Default `rgba(238,233,226,.75)`; selected background `rgba(79,163,255,.16)` with `#EEE9E2` text. Trailing 20×20 eye button — Material Symbols `visibility` / `visibility_off` — at `rgba(238,233,226,.55)` visible, `rgba(238,233,226,.2)` hidden. The eye must `stopPropagation` so toggling visibility does not change selection.
 
 ### 3. Left sidebar — Library tab
@@ -109,12 +109,13 @@ All cards are `draggable="true"` and carry a `text/plain` payload of `{kind}:{id
 Full-bleed WebGL canvas with DOM overlays:
 
 - **Gizmo toolbar** — top-left, `position:absolute`, floating pill group. Buttons 34×34, `border-radius:8px`, `border:1px solid rgba(26,24,21,.12)`, background `rgba(255,255,255,.6)`, icon color `#1A1815`. Active: background and border `#C68A46`. Order: Select · Pan · Move · Rotate · Scale · | · Grid toggle · Snap toggle. Material Symbols glyphs: `arrow_selector_tool`, `pan_tool`, `open_with`, `rotate_right`, `resize`, `grid_on`, `swipe_left_alt`.
-- **Frame button** — top-right, `height:30px`, `padding:0 12px`, `border-radius:7px`, `background:rgba(255,255,255,.6)`, `border:1px solid rgba(26,24,21,.15)`, 11.5px/600 `#1A1815`.
+- **View buttons** — top-right pill: Front · Side · Top · 3D · Frame. Front / Side / Top lock a true orthographic elevation (no foreshortening; left-drag pans). 3D restores the perspective ¾ view. Frame flies to the current selection (or the whole scene).
 - **Measure banner** — top-center when measure mode is on: `background:rgba(26,24,21,.85)`, `color:#EEE9E2`, 11.5px, `padding:6px 14px`, `border-radius:20px`. Copy: "Click two points on the model to measure".
-- **Measure label** — follows the midpoint of the measured segment, `transform:translate(-50%,-130%)`, `background:#1A1815`, `color:#4FA3FF`, IBM Plex Mono 11px, `border:1px solid rgba(79,163,255,.4)`, `border-radius:5px`, `pointer-events:none`. Content: `{n} mm`.
+- **Measure label** — follows the midpoint of the measured segment, `transform:translate(-50%,-130%)`, `background:#1A1815`, `color:#4FA3FF`, IBM Plex Mono 11px, `border:1px solid rgba(79,163,255,.4)`, `border-radius:5px`, `pointer-events:none`. Content: `{n} {unit}`.
+- **Selection dimensions** — when exactly two pieces or groups are selected, witness lines and a length label in `#4FA3FF` show the clearance on each axis where the boxes are separated. Hidden in Render.
 - **Marquee rectangle** — `border:1px solid #4FA3FF`, `background:rgba(79,163,255,.14)`, `pointer-events:none`, `z-index:6`.
 - **Hint line** — bottom-left, 11px IBM Plex Mono `rgba(26,24,21,.5)`: "Drag to orbit · Shift-drag to box select · G/R/S transform · H pan · F frame · ⌘D duplicate · ⌘A select all · Del delete".
-- **Render bar** — bottom-center, Render mode only: `background:rgba(26,24,21,.85)`, `border-radius:12px`, `padding:8px`. Camera preset buttons (Front / 3&frasl;4 Angle / Top) at `rgba(255,255,255,.06)`, then a divider, then the `#C68A46` **Export Image** button.
+- **Render bar** — bottom-center, Render mode only: `background:rgba(26,24,21,.85)`, `border-radius:12px`, `padding:8px`. Camera preset buttons (Front / Side / Top / 3D) at `rgba(255,255,255,.06)`, then a divider, then the `#C68A46` **Export Image** button.
 - **Grid extent** — a typed numeric field in the bottom status bar. It follows the global mm/cm preference, accepts 100 mm (10 cm) increments from 1–20 m, and is kept with the other local viewport preferences rather than presented as furniture data.
 
 **Scene configuration** (units: three.js world units are meters; all UI values are millimetres — divide by 1000 at the geometry boundary):
@@ -131,7 +132,7 @@ Full-bleed WebGL canvas with DOM overlays:
 
 **Purpose:** read and edit dimensions, and act on the selection.
 
-Tab strip (Properties / Finish) matching the left sidebar's underline style. Body `padding:16px`.
+Tab strip (Properties / Color) matching the left sidebar's underline style. Body `padding:16px`.
 
 **Overall Dimensions** — always present, regardless of selection. Uppercase section header, then one control block per dimension (`padding:6px 2px 14px`): a label row with a 12.5px `rgba(238,233,226,.7)` name on the left and, on the right, a number input (58×22, `#26221D`, `border:1px solid rgba(255,255,255,.1)`, `border-radius:5px`, IBM Plex Mono 11.5px, right-aligned) plus a "mm" suffix — followed by a full-width `<input type="range">` with `accent-color:#C68A46`.
 
@@ -148,23 +149,24 @@ Slider and input are two views of one value and must stay bound in both directio
 **Selected** — appears below a `1px rgba(255,255,255,.08)` divider only when something is selected. Shows the part name at 12.5px/600, then:
 - *Fixed (parametric) part*: read-only W/H/D chips — `flex:1` cards, `#211E1A`, `border-radius:6px`, `padding:6px 8px`, 9.5px axis label over an IBM Plex Mono 12px value.
 - *Custom panel*: the same three-up layout but as editable number inputs (`height:26px`, centered text), labelled "W (mm)" etc.
-- *Multi-selection*: read-only chips showing the **combined bounding-box** dimensions, with the header reading `{n} parts selected`.
+- *Multi-selection*: read-only chips showing the **combined bounding-box** dimensions, with the header reading `{n} parts selected`. Two or more selected parts share position and rotation sliders around the selection pivot. A group's **Y** is the underside of the combined box, so a cabinet on the floor reads 0.
+- *Two selection units*: Align Left / Centres / Right, Front / Back, Tops / Bottoms (first stays fixed; only that axis moves) and Snap Together.
 
 Action row (`display:flex; gap:8px; flex-wrap:wrap`), buttons `height:28px`, `padding:0 12px`, `border-radius:6px`, 11.5px: Clear selection · Reset transform · Duplicate (custom panels only) · **Delete** in the danger treatment (`border:1px solid rgba(220,90,90,.3)`, `background:rgba(220,90,90,.1)`, `color:#e08a8a`).
 
 With nothing selected, a divider and the hint "Click a part in the viewport or the Assembly tree to inspect it."
 
-### 6. Right sidebar — Finish tab
+### 6. Right sidebar — Color tab
 
-**Purpose:** assign finishes to the whole piece or to individual parts.
+**Purpose:** assign colors to the whole piece or to individual parts.
 
 Scope chip at top: `#211E1A`, `border-radius:7px`, `border:1px solid rgba(255,255,255,.08)`, `padding:8px 10px`. Reads `Editing: {part name}` — or `Editing: Whole Piece` with no selection — plus a ✕ to drop back to whole-piece scope.
 
-**Finish** — one 2-column picker of complete appearance choices, so users never have to coordinate separate material and color controls. Options: Walnut, White Oak, Ash, Ebony Stain, White Lacquer. The underlying material/color pair remains an internal saved-file detail for backward compatibility.
+**Color** — one 2-column picker of complete appearance choices, so users never have to coordinate separate material and color controls. Panel options: Oak, Walnut, Dark Gray, Dark Gray-Green, White. Oak and Walnut swatches and 3D materials use photographed grain from `public/oak-grain.jpg` and `public/walnut-grain.jpg`. The underlying material/color pair remains an internal saved-file detail for backward compatibility.
 
-Hardware uses the same one-choice interaction with an appropriate palette: Brushed Brass, Matte Black, and Brushed Steel. Selecting hardware shows only hardware finishes; selecting panels shows only panel finishes.
+Hardware uses the same one-choice interaction: Brushed Brass, Matte Black, Brushed Steel, White. Selecting hardware shows only hardware finishes; selecting panels shows only panel colors.
 
-When a per-part override is active, a "Use design finish" link in `#4FA3FF` at 11px appears under the grid. Multi-selections with different appearances show "Mixed finishes" until one finish is applied to the selection.
+When a per-part override is active, a "Use design color" link in `#4FA3FF` at 11px appears under the grid. Multi-selections with different appearances show "Mixed colors" until one color is applied to the selection.
 
 ### 7. Cut List view
 
@@ -191,9 +193,10 @@ The CSV export must serialize exactly what the table shows, including custom pan
 ## Interactions & Behavior
 
 ### Selection
-- **Click** a part in the viewport (raycast against the model group) or a row in the Assembly tree → select it.
+- **Click** a part in the viewport (raycast against the model group) or a row in the Assembly tree → select it. A viewport click on a grouped piece selects that piece, not the group (BUG-006).
 - **Click empty space** → clear selection.
-- **Shift-click** → add/toggle a part in the selection.
+- **Shift-click** a part → add/toggle that part. Shift-click (or ⌘/Ctrl-click) a group row, or use the group checkbox, adds or removes every member.
+- **Two selected units** (two parts, two groups, or one of each) draw clearance dimensions in the viewport on axes where the boxes are separated.
 - **Shift-drag** → marquee box select. Critical detail: the marquee must start **lazily on pointer *move*** once the pointer passes a ~5px threshold, *not* on pointerdown. Committing on pointerdown swallows shift-click additive selection, because a zero-movement shift-click then never reaches the raycast path. While the marquee is active, disable OrbitControls and re-enable on release. Hit test by projecting each visible part's world position to screen space and testing containment. Holding ⌘/Ctrl with the marquee adds to the existing selection instead of replacing it. An empty box clears the selection.
 - **Select All** — the button or ⌘A. Must exclude deleted parts.
 - Selection is always an array, even for one part; the gizmo attaches to a temporary group when more than one part is selected.
@@ -205,7 +208,9 @@ Backed by three.js `TransformControls`. Modes: translate / rotate / scale, plus 
 Toggle in the gizmo toolbar. When on, translation magnetically snaps to nearby part faces while dragging (60 mm capture, live face guide). Hold Shift to snap translation to the 100 mm grid instead. Rotation snap `Math.PI / 12` (15°) and scale snap `0.1` still follow the toggle.
 
 ### Measuring
-Toggle in the toolbar. Click two points on the model; each click raycasts and records a hit point. Renders two 8 mm spheres and a dashed line in `#4FA3FF`, with a DOM label at the projected midpoint showing the distance in millimetres. A third click starts a fresh measurement.
+Toggle in the toolbar. Click two points on the model; each click raycasts and records a hit point. Renders two 8 mm spheres and a dashed line in `#4FA3FF`, with a DOM label at the projected midpoint showing the distance in the current display unit. A third click starts a fresh measurement.
+
+Selecting exactly two pieces or groups also draws SketchUp-style witnesses and a length label for each axis with a positive clearance (side-by-side, stacked, or front-to-back). Touching or overlapping faces stay quiet. The overlay reads live mesh bounds so a gizmo drag stays truthful, and it hides in Render.
 
 ### Keyboard
 | Key | Action |
@@ -227,7 +232,7 @@ Both parametric parts and custom panels can be deleted. Parametric deletions are
 Custom panels only — attempting it on a parametric part shows the toast "Only library panels can be duplicated". Clones are offset by 80 mm in X and Z, inherit material overrides and orientation, and become the new selection.
 
 ### Camera
-`Frame` returns to the default 3/4 view. `F` frames the current selection: expand a `Box3` over the selected meshes, take the center and a radius-derived distance (`clamp(radius * 3.2, 0.9, 6)`), and fly along a normalized `(0.8, 0.55, 0.9)` direction. Camera moves are eased by lerping position and target at `0.08` per frame rather than jumping.
+Front, Side and Top switch to a locked **orthographic** camera (true elevation or plan, no foreshortening). Left-drag pans; orbit is disabled so the view cannot tilt. **3D** and **Frame** stay in perspective. `Frame` / `F` frames the current selection: expand a `Box3` over the selected meshes, take the center and a radius-derived distance (`clamp(radius * 3.2, 0.9, 6)`), and fly along a normalized `(0.8, 0.55, 0.9)` direction. Camera moves are eased by lerping position and target at `0.08` per frame rather than jumping.
 
 ### Version history
 Saving captures dimensions, all style choices, materials, custom panels, deletions, and per-part overrides. Entries list a color dot keyed to the body finish, a label, a relative timestamp, and the dimension string. The current version is badged "Current" in `#6FBF73` on `rgba(111,191,115,.15)`; others get a "Restore" button in `#4FA3FF` on `rgba(79,163,255,.12)`. Restore replaces the whole scene state.
@@ -307,7 +312,7 @@ Held outside reactive state (imperative, must survive rebuilds): `manualTransfor
 
 Viewport gradient `#E9E5DC → #C9C3B6` at 160°. Grid lines `#4a4030` / `#6b5f48`.
 
-Finishes: Walnut `#4b3327` · White Oak `#c7a374` · Ash `#d9cdb6` · Ebony Stain `#211c19` · White Lacquer `#eef0ea`. Hardware: Brushed Brass `#b6884b` · Matte Black `#232323` · Brushed Steel `#9a9a9a`. Each carries `roughness` and `metalness` for the PBR material — see `FINISHES` / `HARDWARE_FINISHES` in `furniture-model.js`.
+Panel colors: Oak `#d4b78f` (photographed grain) · Walnut `#6b4f3b` (photographed grain) · Dark Gray `#4a4a4c` · Dark Gray-Green `#3f4a42` · White `#f2f2f0`. Hardware: Brushed Brass `#b6884b` · Matte Black `#232323` · Brushed Steel `#9a9a9a` · White `#f2f2f0`. Each carries `roughness` and `metalness` for the PBR material — see `FINISHES` / `HARDWARE_FINISHES` in `src/domain/catalog.ts`.
 
 ### Typography
 
@@ -328,7 +333,7 @@ Custom scrollbars: 8px, thumb `rgba(255,255,255,.14)` at `border-radius:4px`, tr
 
 ## Assets
 
-No image assets. Icons come from **Material Symbols Outlined** (Google Fonts) with a handful of inline SVGs in the toolbar mode switcher and export buttons; either source is fine to standardize on in the target codebase. Fonts are Google Fonts (Space Grotesk, IBM Plex Mono). 3D runtime is **three.js 0.184.0** plus the `OrbitControls` and `TransformControls` addons. If the codebase has its own icon set and type stack, substitute them — the glyph names above identify the intent.
+Oak and Walnut grain photographs live in `public/oak-grain.jpg` and `public/walnut-grain.jpg`. Icons come from **Material Symbols Outlined** (Google Fonts) with a handful of inline SVGs in the toolbar mode switcher and export buttons; either source is fine to standardize on in the target codebase. Fonts are Google Fonts (Space Grotesk, IBM Plex Mono). 3D runtime is **three.js 0.184.0** plus the `OrbitControls` and `TransformControls` addons. If the codebase has its own icon set and type stack, substitute them — the glyph names above identify the intent.
 
 ---
 
