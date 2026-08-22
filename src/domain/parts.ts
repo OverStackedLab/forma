@@ -22,6 +22,33 @@ export function livePartIds(customParts: readonly CustomPart[]): string[] {
   return customParts.map((p) => p.id);
 }
 
+/** How much of a group is in the current selection. */
+export type GroupInclusion = 'none' | 'partial' | 'all';
+
+export function groupInclusion(
+  groupPartIds: readonly string[],
+  selectedIds: readonly string[],
+): GroupInclusion {
+  if (!groupPartIds.length) return 'none';
+  const selected = new Set(selectedIds);
+  let hit = 0;
+  for (const id of groupPartIds) if (selected.has(id)) hit += 1;
+  if (hit === 0) return 'none';
+  if (hit === groupPartIds.length) return 'all';
+  return 'partial';
+}
+
+/** Adds a group to the selection, or removes it when every member is already in. */
+export function selectionTogglingGroup(
+  selectedIds: readonly string[],
+  groupPartIds: readonly string[],
+): string[] {
+  if (groupInclusion(groupPartIds, selectedIds) === 'all') {
+    return selectedIds.filter((id) => !groupPartIds.includes(id));
+  }
+  return [...new Set([...selectedIds, ...groupPartIds])];
+}
+
 /** The group whose membership exactly matches this selection, if any. */
 export function groupMatching(groups: readonly Group[], selectedIds: readonly string[]): Group | undefined {
   if (selectedIds.length < 2) return undefined;

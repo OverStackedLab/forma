@@ -20,7 +20,13 @@ import {
   isLegHardwareShape,
   PANEL_PRESETS,
 } from '@/domain/catalog';
-import { groupMatching, livePartIds, selectionPositionMetres, selectionUnits } from '@/domain/parts';
+import {
+  groupMatching,
+  livePartIds,
+  selectionPositionMetres,
+  selectionTogglingGroup,
+  selectionUnits,
+} from '@/domain/parts';
 import { eulerDegreesToQuaternion, invertQuaternion, multiplyQuaternions, quaternionToEulerDegrees } from '@/domain/rotation';
 import {
   halfExtentAlongNormalMm,
@@ -666,6 +672,13 @@ export function renameGroup(groupId: string, label: string): void {
 export function selectGroup(groupId: string): void {
   const group = doc().groups.find((g) => g.id === groupId);
   if (group) ui().setSelection(group.partIds);
+}
+
+/** Adds or removes a whole group without replacing the rest of the selection. */
+export function toggleGroupSelection(groupId: string): void {
+  const group = doc().groups.find((g) => g.id === groupId);
+  if (!group) return;
+  ui().setSelection(selectionTogglingGroup(ui().selectedPartIds, group.partIds));
 }
 
 /** Hides the whole group if any member is visible; otherwise shows every member. */

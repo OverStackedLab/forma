@@ -457,7 +457,7 @@ test('viewport clicks select one grouped piece while the Assembly group row sele
 
   await page.getByRole('tab', { name: 'Assembly' }).click();
   await expect(page.getByText('1 selected')).toBeVisible();
-  await page.getByRole('treeitem', { name: /Collapse group Base 600 6 Hide Base 600/ }).click();
+  await page.getByRole('treeitem', { name: /Select Base 600 .*Base 600 6 Hide Base 600/ }).click();
   await expect(page.getByText('Editing: Base 600')).toBeVisible();
   await expect(page.getByText('Configurable cabinet · 6 pieces')).toBeVisible();
   await expect(page.getByRole('button', { name: 'Add Shelf' })).toBeVisible();
@@ -497,7 +497,7 @@ test('Snap Together moves a whole group without breaking its cabinet configurati
   await page.getByRole('tab', { name: 'Assembly' }).click();
 
   const cabinets = page.getByRole('treeitem', {
-    name: /Collapse group Base 600 6 Hide Base 600/,
+    name: /Select Base 600 .*Base 600 6 Hide Base 600/,
   });
   await expect(cabinets).toHaveCount(2);
   await cabinets.nth(0).click();
@@ -520,10 +520,10 @@ test('Align Left lines a wall cabinet up with a floor cabinet without dropping i
   await page.getByRole('tab', { name: 'Assembly' }).click();
 
   const base = page.getByRole('treeitem', {
-    name: /Collapse group Base 600 6 Hide Base 600/,
+    name: /Select Base 600 .*Base 600 6 Hide Base 600/,
   });
   const wall = page.getByRole('treeitem', {
-    name: /Collapse group Wall 600 6 Hide Wall 600/,
+    name: /Select Wall 600 .*Wall 600 6 Hide Wall 600/,
   });
   await wall.click();
   const wallY = page.getByLabel('Group Y Position in millimetres');
@@ -730,7 +730,7 @@ test('selecting two groups shows shared position and rotation sliders', async ({
   await page.getByRole('tab', { name: 'Assembly' }).click();
 
   const cabinets = page.getByRole('treeitem', {
-    name: /Collapse group Base 600 6 Hide Base 600/,
+    name: /Select Base 600 .*Base 600 6 Hide Base 600/,
   });
   await cabinets.nth(0).click();
   await cabinets.nth(1).click({ modifiers: ['Shift'] });
@@ -745,6 +745,28 @@ test('selecting two groups shows shared position and rotation sliders', async ({
 
   await page.getByRole('button', { name: 'Undo' }).click();
   await expect(page.getByLabel('Y Angle in degrees')).toHaveValue('0');
+});
+
+test('Assembly group checkboxes add a second group without replacing the first', async ({
+  page,
+}) => {
+  await gotoMm(page);
+  await page.getByRole('tab', { name: 'Library' }).click();
+  await page.getByRole('button', { name: /Base 600/ }).click();
+  await page.getByRole('button', { name: /Base 600/ }).click();
+  await page.getByRole('tab', { name: 'Assembly' }).click();
+
+  const boxes = page.getByRole('checkbox', { name: 'Select Base 600' });
+  await expect(boxes).toHaveCount(2);
+  // The last insert is already selected. Checking the other group adds it.
+  await expect(page.getByText('6 selected')).toBeVisible();
+  await expect(boxes.nth(1)).toBeChecked();
+  await boxes.nth(0).click();
+  await expect(page.getByText('12 selected')).toBeVisible();
+  await expect(page.getByLabel('X Position in millimetres')).toBeVisible();
+  await boxes.nth(0).click();
+  await expect(page.getByText('6 selected')).toBeVisible();
+  await expect(page.getByText('Editing: Base 600')).toBeVisible();
 });
 
 test('switching to mm converts the dimension fields and round-trips back to cm', async ({

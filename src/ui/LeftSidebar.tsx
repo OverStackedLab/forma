@@ -1,5 +1,6 @@
 import { useMemo, useState } from 'react';
 import { CABINET_PRESETS, PANEL_PRESETS } from '@/domain/catalog';
+import { groupInclusion } from '@/domain/parts';
 import type { Group, PanelPreset, PartSpec } from '@/domain/types';
 import {
   addCustomPanel,
@@ -8,6 +9,7 @@ import {
   renamePart,
   selectAll,
   selectGroup,
+  toggleGroupSelection,
   togglePartVisibility,
   toggleGroupVisibility,
 } from '@/store/actions';
@@ -220,27 +222,20 @@ function GroupRow({
 }) {
   const [expanded, setExpanded] = useState(true);
   const selected = new Set(selectedPartIds);
-  const isGroupSelected =
-    group.partIds.length === selectedPartIds.length && group.partIds.every((id) => selected.has(id));
+  const inclusion = groupInclusion(group.partIds, selectedPartIds);
+  const allSelected = inclusion === 'all';
   const anyVisible = group.partIds.some((id) => !hidden.has(id));
 
   return (
     <div>
       <div
         role="treeitem"
-        aria-selected={isGroupSelected}
+        aria-selected={allSelected}
         aria-expanded={expanded}
         tabIndex={0}
         onClick={(e) => {
-          if (e.shiftKey || e.metaKey || e.ctrlKey) {
-            const ui = useUiStore.getState();
-            const next = isGroupSelected
-              ? ui.selectedPartIds.filter((id) => !group.partIds.includes(id))
-              : [...new Set([...ui.selectedPartIds, ...group.partIds])];
-            ui.setSelection(next);
-          } else {
-            selectGroup(group.id);
-          }
+          if (e.shiftKey || e.metaKey || e.ctrlKey) toggleGroupSelection(group.id);
+          else selectGroup(group.id);
         }}
         onKeyDown={(e) => {
           if (e.key === 'Enter' || e.key === ' ') {
@@ -249,9 +244,25 @@ function GroupRow({
           }
         }}
         className={`flex h-7 cursor-pointer items-center gap-1 rounded-md pr-2.5 pl-1 text-[12.5px] font-semibold ${
-          isGroupSelected ? 'bg-select/16 text-ink' : 'text-ink/85 hover:bg-white/4'
+          allSelected ? 'bg-select/16 text-ink' : 'text-ink/85 hover:bg-white/4'
         }`}
       >
+        <label
+          className="flex h-5 w-5 flex-none cursor-pointer items-center justify-center"
+          onClick={(e) => e.stopPropagation()}
+        >
+          <input
+            type="checkbox"
+            checked={allSelected}
+            ref={(el) => {
+              if (el) el.indeterminate = inclusion === 'partial';
+            }}
+            onClick={(e) => e.stopPropagation()}
+            onChange={() => toggleGroupSelection(group.id)}
+            aria-label={`Select ${group.label}`}
+            className="group-select-checkbox"
+          />
+        </label>
         <button
           type="button"
           aria-label={expanded ? 'Collapse group' : 'Expand group'}
@@ -259,7 +270,7 @@ function GroupRow({
             e.stopPropagation();
             setExpanded((v) => !v);
           }}
-          className="flex h-5 w-4 flex-none items-center justify-center text-[10px] text-ink/55"
+          className="flex h-5 w-5 flex-none items-center justify-center text-[16px] leading-none text-ink/55"
         >
           {expanded ? '▾' : '▸'}
         </button>
