@@ -105,6 +105,68 @@ shows `â€"`. See also IMP-005.
 
 Leave blank until fixed.
 
+### BUG-019 — Duplicating two cabinets drops Add Shelf on the copies
+
+- **Status:** Open
+- **Severity:** Medium
+- **Found:** 2026-08-27
+- **Area:** Panels
+- **App version or commit:** dev @ 06df283
+- **Frequency:** Always (⌘D with two cabinets selected)
+
+#### Steps to reproduce
+
+1. Insert two Base 600 cabinets.
+2. Shift-select both group rows in Assembly.
+3. Press ⌘D (the Duplicate button is hidden because the selection is not one group).
+
+#### Expected behavior
+
+Each copy is still a configurable cabinet with Add Shelf.
+
+#### Actual behavior
+
+`duplicateSelected` only groups a copy when the selection matches one group (or, after BUG-018, sits inside one cabinet). Two cabinets are cloned as loose parts. The copies have no `cabinet` config, so Add Shelf is gone.
+
+#### Notes and evidence
+
+`src/store/actions.ts` → `duplicateSelected`. `groupMatching` requires an exact single-group membership; `cabinetContainingSelection` requires every selected id to live in one cabinet. Keyboard shortcut still calls duplicate when the button is hidden (`useKeyboardShortcuts.ts`).
+
+#### Resolution
+
+Leave blank until fixed.
+
+### BUG-020 — Changing one cabinet panel's size hides Add Shelf
+
+- **Status:** Open
+- **Severity:** Medium
+- **Found:** 2026-08-27
+- **Area:** Panels
+- **App version or commit:** dev @ 06df283
+- **Frequency:** Always
+
+#### Steps to reproduce
+
+1. Insert a Base 600.
+2. Click a panel in the viewport. Add Shelf is still visible.
+3. Change that panel's Width, Height, or Depth in Properties.
+
+#### Expected behavior
+
+Either the size sliders should not invite a carcass-breaking edit while Add Shelf is showing, or the cabinet should stay configurable.
+
+#### Actual behavior
+
+`invalidatePartiallyEditedCabinets` clears `cabinet` when a size edit hits some but not all members. Add Shelf disappears even though the user was still looking at cabinet controls. Moving, rotating, or renaming that panel does not demote (intentional); a dimension change does.
+
+#### Notes and evidence
+
+`src/store/actions.ts` → `setCustomPartDim` / `invalidatePartiallyEditedCabinets`. Properties shows both per-part dimension sliders and Add Shelf for a single selected member (`RightSidebar.tsx`). Related to BUG-014 (delete) and BUG-018 (duplicate).
+
+#### Resolution
+
+Leave blank until fixed.
+
 ## Bug template
 
 ### BUG-### — Short summary
@@ -157,3 +219,4 @@ Leave blank until fixed. Record the change and how it was verified.
 | BUG-015 | A selected group had no rotation sliders | Properties already showed group position, but rotation fields only existed for a single part. Selecting a group or cabinet now shows Group Rotation (X/Y/Z); each axis turns every member around the shared centroid. Covered by a group-rotation unit test and a browser regression. | 2026-08-20 |
 | BUG-016 | Selecting several groups hid all transform sliders | `groupMatching` only resolves an exact single-group membership, so Group Position/Rotation never mounted for two groups. Any multi-select of two or more parts now shows shared position and rotation sliders around the selection pivot; cabinet size sliders stay off so 18 mm panels are not squashed. Covered by multi-group unit tests and a two-cabinet browser regression. | 2026-08-20 |
 | BUG-017 | Group Y Position was not 0 on the floor | Group Y used the member-origin centroid, so an 800 mm cabinet on the grid read ~400 mm. Y is now the underside of the combined AABB; X and Z stay the shared centre. Covered by domain and actions unit tests and a Base 600 group browser check. | 2026-08-22 |
+| BUG-018 | Duplicating a cabinet member dropped Add Shelf | Viewport clicks select one piece (BUG-006) while Add Shelf still shows for that carcass. Duplicate now copies the containing cabinet, not the lone panel. Covered by an actions unit test and a Base 600 browser check. | 2026-08-27 |

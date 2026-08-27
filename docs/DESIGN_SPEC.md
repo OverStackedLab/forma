@@ -230,7 +230,7 @@ Suppress all shortcuts while focus is in an input.
 Both parametric parts and custom panels can be deleted. Parametric deletions are recorded as a `deletedFixedIds` list that filters the rebuild, the assembly tree, the part count, Select All, and the cut list. Custom panels are removed from the `customParts` array.
 
 ### Duplicating
-Custom panels only — attempting it on a parametric part shows the toast "Only library panels can be duplicated". Clones are offset by 80 mm in X and Z, inherit material overrides and orientation, and become the new selection.
+Clones are offset by 80 mm in X and Z, inherit material overrides and orientation, and become the new selection. A piece that belongs to a configurable cabinet duplicates the whole cabinet so Add Shelf stays available (BUG-018).
 
 ### Camera
 Front, Side and Top switch to a locked **orthographic** camera (true elevation or plan, no foreshortening). Left-drag pans; orbit is disabled so the view cannot tilt. **3D** and **Frame** stay in perspective. `Frame` / `F` frames the current selection: expand a `Box3` over the selected meshes, take the center and a radius-derived distance (`clamp(radius * 3.2, 0.9, 6)`), and fly along a normalized `(0.8, 0.55, 0.9)` direction. Camera moves are eased by lerping position and target at `0.08` per frame rather than jumping.
