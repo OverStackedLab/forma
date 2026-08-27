@@ -87,7 +87,7 @@ hides the overlay.
 **Persistence is schema-versioned.** Autosave is debounced into `localStorage`
 under a versioned envelope (currently schema 5), with migrations from schema 4
 and 3 and defensive `normalize`. Unknown or pre-rewrite schemas are refused
-rather than guessed. Save to File writes the same envelope as `.forma.json`.
+rather than guessed. Save to File downloads that envelope as `.forma.json`.
 Saved Versions are checkpoints *inside* one document (and autosave). Version
 History can download a `{title} - Version N.forma.json` file. Rules for keeping
 old files loadable live in [`CODING_STANDARDS.md`](./CODING_STANDARDS.md) §9.

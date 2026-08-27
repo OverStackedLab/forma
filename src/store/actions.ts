@@ -1693,97 +1693,34 @@ export function titleFromFilename(filename: string): string {
   return sanitizeFilename(stem);
 }
 
-type SaveFilePickerWindow = Window & {
-  showSaveFilePicker?: (options?: {
-    suggestedName?: string;
-    types?: Array<{
-      description?: string;
-      accept: Record<string, string[]>;
-    }>;
-  }) => Promise<FileSystemFileHandle>;
-};
-
-/** Guards against a second Save while the picker is open (e.g. a double-click). */
+/** Guards against a second Save while a write is in flight (e.g. a double-click). */
 let isSavingToFile = false;
 
 /**
  * Saves the whole document — geometry, materials, groups and version
- * history — as a .forma.json file, using the same schema-versioned envelope
- * as localStorage autosave. Prefers the File System Access save picker, where
- * the chosen on-disk name drives `docTitle` so the header matches the file.
- * Where the picker is unavailable, downloads under the current title with no
- * extra dialog — the browser may still show its own save dialog, and that is
- * the only one the user sees. Distinct from Save Version, which stays inside
- * this one document until downloaded from Version History.
+ * history — as a downloaded `.forma.json` file, using the same schema-versioned
+ * envelope as localStorage autosave. A native save picker is not used: Chrome's
+ * File System Access write often fails after the dialog (BUG-026), which left
+ * only a "Could not save the file" toast. Distinct from Save Version, which
+ * stays inside this one document until downloaded from Version History.
  */
-export async function saveToFile(): Promise<void> {
-  if (isSavingToFile) return;
+export async function saveToFile(): Promise<boolean> {
+  if (isSavingToFile) return false;
   isSavingToFile = true;
   try {
-    await saveToFileOnce();
+    const title = sanitizeFilename(doc().docTitle);
+    renameDocument(title);
+    const payload = serializeCurrentDocument();
+    downloadBlob(new Blob([payload], { type: 'application/json' }), `${title}.forma.json`);
+    ui().showToast(`Saved ${title}`);
+    return true;
+  } catch (error) {
+    console.error('Save to file failed', error);
+    ui().showToast('Could not save the file');
+    return false;
   } finally {
     isSavingToFile = false;
   }
-}
-
-async function saveToFileOnce(): Promise<void> {
-  const title = sanitizeFilename(doc().docTitle);
-  const pickerWindow = typeof window !== 'undefined' ? (window as SaveFilePickerWindow) : undefined;
-
-  if (typeof pickerWindow?.showSaveFilePicker === 'function') {
-    let handle: FileSystemFileHandle;
-    try {
-      handle = await pickerWindow.showSaveFilePicker({
-        suggestedName: `${title}.forma.json`,
-        types: [
-          {
-            description: 'Forma design',
-            accept: { 'application/json': ['.json'] },
-          },
-        ],
-      });
-    } catch (error) {
-      // User dismissed the picker — not a save, so change nothing.
-      if (error instanceof DOMException && error.name === 'AbortError') return;
-      // The API exists but refused to show a dialog (embedded frame, browser
-      // policy). Nothing was shown yet, so the download below is the only dialog.
-      await writeDocumentToFile(title);
-      return;
-    }
-
-    // The picker was already shown — never stack a second save dialog on top
-    // of it. If the write fails, report it rather than falling back.
-    try {
-      await writeDocumentToFile(titleFromFilename(handle.name), handle);
-    } catch (error) {
-      console.error('Save to file failed', error);
-      ui().showToast('Could not save the file');
-    }
-    return;
-  }
-
-  await writeDocumentToFile(title);
-}
-
-async function writeDocumentToFile(
-  title: string,
-  handle?: FileSystemFileHandle,
-): Promise<void> {
-  renameDocument(title);
-  const payload = serializeCurrentDocument();
-
-  if (handle) {
-    const writable = await handle.createWritable();
-    await writable.write(payload);
-    await writable.close();
-  } else {
-    try {
-      downloadBlob(new Blob([payload], { type: 'application/json' }), `${title}.forma.json`);
-    } catch {
-      throw new Error('Could not download the file');
-    }
-  }
-  ui().showToast(`Saved ${title}`);
 }
 
 /** Same schema-versioned envelope as localStorage autosave and Open File. */

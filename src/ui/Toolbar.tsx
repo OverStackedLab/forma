@@ -1,9 +1,10 @@
-import { useRef, useSyncExternalStore } from 'react';
+import { useEffect, useRef, useState, useSyncExternalStore } from 'react';
 import { DISPLAY_UNITS, type DisplayUnit } from '@/domain/units';
 import { newDocument, openFile, renameDocument, saveToFile, saveVersion } from '@/store/actions';
 import { useDocumentStore } from '@/store/documentStore';
 import { canRedo, canUndo, historyStore, redo, undo } from '@/store/history';
 import { useUiStore, type ViewMode } from '@/store/uiStore';
+import { Button } from './primitives/Button';
 import { IconButton } from './primitives/IconButton';
 import { Icon } from './primitives/Icon';
 import { InlineRename } from './primitives/InlineRename';
@@ -31,15 +32,22 @@ export function Toolbar() {
     (s) => s.customParts.length > 0 || s.versions.length > 0 || s.docTitle !== 'Untitled Design',
   );
 
-  const createNewFile = () => {
-    if (
-      hasDocumentContent &&
-      !window.confirm(
-        'Create a new design? The current design will be cleared. Save it to a file first if you want to keep a copy.',
-      )
-    ) {
+  const [newFilePrompt, setNewFilePrompt] = useState(false);
+
+  const requestNewFile = () => {
+    if (!hasDocumentContent) {
+      newDocument();
       return;
     }
+    setNewFilePrompt(true);
+  };
+
+  const finishNewFile = async (saveFirst: boolean) => {
+    if (saveFirst) {
+      const saved = await saveToFile();
+      if (!saved) return;
+    }
+    setNewFilePrompt(false);
     newDocument();
   };
 
@@ -48,7 +56,8 @@ export function Toolbar() {
   useSyncExternalStore(historyStore.subscribe, historyStore.getSnapshot);
 
   return (
-    <header className="grid h-14 flex-none grid-cols-[1fr_auto_1fr] items-center gap-4 border-b border-hairline bg-surface px-5">
+    <>
+      <header className="grid h-14 flex-none grid-cols-[1fr_auto_1fr] items-center gap-4 border-b border-hairline bg-surface px-5">
       <div className="flex min-w-0 items-center gap-3.5">
         <div className="flex items-center gap-2 font-display text-lg font-bold tracking-[-0.01em] whitespace-nowrap text-ink">
           <div className="flex h-5 w-5 items-center justify-center rounded-[5px] bg-accent text-xs font-bold text-canvas">
@@ -135,7 +144,7 @@ export function Toolbar() {
           onClick={toggleHistory}
         />
         <div className="h-5 w-px flex-none bg-white/10" />
-        <IconButton icon="new_file" label="New File" onClick={createNewFile} />
+        <IconButton icon="new_file" label="New File" onClick={requestNewFile} />
         <IconButton icon="save_file" label="Save to File" onClick={() => void saveToFile()} />
         <OpenFileButton />
         <div className="h-5 w-px flex-none bg-white/10" />
@@ -147,7 +156,64 @@ export function Toolbar() {
           Save Version
         </button>
       </div>
-    </header>
+      </header>
+      {newFilePrompt && (
+        <NewFilePrompt
+          onCancel={() => setNewFilePrompt(false)}
+          onDiscard={() => void finishNewFile(false)}
+          onSave={() => void finishNewFile(true)}
+        />
+      )}
+    </>
+  );
+}
+
+type NewFilePromptProps = {
+  onCancel: () => void;
+  onDiscard: () => void;
+  onSave: () => void;
+};
+
+/** In-app stand-in for the old window.confirm — Save actually downloads a copy. */
+function NewFilePrompt({ onCancel, onDiscard, onSave }: NewFilePromptProps) {
+  useEffect(() => {
+    function onKey(event: KeyboardEvent) {
+      if (event.key === 'Escape') onCancel();
+    }
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [onCancel]);
+
+  return (
+    <div
+      className="fixed inset-0 z-40 flex items-center justify-center bg-black/50"
+      onClick={onCancel}
+    >
+      <div
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="new-file-title"
+        aria-describedby="new-file-copy"
+        className="w-[min(26rem,calc(100vw-2rem))] rounded-lg border border-hairline bg-panel p-4 shadow-[0_16px_40px_rgba(0,0,0,.45)]"
+        onClick={(event) => event.stopPropagation()}
+      >
+        <h2 id="new-file-title" className="text-[14px] font-semibold text-ink">
+          Create a new design?
+        </h2>
+        <p id="new-file-copy" className="mt-2 text-[12.5px] leading-relaxed text-ink/60">
+          The current design will be cleared from this browser. Save a{' '}
+          <span className="font-mono text-ink/80">.forma.json</span> copy first if you want to
+          open it again later.
+        </p>
+        <div className="mt-4 flex flex-wrap justify-end gap-2">
+          <Button onClick={onCancel}>Cancel</Button>
+          <Button onClick={onDiscard}>Don&apos;t save</Button>
+          <Button variant="primary" onClick={onSave}>
+            Save and continue
+          </Button>
+        </div>
+      </div>
+    </div>
   );
 }
 
@@ -161,7 +227,7 @@ function OpenFileButton() {
       <input
         ref={inputRef}
         type="file"
-        accept="application/json,.json"
+        accept=".json,.forma.json,application/json"
         className="hidden"
         onChange={(e) => {
           const file = e.target.files?.[0];
