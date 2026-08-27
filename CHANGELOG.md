@@ -16,6 +16,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - Assembly group checkboxes add or remove a whole group from the selection.
 - Selecting two pieces or groups draws the clearance between them in the viewport.
 - Selecting one piece or group draws clearance to the nearest facing neighbour in each direction, so a panel can be placed without picking a second object.
+- Click a clearance label to type the gap. The same parts the move gizmo drives (the selection, or the second of two units) move to match.
 - Cabinet shelf placement by explicit height or even spacing.
 - Cabinet vertical panels by explicit offset from the left or even spacing. Shelves split into bays around them.
 - Favicon from the toolbar F mark.
@@ -27,7 +28,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - Align Left / Centres / Right, Front / Back, and Tops / Bottoms for two selected pieces or groups. The first stays fixed and only that axis moves, so a wall cabinet can share a floor cabinet's edge without leaving its hang height (IMP-008).
 - True orthographic Front, Side and Top views (no perspective foreshortening). 3D and Frame stay in perspective. Left-drag pans in those elevations (IMP-009).
 - 3D camera button next to Front / Side / Top.
-- Inches as a display unit for dimensions, measure, clearance, the cut list, and CSV export.
+- Restore cabinet on a rigid group that still has a carcass, so a saved design that lost Add Shelf can get it back. Opening the file does not rewrite groups on its own (BUG-009).
+- Arrow keys nudge the selection while the move gizmo is active. Front and Side follow the view; 3D and Top stay on the floor. One display unit per tap, Shift for 100 mm.
+- Selecting a cabinet (or a fully selected group) draws overall width, height, and depth in the viewport so a lone carcass still shows its size (IMP-012).
 
 ### Changed
 
@@ -41,6 +44,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - The magnet toggle is object snap, not the 100 mm grid. Rotation and scale increments still follow the toggle.
 - Save Version no longer shrinks in the toolbar.
 - Docs live under `docs/`.
+- Duplicate copies the current selection. A fully selected cabinet still clones with Add Shelf; a single shelf or carcass piece copies only that piece (BUG-022). Duplicating an interior panel adds the next free centreline like Add Panel (BUG-024).
 
 ### Fixed
 
@@ -53,4 +57,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - A selected group's Y position is the underside on the floor, so a cabinet sitting on the grid reads 0 (BUG-017).
 - Oak uses the photographed grain (lighter honey oak) instead of the procedural brown swatch.
 - Add shelf and Space evenly fields show defaults (300 mm, 3 every 200 mm) and are wide enough to read.
-- Duplicating a cabinet from one selected member clones the whole carcass, so Add Shelf stays on the copy (BUG-018).
+- Add Panel and Add Shelf skip an occupied centreline and place the next free 100 mm slot, so a second click adds another instead of stacking on the first (BUG-021).
+- Duplicating an interior cabinet panel places the next free centreline like Add Panel, so clearance reads from the facing inner face rather than the carcass outside (BUG-024).
+- Add Shelf / Add Panel no longer remap existing panels onto new bay shelves or snap them back to stale centrelines (BUG-025).
+- Add Shelf and Add Panel stay at the top of Properties for a selected cabinet, including a single member or extra loose parts.
+- Reload, Open File, and Restore Version frame every object in the scene (BUG-023).

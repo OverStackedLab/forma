@@ -5,6 +5,10 @@ export type Aabb = { min: Vec3; max: Vec3 };
 export type GapDimension = {
   axis: Axis;
   gapMm: number;
+  /** True when the part that should move sits on the high side of the gap. */
+  movableIsHigh: boolean;
+  /** Overall size of one box; gaps are clearances between two. */
+  kind: 'gap' | 'overall';
   line: [Vec3, Vec3];
   witnessA: [Vec3, Vec3];
   witnessB: [Vec3, Vec3];
@@ -15,6 +19,8 @@ export type GapDimension = {
 const AXES: readonly Axis[] = ['x', 'y', 'z'];
 /** Keep the dimension outside the panels so it reads in the default ¾ view. */
 const OFFSET_M = 0.06;
+/** Sit outside clearance witnesses so overall W/H/D do not stack on a gap. */
+const OVERALL_OFFSET_M = 0.12;
 const TICK_M = 0.014;
 /** Ignore hairline separations from float error. */
 const MIN_GAP_M = 0.0005;
@@ -67,7 +73,7 @@ export function facesOnAxis(a: Aabb, b: Aabb, gapAxis: Axis): boolean {
   return AXES.every((axis) => axis === gapAxis || overlapsOnAxis(a, b, axis));
 }
 
-function dimensionOnAxis(a: Aabb, b: Aabb, axis: Axis): GapDimension | null {
+function dimensionOnAxis(a: Aabb, b: Aabb, axis: Axis, movable: 'a' | 'b'): GapDimension | null {
   const gap = axisGap(a, b, axis);
   if (!gap) return null;
   const along = offsetAxis(axis);
@@ -84,9 +90,60 @@ function dimensionOnAxis(a: Aabb, b: Aabb, axis: Axis): GapDimension | null {
   const end = setAxis(dim, axis, gap.high);
   const faceA = setAxis(face, axis, gap.low);
   const faceB = setAxis(face, axis, gap.high);
+  const movableBox = movable === 'a' ? a : b;
+  const fixedBox = movable === 'a' ? b : a;
   return {
     axis,
     gapMm: gap.gapM * 1000,
+    movableIsHigh: movableBox.min[axis] > fixedBox.max[axis],
+    kind: 'gap',
+    line: [start, end],
+    witnessA: [faceA, start],
+    witnessB: [faceB, end],
+    tickA: [setAxis(start, tick, start[tick] - TICK_M / 2), setAxis(start, tick, start[tick] + TICK_M / 2)],
+    tickB: [setAxis(end, tick, end[tick] - TICK_M / 2), setAxis(end, tick, end[tick] + TICK_M / 2)],
+  };
+}
+
+/**
+ * World millimetres to translate the movable box so the gap becomes `targetGapMm`.
+ * Negative targets are rejected; overlapping boxes have no gap to edit.
+ */
+export function gapDeltaMm(
+  movableIsHigh: boolean,
+  currentGapMm: number,
+  targetGapMm: number,
+): number | null {
+  if (!Number.isFinite(targetGapMm) || targetGapMm < 0) return null;
+  if (!Number.isFinite(currentGapMm)) return null;
+  const delta = targetGapMm - currentGapMm;
+  return movableIsHigh ? delta : -delta;
+}
+
+/**
+ * Overall width, height, and depth of one AABB. Lines sit on the
+ * bottom-front / right-front / bottom-right so they read in the default ¾ view.
+ */
+export function overallDimensions(box: Aabb): GapDimension[] {
+  return AXES.map((axis) => overallOnAxis(box, axis));
+}
+
+function overallOnAxis(box: Aabb, axis: Axis): GapDimension {
+  const along = offsetAxis(axis);
+  const tick = tickAxis(axis, along);
+  const remaining = AXES.find((candidate) => candidate !== axis && candidate !== along) ?? 'y';
+  const remainingValue = remaining === 'y' ? box.min[remaining] : box.max[remaining];
+  const outer = box.max[along] + OVERALL_OFFSET_M;
+  const origin = setAxis(setAxis({ x: 0, y: 0, z: 0 }, remaining, remainingValue), along, outer);
+  const start = setAxis(origin, axis, box.min[axis]);
+  const end = setAxis(origin, axis, box.max[axis]);
+  const faceA = setAxis(start, along, box.max[along]);
+  const faceB = setAxis(end, along, box.max[along]);
+  return {
+    axis,
+    gapMm: (box.max[axis] - box.min[axis]) * 1000,
+    movableIsHigh: true,
+    kind: 'overall',
     line: [start, end],
     witnessA: [faceA, start],
     witnessB: [faceB, end],
@@ -99,7 +156,7 @@ function dimensionOnAxis(a: Aabb, b: Aabb, axis: Axis): GapDimension | null {
 export function gapsBetweenBoxes(a: Aabb, b: Aabb): GapDimension[] {
   const out: GapDimension[] = [];
   for (const axis of AXES) {
-    const dimension = dimensionOnAxis(a, b, axis);
+    const dimension = dimensionOnAxis(a, b, axis, 'b');
     if (dimension) out.push(dimension);
   }
   return out;
@@ -116,11 +173,11 @@ export function nearestFacingGaps(selected: Aabb, others: readonly Aabb[]): GapD
     const below = nearestOnSide(selected, others, axis, 'below');
     const above = nearestOnSide(selected, others, axis, 'above');
     if (below) {
-      const dimension = dimensionOnAxis(selected, below, axis);
+      const dimension = dimensionOnAxis(selected, below, axis, 'a');
       if (dimension) out.push(dimension);
     }
     if (above) {
-      const dimension = dimensionOnAxis(selected, above, axis);
+      const dimension = dimensionOnAxis(selected, above, axis, 'a');
       if (dimension) out.push(dimension);
     }
   }

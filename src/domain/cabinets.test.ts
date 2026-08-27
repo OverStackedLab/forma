@@ -1,11 +1,14 @@
 import { describe, expect, it } from 'vitest';
 import { CABINET_PRESETS } from './catalog';
 import {
+  assignCabinetMemberIds,
   buildCabinetLayout,
   distributedDividerPositions,
   distributedShelfPositions,
   dividerPositionRange,
   dividerPositions,
+  interiorMemberPlacement,
+  nextFreeInteriorPosition,
   shelfPositionRange,
   shelfPositions,
 } from './cabinets';
@@ -117,5 +120,53 @@ describe('distributedDividerPositions', () => {
 
   it('rejects a non-positive spacing', () => {
     expect(distributedDividerPositions({ width: 720 }, 3, 0)).toEqual([]);
+  });
+});
+
+describe('nextFreeInteriorPosition', () => {
+  it('returns the requested centreline when it is free', () => {
+    expect(nextFreeInteriorPosition([], 300, { min: 27, max: 573 })).toBe(300);
+  });
+
+  it('steps 100 mm when the requested centreline is already occupied', () => {
+    expect(nextFreeInteriorPosition([300], 300, { min: 27, max: 573 })).toBe(400);
+    expect(nextFreeInteriorPosition([300, 400], 300, { min: 27, max: 573 })).toBe(500);
+  });
+});
+
+describe('interiorMemberPlacement', () => {
+  it('returns the centreline of a generated interior panel', () => {
+    const cabinet = { width: 600, height: 800, depth: 600, shelfCount: 1, dividerPositionsMm: [300] };
+    const layout = buildCabinetLayout({
+      id: 'base-600',
+      label: 'Base 600',
+      icon: 'cabinet',
+      ...cabinet,
+    });
+    const partIds = layout.map((_, index) => `p${index}`);
+    const panelIndex = layout.findIndex((part) => part.label.includes('Panel'));
+    expect(interiorMemberPlacement(cabinet, partIds, partIds[panelIndex]!)).toEqual({
+      kind: 'divider',
+      positionMm: 300,
+    });
+    expect(interiorMemberPlacement(cabinet, partIds, partIds[0]!)).toBeNull();
+  });
+});
+
+describe('assignCabinetMemberIds', () => {
+  it('keeps a panel id when a second panel adds a bay shelf', () => {
+    let minted = 0;
+    const mint = () => `new-${++minted}`;
+    const empty = { width: 600, height: 800, depth: 600, shelfCount: 1 };
+    const onePanel = { ...empty, dividerPositionsMm: [300] };
+    const twoPanels = { ...empty, dividerPositionsMm: [300, 400] };
+    const first = assignCabinetMemberIds(['L', 'R', 'B', 'T', 'K', 'S'], empty, 8, onePanel, mint);
+    expect(first.slice(0, 6)).toEqual(['L', 'R', 'B', 'T', 'K', 'S']);
+    const panelId = first[7];
+    expect(panelId).toMatch(/^new-/);
+
+    const second = assignCabinetMemberIds(first, onePanel, 10, twoPanels, mint);
+    expect(second).toContain(panelId);
+    expect(second[8]).toBe(panelId);
   });
 });

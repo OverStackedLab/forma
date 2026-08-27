@@ -62,18 +62,19 @@ export function groupContaining(groups: readonly Group[], partId: string): Group
 }
 
 /**
- * The unique generated cabinet that fully contains this selection. A single
- * side panel, a partial multi-select, or the whole group all resolve to the
- * same carcass so shelf controls stay available without an exact group match.
+ * The unique generated cabinet this selection belongs to. A single side, a
+ * partial multi-select, the whole group, or extra loose parts still resolve
+ * to that carcass so shelf controls stay available. Two cabinets do not.
  */
 export function cabinetContainingSelection(
   groups: readonly Group[],
   selectedIds: readonly string[],
 ): Group | undefined {
   if (!selectedIds.length) return undefined;
-  return groups.find(
-    (group) => Boolean(group.cabinet) && selectedIds.every((id) => group.partIds.includes(id)),
+  const hits = groups.filter(
+    (group) => Boolean(group.cabinet) && selectedIds.some((id) => group.partIds.includes(id)),
   );
+  return hits.length === 1 ? hits[0] : undefined;
 }
 
 export type SelectionUnit = {
@@ -111,9 +112,10 @@ export function selectionUnits(
 }
 
 /**
- * Bodies to measure a selection against. Unselected groups stay one box.
- * Remaining members of a partially selected group stay individual parts, so
- * a shelf can read clearance to its neighbours in the same cabinet.
+ * Bodies to measure a selection against. A fully selected group treats other
+ * groups as one box. A single selected piece reads every other part, including
+ * members of unselected cabinets, so a panel can clear to the facing inner
+ * face instead of the carcass AABB.
  */
 export function dimensionNeighborIds(
   groups: readonly Group[],
@@ -124,11 +126,17 @@ export function dimensionNeighborIds(
   const live = new Set(allPartIds);
   const consumed = new Set<string>();
   const bodies: string[][] = [];
+  const units = selectionUnits(groups, selectedPartIds);
+  // A whole selected cabinet should read other cabinets as one box. A single
+  // selected piece (including a duplicate sitting in a carcass) must see
+  // individual facing panels, not the outer AABB of the unselected group.
+  const collapseUnselected = units.length === 1 && units[0]?.kind === 'group';
 
   for (const group of groups) {
     const members = group.partIds.filter((id) => live.has(id) && !selected.has(id));
     if (!members.length) continue;
     if (group.partIds.some((id) => selected.has(id))) continue;
+    if (!collapseUnselected) continue;
     bodies.push(members);
     members.forEach((id) => consumed.add(id));
   }

@@ -1,5 +1,7 @@
 import { useEffect } from 'react';
-import { deleteParts, duplicateSelected, selectAll } from '@/store/actions';
+import { arrowNudgeDeltaMm, isArrowKey, NUDGE_GRID_MM, type NudgeFrame } from '@/domain/nudge';
+import { toMm } from '@/domain/units';
+import { deleteParts, duplicateSelected, nudgeSelected, selectAll } from '@/store/actions';
 import { redo, undo } from '@/store/history';
 import { useUiStore, type GizmoMode } from '@/store/uiStore';
 import { viewportApi } from '@/viewport/viewportApi';
@@ -27,6 +29,13 @@ const MODE_KEYS: Record<string, GizmoMode> = {
   s: 'scale',
 };
 
+const FALLBACK_NUDGE_FRAME: NudgeFrame = {
+  right: { x: 1, y: 0, z: 0 },
+  up: { x: 0, y: 1, z: 0 },
+  look: { x: 0, y: 0, z: -1 },
+  plane: 'floor',
+};
+
 export function useKeyboardShortcuts(): void {
   useEffect(() => {
     const onKeyDown = (e: KeyboardEvent) => {
@@ -50,6 +59,16 @@ export function useKeyboardShortcuts(): void {
           e.preventDefault();
           duplicateSelected();
         }
+        return;
+      }
+
+      if (isArrowKey(e.key)) {
+        if (ui.gizmoMode !== 'translate' || !ui.selectedPartIds.length) return;
+        if (viewportApi()?.isGizmoDragging()) return;
+        e.preventDefault();
+        const stepMm = e.shiftKey ? NUDGE_GRID_MM : toMm(1, ui.displayUnit);
+        const frame = viewportApi()?.viewNudgeFrame() ?? FALLBACK_NUDGE_FRAME;
+        nudgeSelected(arrowNudgeDeltaMm(e.key, frame, stepMm));
         return;
       }
 

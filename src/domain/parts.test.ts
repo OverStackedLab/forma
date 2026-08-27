@@ -136,10 +136,14 @@ describe('cabinetContainingSelection', () => {
     expect(cabinetContainingSelection([cabinet], ['c', 'a', 'b'])).toBe(cabinet);
   });
 
-  it('ignores rigid groups and selections that spill outside one cabinet', () => {
+  it('ignores rigid groups and selections that spill across two cabinets', () => {
     expect(cabinetContainingSelection([rigid], ['d', 'e'])).toBeUndefined();
     expect(cabinetContainingSelection([cabinet, other], ['a', 'f'])).toBeUndefined();
     expect(cabinetContainingSelection([cabinet], [])).toBeUndefined();
+  });
+
+  it('still resolves when loose parts are selected with one cabinet', () => {
+    expect(cabinetContainingSelection([cabinet], ['a', 'loose'])).toBe(cabinet);
   });
 });
 
@@ -174,6 +178,14 @@ describe('dimensionNeighborIds', () => {
 
   it('leaves siblings of a partially selected group as individual parts', () => {
     expect(dimensionNeighborIds([first], ['a', 'b', 'c'], ['b'])).toEqual([['a'], ['c']]);
+  });
+
+  it('explodes an unselected cabinet when the selection is a single piece', () => {
+    expect(dimensionNeighborIds([first], ['a', 'b', 'c', 'loose'], ['loose'])).toEqual([
+      ['a'],
+      ['b'],
+      ['c'],
+    ]);
   });
 });
 

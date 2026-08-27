@@ -13,6 +13,7 @@ import {
 import { OAK_GRAIN_URL } from '@/domain/oakGrain';
 import { WALNUT_GRAIN_URL } from '@/domain/walnutGrain';
 import { cabinetContainingSelection, groupMatching, selectionPositionMetres, selectionUnits } from '@/domain/parts';
+import { restorableCabinetGroup } from '@/domain/restoreCabinet';
 import { quaternionToEulerDegrees } from '@/domain/rotation';
 import type { CabinetConfig } from '@/domain/types';
 import { convertedValue, convertRange, toMm, DISPLAY_UNIT_NAMES, type DisplayUnit } from '@/domain/units';
@@ -33,6 +34,7 @@ import {
   renamePart,
   resetOverrides,
   resetTransforms,
+  restoreSelectedCabinet,
   setCabinetDim,
   setCabinetDividerPositions,
   setCabinetShelfPositions,
@@ -656,13 +658,24 @@ function PropertiesTab() {
   const clearSelection = useUiStore((s) => s.clearSelection);
   const selectedPartIds = useUiStore((s) => s.selectedPartIds);
   const groups = useDocumentStore((s) => s.groups);
-  const matchedGroup = groupMatching(groups, selectedPartIds);
-  const cabinetGroup = cabinetContainingSelection(groups, selectedPartIds);
-  const units = selectionUnits(groups, selectedPartIds);
+  const customParts = useDocumentStore((s) => s.customParts);
+  const transforms = useDocumentStore((s) => s.transforms);
+  const liveSelectedIds = selectedPartIds.filter((id) =>
+    customParts.some((part) => part.id === id),
+  );
+  const matchedGroup = groupMatching(groups, liveSelectedIds);
+  const cabinetGroup = cabinetContainingSelection(groups, liveSelectedIds);
+  const restorableGroup = restorableCabinetGroup(
+    groups,
+    customParts,
+    transforms,
+    liveSelectedIds,
+  );
+  const units = selectionUnits(groups, liveSelectedIds);
   const canSnapTogether = units.length === 2;
   const containsSavedGroup = units.some((selectionUnit) => selectionUnit.kind === 'group');
   const hasCabinet = groups.some(
-    (group) => group.cabinet && selectedPartIds.some((id) => group.partIds.includes(id)),
+    (group) => group.cabinet && liveSelectedIds.some((id) => group.partIds.includes(id)),
   );
   const unit = useUiStore((s) => s.displayUnit);
   const shelfEditor = cabinetGroup?.cabinet ? (
@@ -696,6 +709,17 @@ function PropertiesTab() {
           </div>
         </>
       )}
+      {restorableGroup && (
+        <div className="mb-4">
+          <p className="mb-2 text-[10.5px] leading-relaxed text-ink/40">
+            This group still looks like a cabinet. Restore Add Shelf from the current pieces —
+            opening the file will not do that on its own.
+          </p>
+          <Button onClick={restoreSelectedCabinet}>Restore cabinet</Button>
+        </div>
+      )}
+
+      {shelfEditor}
 
       {selection.kind === 'single' && (
         <>
@@ -797,7 +821,6 @@ function PropertiesTab() {
               />
             );
           })}
-          {shelfEditor}
           <hr className="my-4 border-hairline" />
           <PositionFields partId={selection.spec.id} />
           <RotationFields partId={selection.spec.id} />
@@ -807,7 +830,6 @@ function PropertiesTab() {
 
       {selection.kind === 'multi' && matchedGroup?.cabinet && (
         <>
-          {shelfEditor}
           <SectionHeader>Cabinet Dimensions</SectionHeader>
           {CABINET_DIM_FIELDS.map(({ key, label }) => {
             const range = convertRange(CABINET_DIM_LIMITS[key], unit);
@@ -831,8 +853,6 @@ function PropertiesTab() {
           <hr className="my-4 border-hairline" />
         </>
       )}
-
-      {selection.kind === 'multi' && !matchedGroup?.cabinet && shelfEditor}
 
       {selection.kind === 'multi' && matchedGroup && !matchedGroup.cabinet && selection.size && (
         <SelectionSizeFields partIds={matchedGroup.partIds} size={selection.size} asGroup />

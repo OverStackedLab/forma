@@ -142,6 +142,8 @@ export function Viewport() {
     // Viewport is lazy-loaded, so App has normally hydrated the preference by
     // now — but that ordering is incidental, hence the subscription below too.
     scene.setGridSize(useUiStore.getState().gridSizeM);
+    // Reload / first paint: fit every restored part instead of the empty-scene camera.
+    camera.frameAll();
     const syncPresentationVisibility = () => {
       const state = useUiStore.getState();
       const editing = state.viewMode !== 'render';
@@ -236,6 +238,22 @@ export function Viewport() {
         computeSnapTogetherTransforms(builder, targetIds, movingIds),
       computeAlign: (targetIds, movingIds, edge) =>
         computeAlignTransforms(builder, targetIds, movingIds, edge),
+      isGizmoDragging: () => gizmo.isDragging,
+      viewNudgeFrame: () => {
+        const camera = scene.camera;
+        camera.updateMatrixWorld();
+        const right = new Vector3();
+        const up = new Vector3();
+        const back = new Vector3();
+        camera.matrixWorld.extractBasis(right, up, back);
+        const look = back.clone().negate();
+        return {
+          right: { x: right.x, y: right.y, z: right.z },
+          up: { x: up.x, y: up.y, z: up.z },
+          look: { x: look.x, y: look.y, z: look.z },
+          plane: scene.isOrthographic && Math.abs(look.y) < 0.5 ? 'view' : 'floor',
+        };
+      },
     });
 
     return () => {

@@ -53,7 +53,9 @@ Natural Oak and Walnut share one photographed grain map each (`public/oak-grain.
 **Cabinets are groups that remember they are cabinets.** `buildCabinetLayout`
 generates ordinary panels bundled into a `Group` carrying a `cabinet` config.
 Because the config survives, changing the cabinet's width rebuilds the carcass
-parametrically while preserving the 18 mm panels and 8 mm back. Changing only some
+parametrically while preserving the 18 mm panels and 8 mm back. Member ids stay
+bound to carcass / shelf / panel roles across Add Shelf and Add Panel, and those
+adds read live centrelines so a typed or gizmo'd placement is not overwritten. Changing only some
 members' size, or deleting a side/top/bottom/back, clears the config — the group
 demotes to a plain group, because it can no longer be regenerated faithfully.
 Moving or renaming members does not, and deleting a generated shelf or interior
@@ -71,10 +73,16 @@ the lazy chunk may not be loaded yet.
 
 **Clearance witnesses follow the selection.** `selectionUnits` collapses a
 flat part selection into rigid groups. One unit shows the nearest facing gap
-in each direction (`nearestFacingGaps`, skipping members of the same selected
-group). Two units lock that pair; `gizmoPartIds` hands the gizmo only the
-second so the first stays put. `SelectionDimensions` reads live halo-excluding
-AABBs. Touching or overlapping faces stay quiet. Render mode hides the overlay.
+in each direction (`nearestFacingGaps`). A cabinet from `cabinetContainingSelection`,
+or a fully selected group, also draws overall W/H/D (`overallDimensions`)
+further out than the gaps. A fully selected group treats other groups as one
+box; a single selected piece reads individual parts so it can clear to an inner
+face, not the outer AABB of an unselected cabinet. Two units lock that pair;
+`gizmoPartIds` hands the gizmo only the second so the first stays put.
+`SelectionDimensions` reads live halo-excluding AABBs. Click a clearance label
+to type a gap; `nudgeSelected` moves the gizmo parts along that axis. Overall
+labels are display-only. Touching or overlapping faces stay quiet. Render mode
+hides the overlay.
 
 **Persistence is schema-versioned.** Autosave is debounced into `localStorage`
 under a versioned envelope (currently schema 5), with migrations from schema 4

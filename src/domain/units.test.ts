@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { convertedValue, convertRange, decimalsFor, formatLength, fromMm, toMm } from './units';
+import { convertedValue, convertRange, decimalsFor, formatLength, fromMm, parseLength, toMm } from './units';
 
 describe('fromMm / toMm', () => {
   it('is the identity for mm', () => {
@@ -86,5 +86,28 @@ describe('formatLength', () => {
   it('shows two decimals for fractional inches and omits them for a whole inch', () => {
     expect(formatLength(800, 'in')).toBe('31.5');
     expect(formatLength(762, 'in')).toBe('30');
+  });
+});
+
+describe('parseLength', () => {
+  it('reads a bare number in the current display unit', () => {
+    expect(parseLength('20', 'cm')).toBe(200);
+    expect(parseLength('200', 'mm')).toBe(200);
+    expect(parseLength('1.8', 'cm')).toBeCloseTo(18, 10);
+  });
+
+  it('lets a trailing unit override the display unit', () => {
+    expect(parseLength('20 cm', 'mm')).toBe(200);
+    expect(parseLength('200mm', 'cm')).toBe(200);
+    expect(parseLength('1 in', 'mm')).toBeCloseTo(25.4, 10);
+  });
+
+  it('strips thousands separators', () => {
+    expect(parseLength('1,400', 'mm')).toBe(1400);
+  });
+
+  it('rejects empty or non-numeric text', () => {
+    expect(parseLength('', 'mm')).toBeNull();
+    expect(parseLength('abc', 'mm')).toBeNull();
   });
 });

@@ -1,4 +1,4 @@
-import { lazy, Suspense, useEffect } from 'react';
+import { lazy, Suspense, useEffect, useState } from 'react';
 import { useDocumentStore } from '@/store/documentStore';
 import { clearHistory } from '@/store/history';
 import {
@@ -22,26 +22,31 @@ import { useKeyboardShortcuts } from '@/ui/useKeyboardShortcuts';
 // three.js is ~600 kB; the Cut List path should not pay for it up front.
 const Viewport = lazy(() => import('@/viewport/Viewport').then((m) => ({ default: m.Viewport })));
 
+/** Restore autosave and prefs before the first paint so the viewport can frame them. */
+function restoreSession(): void {
+  const saved = loadDocument();
+  if (saved) {
+    useDocumentStore.getState().hydrate(saved);
+    // A restored document is the baseline, not an undoable step.
+    clearHistory();
+  }
+  const savedUnit = loadDisplayUnit();
+  if (savedUnit) useUiStore.getState().setDisplayUnit(savedUnit);
+  const savedGrid = loadGridSize();
+  if (savedGrid) useUiStore.getState().setGridSize(savedGrid);
+}
+
 export function App() {
   const viewMode = useUiStore((s) => s.viewMode);
   const leftSidebarOpen = useUiStore((s) => s.leftSidebarOpen);
   const rightSidebarOpen = useUiStore((s) => s.rightSidebarOpen);
   useKeyboardShortcuts();
+  useState(() => {
+    restoreSession();
+    return null;
+  });
 
   useEffect(() => {
-    const saved = loadDocument();
-    if (saved) {
-      useDocumentStore.getState().hydrate(saved);
-      // A restored document is the baseline, not an undoable step.
-      clearHistory();
-    }
-    // Preferences load before their sync subscriptions start, so hydrating
-    // one doesn't immediately write it back over a value never chosen.
-    const savedUnit = loadDisplayUnit();
-    if (savedUnit) useUiStore.getState().setDisplayUnit(savedUnit);
-    const savedGrid = loadGridSize();
-    if (savedGrid) useUiStore.getState().setGridSize(savedGrid);
-
     const stopAutosave = startAutosave();
     const stopUnitSync = startDisplayUnitSync();
     const stopGridSync = startGridSizeSync();
