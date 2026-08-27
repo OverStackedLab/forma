@@ -256,8 +256,9 @@ every document field change.
 
 ### Feedback
 
-User-visible outcomes go through `showToast(...)`. Destructive New File confirms
-with `window.confirm` when the document has content.
+User-visible outcomes go through `showToast(...)`. Destructive New File uses an
+in-app dialog (Cancel / Don't save / Save and continue) when the document has
+content. Save and continue downloads a `.forma.json` then starts the new design.
 
 ---
 
@@ -385,7 +386,7 @@ Read these before changing picking, history, cabinets, or materials:
 
 - New reproducible defects → next `BUG-###` in [`BUGS.md`](./BUGS.md) (full
   template while open; keep the write-up under Resolved records and a summary
-  row when resolved). Next unused id after BUG-025.
+  row when resolved). Next unused id after BUG-026.
 - Non-bug follow-ups → next `IMP-###` in [`IMPROVEMENTS.md`](./IMPROVEMENTS.md)
 - Do not invent tracker entries in PR descriptions only — write them in those
   files so the next agent can find them

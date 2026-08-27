@@ -388,6 +388,41 @@ The rebuild reused member ids by layout index. Adding a bay inserted extra shelf
 
 `assignCabinetMemberIds` reuses ids by role. Add Shelf / Add Panel read live interior centrelines before rebuilding. A partial selection stays on surviving members. Covered by `assignCabinetMemberIds` and actions unit tests. Verified 2026-08-27.
 
+### BUG-026 — Save to File did nothing when the native picker aborted immediately
+
+- **Status:** Resolved
+- **Severity:** High
+- **Found:** 2026-08-27
+- **Area:** Persistence
+- **App version or commit:** main @ c684cc8
+- **Frequency:** Always in headless Chromium / some webviews; also when Open File hid `*.forma.json`
+
+#### Steps to reproduce
+
+1. Click Save to File in a browser where `showSaveFilePicker` exists but cannot show a dialog (Playwright Chromium, some embedded views).
+2. Or click Open File and look for a previously saved `*.forma.json`.
+
+#### Expected behavior
+
+A `.forma.json` download starts. Open File lists those files.
+
+#### Actual behavior
+
+The picker rejected with `AbortError` in well under a second. Save treated that as a user cancel and returned without a download or toast. Open File's `accept` listed only `.json`, so some choosers hid `*.forma.json`.
+
+#### Notes and evidence
+
+`src/store/actions.ts` → `saveToFileOnce`. Distinct from a real cancel, which takes long enough to see and dismiss the dialog. Vercel *preview* URLs (`forma-git-dev-…`) also require Vercel SSO; production `forma-ebon-one.vercel.app` does not.
+
+#### Resolution
+
+An `AbortError` faster than 400 ms was treated as a cancel, so nothing
+downloaded. After that, a shown picker whose `createWritable()` failed still
+toasted only "Could not save the file" and never downloaded. Save to File now
+always downloads `{title}.forma.json`. Open File accepts `.json` and
+`.forma.json`. Covered by save unit tests and Chromium download checks.
+Verified 2026-08-27.
+
 ## Resolved bugs
 
 | ID | Summary | Resolution | Verified |
@@ -412,3 +447,4 @@ The rebuild reused member ids by layout index. Adding a bay inserted extra shelf
 | BUG-023 | Reload left the camera on the empty-scene view | See Resolved records. Reload, Open File, and Restore Version call `frameAll`. | 2026-08-27 |
 | BUG-024 | Duplicating a panel measured from the wrong face | See Resolved records. Duplicate of an interior panel is Add Panel at the next free centreline; a single selected piece measures to individual neighbours. | 2026-08-27 |
 | BUG-025 | Add Shelf / Add Panel reset existing panel positions | See Resolved records. Rebuilds reuse ids by role and keep live centrelines. | 2026-08-27 |
+| BUG-026 | Save to File did nothing when the native picker aborted immediately | See Resolved records. Save always downloads `{title}.forma.json`; Open File accepts `.forma.json`. | 2026-08-27 |

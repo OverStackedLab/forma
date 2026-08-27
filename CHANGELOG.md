@@ -62,3 +62,5 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - Add Shelf / Add Panel no longer remap existing panels onto new bay shelves or snap them back to stale centrelines (BUG-025).
 - Add Shelf and Add Panel stay at the top of Properties for a selected cabinet, including a single member or extra loose parts.
 - Reload, Open File, and Restore Version frame every object in the scene (BUG-023).
+- Save to File always downloads a `.forma.json` instead of using Chrome's save picker, which often failed after the dialog (BUG-026). Open File lists `.forma.json` files.
+- New File offers Cancel, Don't save, or Save and continue. Save downloads a `.forma.json` copy before clearing the design.

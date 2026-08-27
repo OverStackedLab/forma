@@ -29,8 +29,8 @@ async function gotoMm(page: Page): Promise<void> {
 }
 
 /**
- * Force the plain-download fallback. Chromium exposes showSaveFilePicker,
- * which Playwright cannot drive as a native dialog.
+ * Force the plain-download path in older builds that still called
+ * showSaveFilePicker. Chromium exposes that API; Playwright cannot drive it.
  */
 async function gotoWithDownloadFallback(page: Page): Promise<void> {
   await page.addInitScript(() => {
@@ -1147,6 +1147,16 @@ test('saving to a file and opening it round-trips the document', async ({ page }
   await expect(page.getByText('No parts yet.')).toBeVisible();
 });
 
+test('saving still downloads when the native picker aborts immediately', async ({ page }) => {
+  await page.goto('/');
+  await insertShelf(page);
+  const downloadPromise = page.waitForEvent('download');
+  await page.getByRole('button', { name: 'Save to File' }).click();
+  const download = await downloadPromise;
+  expect(download.suggestedFilename()).toBe('Untitled Design.forma.json');
+  await expect(page.getByText('Saved Untitled Design')).toBeVisible();
+});
+
 test('creating a new file can be cancelled and then starts a clean persisted design', async ({
   page,
 }) => {
@@ -1158,16 +1168,13 @@ test('creating a new file can be cancelled and then starts a clean persisted des
   await gridSize.blur();
   await expect(gridSize).toHaveValue('600');
 
-  page.once('dialog', async (dialog) => {
-    expect(dialog.type()).toBe('confirm');
-    expect(dialog.message()).toContain('current design will be cleared');
-    await dialog.dismiss();
-  });
   await page.getByRole('button', { name: 'New File' }).click();
+  await expect(page.getByRole('dialog', { name: 'Create a new design?' })).toBeVisible();
+  await page.getByRole('button', { name: 'Cancel' }).click();
   await expect(page.getByText('1 part').first()).toBeVisible();
 
-  page.once('dialog', async (dialog) => dialog.accept());
   await page.getByRole('button', { name: 'New File' }).click();
+  await page.getByRole('button', { name: "Don't save" }).click();
   await expect(page.getByText('New design created')).toBeVisible();
   await expect(page.getByText('Untitled Design', { exact: true })).toBeVisible();
   await expect(page.getByText('No parts yet.')).toBeVisible();
@@ -1179,6 +1186,18 @@ test('creating a new file can be cancelled and then starts a clean persisted des
 
   await expect(page.getByText('Autosaved')).toBeVisible();
   await page.reload();
+  await expect(page.getByText('No parts yet.')).toBeVisible();
+});
+
+test('new file can save a copy then start a clean design', async ({ page }) => {
+  await page.goto('/');
+  await insertShelf(page);
+  await page.getByRole('button', { name: 'New File' }).click();
+  const downloadPromise = page.waitForEvent('download');
+  await page.getByRole('button', { name: 'Save and continue' }).click();
+  const download = await downloadPromise;
+  expect(download.suggestedFilename()).toBe('Untitled Design.forma.json');
+  await expect(page.getByText('New design created')).toBeVisible();
   await expect(page.getByText('No parts yet.')).toBeVisible();
 });
 

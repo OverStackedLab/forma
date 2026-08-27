@@ -803,108 +803,35 @@ describe('save and open title', () => {
     downloadBlob.mockRestore();
   });
 
-  it('downloads under the current title without any prompt when the picker is unavailable', async () => {
+  it('downloads under the current title without a native save picker', async () => {
     renameDocument('Dining Table');
-    vi.stubGlobal('window', {});
     const prompt = vi.fn();
     vi.stubGlobal('prompt', prompt);
     const downloadBlob = vi.spyOn(download, 'downloadBlob').mockImplementation(() => undefined);
 
-    await saveToFile();
+    const ok = await saveToFile();
 
+    expect(ok).toBe(true);
     expect(prompt).not.toHaveBeenCalled();
     expect(useDocumentStore.getState().docTitle).toBe('Dining Table');
     expect(downloadBlob).toHaveBeenCalledWith(expect.any(Blob), 'Dining Table.forma.json');
+    expect(useUiStore.getState().toast?.message).toBe('Saved Dining Table');
     downloadBlob.mockRestore();
     vi.unstubAllGlobals();
   });
 
-  it('updates the document title from the File System Access save picker', async () => {
-    const write = vi.fn(async () => undefined);
-    const close = vi.fn(async () => undefined);
-    const createWritable = vi.fn(async () => ({ write, close }));
-    const showSaveFilePicker = vi.fn(async () => ({
-      name: 'Sideboard.forma.json',
-      createWritable,
-    }));
-    vi.stubGlobal('window', { showSaveFilePicker });
-    const downloadBlob = vi.spyOn(download, 'downloadBlob').mockImplementation(() => undefined);
-
-    await saveToFile();
-
-    expect(showSaveFilePicker).toHaveBeenCalled();
-    expect(useDocumentStore.getState().docTitle).toBe('Sideboard');
-    expect(write).toHaveBeenCalledOnce();
-    expect(close).toHaveBeenCalledOnce();
-    expect(downloadBlob).not.toHaveBeenCalled();
-    downloadBlob.mockRestore();
-    vi.unstubAllGlobals();
-  });
-
-  it('leaves the title alone when the save picker is dismissed', async () => {
-    renameDocument('Keep Me');
-    const showSaveFilePicker = vi.fn(async () => {
-      throw new DOMException('The user aborted a request.', 'AbortError');
+  it('toasts when the download itself throws', async () => {
+    const downloadBlob = vi.spyOn(download, 'downloadBlob').mockImplementation(() => {
+      throw new Error('blocked');
     });
-    vi.stubGlobal('window', { showSaveFilePicker });
-    const prompt = vi.fn();
-    vi.stubGlobal('prompt', prompt);
-    const downloadBlob = vi.spyOn(download, 'downloadBlob').mockImplementation(() => undefined);
-
-    await saveToFile();
-
-    expect(useDocumentStore.getState().docTitle).toBe('Keep Me');
-    expect(prompt).not.toHaveBeenCalled();
-    expect(downloadBlob).not.toHaveBeenCalled();
-    downloadBlob.mockRestore();
-    vi.unstubAllGlobals();
-  });
-
-  it('never falls back to a download once the picker has been shown', async () => {
-    const createWritable = vi.fn(async () => {
-      throw new DOMException('Write access denied.', 'NotAllowedError');
-    });
-    const showSaveFilePicker = vi.fn(async () => ({
-      name: 'Sideboard.forma.json',
-      createWritable,
-    }));
-    vi.stubGlobal('window', { showSaveFilePicker });
     const consoleError = vi.spyOn(console, 'error').mockImplementation(() => undefined);
-    const downloadBlob = vi.spyOn(download, 'downloadBlob').mockImplementation(() => undefined);
 
-    await saveToFile();
+    const ok = await saveToFile();
 
-    expect(downloadBlob).not.toHaveBeenCalled();
+    expect(ok).toBe(false);
     expect(useUiStore.getState().toast?.message).toBe('Could not save the file');
     downloadBlob.mockRestore();
     consoleError.mockRestore();
-    vi.unstubAllGlobals();
-  });
-
-  it('ignores a second save while the picker is already open', async () => {
-    let resolvePicker: (handle: { name: string; createWritable: () => Promise<unknown> }) => void =
-      () => undefined;
-    const write = vi.fn(async () => undefined);
-    const close = vi.fn(async () => undefined);
-    const showSaveFilePicker = vi.fn(
-      () =>
-        new Promise((resolve) => {
-          resolvePicker = resolve;
-        }),
-    );
-    vi.stubGlobal('window', { showSaveFilePicker });
-    const downloadBlob = vi.spyOn(download, 'downloadBlob').mockImplementation(() => undefined);
-
-    const first = saveToFile();
-    const second = saveToFile();
-    resolvePicker({ name: 'Sideboard.forma.json', createWritable: async () => ({ write, close }) });
-    await Promise.all([first, second]);
-
-    expect(showSaveFilePicker).toHaveBeenCalledOnce();
-    expect(write).toHaveBeenCalledOnce();
-    expect(downloadBlob).not.toHaveBeenCalled();
-    downloadBlob.mockRestore();
-    vi.unstubAllGlobals();
   });
 
   it('sets the document title from the opened file name', async () => {
