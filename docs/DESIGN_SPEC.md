@@ -112,9 +112,9 @@ Full-bleed WebGL canvas with DOM overlays:
 - **View buttons** — top-right pill: 3D · Front · Side · Top · Frame. Front / Side / Top lock a true orthographic elevation (no foreshortening; left-drag pans). 3D restores the perspective ¾ view. Frame flies to the current selection (or the whole scene).
 - **Measure banner** — top-center when measure mode is on: `background:rgba(26,24,21,.85)`, `color:#EEE9E2`, 11.5px, `padding:6px 14px`, `border-radius:20px`. Copy: "Click two points on the model to measure".
 - **Measure label** — follows the midpoint of the measured segment, `transform:translate(-50%,-130%)`, `background:#1A1815`, `color:#4FA3FF`, IBM Plex Mono 11px, `border:1px solid rgba(79,163,255,.4)`, `border-radius:5px`, `pointer-events:none`. Content: `{n} {unit}`.
-- **Selection dimensions** — one selected piece or group draws witness lines and a length label in `#4FA3FF` to the nearest facing neighbour in each direction. Two selected units lock that pair. Hidden in Render.
+- **Selection dimensions** — one selected piece or group draws witness lines and a length label in `#4FA3FF` to the nearest facing neighbour in each direction. A cabinet or fully selected group also shows overall W/H/D. Two selected units lock that pair. Click a clearance label to type a gap; the gizmo's parts move to match. Hidden in Render.
 - **Marquee rectangle** — `border:1px solid #4FA3FF`, `background:rgba(79,163,255,.14)`, `pointer-events:none`, `z-index:6`.
-- **Hint line** — bottom-left, 11px IBM Plex Mono `rgba(26,24,21,.5)`: "Drag to orbit · Shift-drag to box select · G/R/S transform · H pan · F frame · ⌘D duplicate · ⌘A select all · Del delete".
+- **Hint line** — bottom-left, 11px IBM Plex Mono `rgba(26,24,21,.5)`: "Drag to orbit · Shift-drag to box select · G/R/S transform · arrows nudge · H pan · F frame · ⌘D duplicate · ⌘A select all · Del delete".
 - **Render bar** — bottom-center, Render mode only: `background:rgba(26,24,21,.85)`, `border-radius:12px`, `padding:8px`. Camera preset buttons (3D / Front / Side / Top) at `rgba(255,255,255,.06)`, then a divider, then the `#C68A46` **Export Image** button.
 - **Grid extent** — a typed numeric field in the bottom status bar. It follows the global mm/cm/in preference, accepts 100 mm (10 cm) increments from 1–20 m, and is kept with the other local viewport preferences rather than presented as furniture data.
 
@@ -150,7 +150,9 @@ Slider and input are two views of one value and must stay bound in both directio
 - *Fixed (parametric) part*: read-only W/H/D chips — `flex:1` cards, `#211E1A`, `border-radius:6px`, `padding:6px 8px`, 9.5px axis label over an IBM Plex Mono 12px value.
 - *Custom panel*: the same three-up layout but as editable number inputs (`height:26px`, centered text), labelled "W (mm)" etc.
 - *Multi-selection*: read-only chips showing the **combined bounding-box** dimensions, with the header reading `{n} parts selected`. Two or more selected parts share position and rotation sliders around the selection pivot. A group's **Y** is the underside of the combined box, so a cabinet on the floor reads 0.
+- *Rigid group that still looks like a cabinet*: Restore cabinet reattaches Add Shelf from the current pieces. Opening a saved file does not do this automatically.
 - *Two selection units*: Align Left / Centres / Right, Front / Back, Tops / Bottoms (first stays fixed; only that axis moves) and Snap Together.
+- *A generated cabinet* (the whole group, one member, or extra loose parts): Add Shelf and Add Panel at the top of Properties.
 
 Action row (`display:flex; gap:8px; flex-wrap:wrap`), buttons `height:28px`, `padding:0 12px`, `border-radius:6px`, 11.5px: Clear selection · Reset transform · Duplicate (custom panels only) · **Delete** in the danger treatment (`border:1px solid rgba(220,90,90,.3)`, `background:rgba(220,90,90,.1)`, `color:#e08a8a`).
 
@@ -196,8 +198,8 @@ The CSV export must serialize exactly what the table shows, including custom pan
 - **Click** a part in the viewport (raycast against the model group) or a row in the Assembly tree → select it. A viewport click on a grouped piece selects that piece, not the group (BUG-006).
 - **Click empty space** → clear selection.
 - **Shift-click** a part → add/toggle that part. Shift-click (or ⌘/Ctrl-click) a group row, or use the group checkbox, adds or removes every member.
-- **One selected unit** draws clearance to the nearest facing neighbour in each direction (above/below, left/right, front/back), so a shelf can be moved on its own. A fully selected group is one body and does not dimension to its own members.
-- **Two selected units** (two parts, two groups, or one of each) lock that pair. The first stays fixed; the gizmo attaches only to the second, so the gap updates while you move it (same order as Align).
+- **One selected unit** draws clearance to the nearest facing neighbour in each direction (above/below, left/right, front/back), so a shelf can be moved on its own. A cabinet (or fully selected group) also draws overall W/H/D. A fully selected group is one body and does not dimension to its own members. Click a clearance label to type the gap; the selected unit moves. Overall size labels are display-only.
+- **Two selected units** (two parts, two groups, or one of each) lock that pair. The first stays fixed; the gizmo attaches only to the second, so the gap updates while you move it (same order as Align). Click a length label to type the gap; only the second unit moves.
 - **Shift-drag** → marquee box select. Critical detail: the marquee must start **lazily on pointer *move*** once the pointer passes a ~5px threshold, *not* on pointerdown. Committing on pointerdown swallows shift-click additive selection, because a zero-movement shift-click then never reaches the raycast path. While the marquee is active, disable OrbitControls and re-enable on release. Hit test by projecting each visible part's world position to screen space and testing containment. Holding ⌘/Ctrl with the marquee adds to the existing selection instead of replacing it. An empty box clears the selection.
 - **Select All** — the button or ⌘A. Must exclude deleted parts.
 - Selection is always an array, even for one part. The gizmo attaches to a temporary group when more than one part is selected, except for exactly two selection units, where it drives only the second.
@@ -211,12 +213,13 @@ Toggle in the gizmo toolbar. When on, translation magnetically snaps to nearby p
 ### Measuring
 Toggle in the toolbar. Click two points on the model; each click raycasts and records a hit point. Renders two 8 mm spheres and a dashed line in `#4FA3FF`, with a DOM label at the projected midpoint showing the distance in the current display unit. A third click starts a fresh measurement.
 
-Selecting a piece or group draws SketchUp-style witnesses to the nearest facing neighbour in each direction. Selecting exactly two pieces or groups locks that pair instead. Touching or overlapping faces stay quiet. The overlay reads live mesh bounds so a gizmo drag stays truthful, and it hides in Render.
+Selecting a piece or group draws SketchUp-style witnesses to the nearest facing neighbour in each direction. A cabinet — or any fully selected group — also draws overall width, height, and depth on the carcass. Selecting exactly two pieces or groups locks that pair instead. Click a clearance label to type the gap in the current display unit; the same parts the gizmo would drive move to match. Overall size labels are display-only. Touching or overlapping faces stay quiet. The overlay reads live mesh bounds so a gizmo drag stays truthful, and it hides in Render.
 
 ### Keyboard
 | Key | Action |
 |---|---|
 | `G` / `R` / `S` | Move / Rotate / Scale gizmo |
+| Arrow keys | Nudge the move-gizmo selection. Front/Side follow the view; 3D and Top stay on the floor. One display unit per tap, Shift for 100 mm. |
 | `H` | Pan tool |
 | `F` | Frame selection (falls back to framing the whole piece) |
 | `Delete` / `Backspace` | Delete selection |
@@ -230,10 +233,10 @@ Suppress all shortcuts while focus is in an input.
 Both parametric parts and custom panels can be deleted. Parametric deletions are recorded as a `deletedFixedIds` list that filters the rebuild, the assembly tree, the part count, Select All, and the cut list. Custom panels are removed from the `customParts` array.
 
 ### Duplicating
-Clones are offset by 80 mm in X and Z, inherit material overrides and orientation, and become the new selection. A piece that belongs to a configurable cabinet duplicates the whole cabinet so Add Shelf stays available (BUG-018).
+Clones are offset by 80 mm in X and Z, inherit material overrides and orientation, and become the new selection. Duplicate copies the current selection: a fully selected cabinet clones as a cabinet; a single interior panel is added like Add Panel (next free centreline in the carcass); a single shelf or carcass piece copies as a loose part.
 
 ### Camera
-Front, Side and Top switch to a locked **orthographic** camera (true elevation or plan, no foreshortening). Left-drag pans; orbit is disabled so the view cannot tilt. **3D** and **Frame** stay in perspective. `Frame` / `F` frames the current selection: expand a `Box3` over the selected meshes, take the center and a radius-derived distance (`clamp(radius * 3.2, 0.9, 6)`), and fly along a normalized `(0.8, 0.55, 0.9)` direction. Camera moves are eased by lerping position and target at `0.08` per frame rather than jumping.
+Front, Side and Top switch to a locked **orthographic** camera (true elevation or plan, no foreshortening). Left-drag pans; orbit is disabled so the view cannot tilt. **3D** and **Frame** stay in perspective. On reload, Open File, and Restore Version the camera frames every live part. `Frame` / `F` frames the current selection: expand a `Box3` over the selected meshes, take the center and a radius-derived distance (`clamp(radius * 3.2, 0.9, 6)`), and fly along a normalized `(0.8, 0.55, 0.9)` direction. Camera moves are eased by lerping position and target at `0.08` per frame rather than jumping.
 
 ### Version history
 Saving captures dimensions, all style choices, materials, custom panels, deletions, and per-part overrides. Entries list a color dot keyed to the body finish, a label, a relative timestamp, and the dimension string. The current version is badged "Current" in `#6FBF73` on `rgba(111,191,115,.15)`; others get a "Restore" button in `#4FA3FF` on `rgba(79,163,255,.12)`. Restore replaces the whole scene state.

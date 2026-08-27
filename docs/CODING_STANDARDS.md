@@ -133,11 +133,14 @@ count, Select All, and BOM. Do not maintain a parallel “fixed parts” list.
 
 - Generated cabinets carry `group.cabinet` config; parametric rebuilds go through
   `setCabinetDim` / `resizeCabinetFromGizmo` / `commitCabinetResize`
+- Rebuilds reuse carcass / shelf / panel ids by role, not by array index, so
+  Add Panel does not turn an existing panel into a bay shelf (BUG-025)
 - Changing a **subset** of members' **size** clears `cabinet` (demotion). Moving,
   rotating or renaming members does not. Deleting a generated shelf or interior
   panel updates the config and rebuilds; deleting a carcass piece still demotes.
   Persistence must not resurrect stock configs from labels on current-schema
-  loads (BUG-009)
+  loads (BUG-009). `restoreSelectedCabinet` can reattach config from carcass
+  geometry when the user asks.
 - Grain / edge banding on cabinet panels are user-editable and must survive
   reload (BUG-008)
 
@@ -160,6 +163,8 @@ On document/UI changes:
 1. `builder.sync(...)` — geometry, materials, transforms, visibility
 2. Selection overlay (`decorated()` is empty in Render mode)
 3. Gizmo attach/detach
+
+On first mount the camera then **frames all** live parts (reload / restored autosave). Open File and Restore Version call `viewportApi().frameAll()` after the meshes exist.
 
 Render mode must not bake halos or gizmos into PNG export.
 
@@ -245,6 +250,9 @@ every document field change.
 - Modifiers: Cmd/Ctrl+Z (undo), Shift+Cmd/Ctrl+Z (redo), Cmd/Ctrl+A, Cmd/Ctrl+D
 - Modes: Q/Esc select, H pan, G/M translate, R rotate, S scale, F frame,
   Delete/Backspace delete
+- Move gizmo: arrow keys nudge the same parts the gizmo drives (one display
+  unit; Shift is 100 mm). Front/Side stay in the view plane; 3D and Top stay
+  on the floor.
 
 ### Feedback
 
@@ -364,7 +372,7 @@ Read these before changing picking, history, cabinets, or materials:
 4. **Halos inflate bounds** — exclude them from measure/frame/snap/gap boxes
 5. **`preserveDrawingBuffer: true`** — required for PNG export
 6. **Metadata outside `commit()`** — patch history with `syncHistoryDocumentMeta()`
-7. **Demoted cabinets** — missing `cabinet` on a current-schema group means “regular group”
+7. **Demoted cabinets** — missing `cabinet` on a current-schema group means “regular group”; Restore cabinet is explicit, never silent on load
 8. **Hidden ≠ unpickable in three.js** — filter with `visibleIds()`
 9. **Unlayered base CSS breaks buttons** — keep resets in `@layer base`
 10. **Empty canvas is intentional** — do not restore the parametric sideboard
@@ -376,7 +384,8 @@ Read these before changing picking, history, cabinets, or materials:
 ## 12. Bugs and improvements
 
 - New reproducible defects → next `BUG-###` in [`BUGS.md`](./BUGS.md) (full
-  template while open; summary row when resolved)
+  template while open; keep the write-up under Resolved records and a summary
+  row when resolved). Next unused id after BUG-025.
 - Non-bug follow-ups → next `IMP-###` in [`IMPROVEMENTS.md`](./IMPROVEMENTS.md)
 - Do not invent tracker entries in PR descriptions only — write them in those
   files so the next agent can find them

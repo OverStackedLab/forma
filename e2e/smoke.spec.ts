@@ -152,6 +152,10 @@ test('cabinet panels can be added at a position and distributed by spacing', asy
   await expect(page.getByText('8 parts').first()).toBeVisible();
   await expect(page.getByLabel('Panel 1 position in millimetres')).toHaveValue('300');
 
+  await page.getByRole('button', { name: 'Add Panel' }).click();
+  await expect(page.getByText('Panel added at 400 mm')).toBeVisible();
+  await expect(page.getByLabel('Panel 2 position in millimetres')).toHaveValue('400');
+
   await page.getByLabel('Panel count').fill('3');
   await page.getByLabel('Panel spacing in millimetres').fill('200');
   await page.getByRole('button', { name: 'Apply Panels' }).click();
@@ -165,6 +169,25 @@ test('cabinet panels can be added at a position and distributed by spacing', asy
 
   await page.getByRole('button', { name: 'Undo' }).click();
   await expect(page.getByText('10 parts').first()).toBeVisible();
+});
+
+test('duplicating an interior panel adds the next free centreline like Add Panel', async ({
+  page,
+}) => {
+  await gotoMm(page);
+  await page.getByRole('tab', { name: 'Library' }).click();
+  await page.getByRole('button', { name: /Base 600/ }).click();
+  await page.getByLabel('New panel position in millimetres').fill('300');
+  await page.getByRole('button', { name: 'Add Panel' }).click();
+  await expect(page.getByText('Panel added at 300 mm')).toBeVisible();
+
+  await page.getByRole('tab', { name: 'Assembly' }).click();
+  await page.getByRole('treeitem', { name: /Panel 1/ }).click();
+  await page.getByRole('button', { name: 'Duplicate' }).click();
+  await expect(page.getByText('Panel added at 400 mm')).toBeVisible();
+  await expect(page.getByLabel('Panel 2 position in millimetres')).toHaveValue('400');
+  await expect(page.getByText('10 parts').first()).toBeVisible();
+  await expect(page.getByLabel('Panel 1 position in millimetres')).toHaveValue('300');
 });
 
 test('deleting a panel updates the tree, the count and the cut list together', async ({ page }) => {
@@ -260,6 +283,26 @@ test('switching gizmo tools preserves the current selection', async ({ page }) =
   await expect(page.getByText('1 selected')).toBeVisible();
 });
 
+test('arrow keys nudge while the move gizmo is active', async ({ page }) => {
+  await gotoMm(page);
+  await insertShelf(page);
+  await expect(page.locator('canvas')).toBeVisible();
+  await page.getByRole('button', { name: 'Front', exact: true }).first().click();
+  await page.getByRole('button', { name: 'Move (G)' }).click();
+
+  const xPosition = page.getByLabel('X Position in millimetres');
+  await expect(xPosition).toHaveValue('0');
+  await page.keyboard.press('ArrowRight');
+  await expect(xPosition).toHaveValue('1');
+
+  await page.keyboard.press('Shift+ArrowRight');
+  await expect(xPosition).toHaveValue('101');
+
+  await page.getByRole('button', { name: 'Select (Q)' }).click();
+  await page.keyboard.press('ArrowRight');
+  await expect(xPosition).toHaveValue('101');
+});
+
 test('a panel dimension change is undoable and redoable', async ({ page }) => {
   await gotoMm(page);
   await insertShelf(page);
@@ -297,6 +340,7 @@ test('the document persists across a reload', async ({ page }) => {
   await expect(page.getByText('Autosaved')).toBeVisible({ timeout: 5_000 });
 
   await page.reload();
+  await expect(page.locator('canvas')).toBeVisible();
   await page.getByRole('tab', { name: 'Assembly' }).click();
   await expect(page.getByRole('treeitem', { name: 'Shelf Hide Shelf' })).toBeVisible();
 });
@@ -463,11 +507,12 @@ test('viewport clicks select one grouped piece while the Assembly group row sele
   await expect(page.getByText('Editing: Base 600')).toBeVisible();
   await expect(page.getByText('Configurable cabinet · 6 pieces')).toBeVisible();
   await expect(page.getByRole('button', { name: 'Add Shelf' })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Add Panel' })).toBeVisible();
   await expect(page.getByLabel('Group X Position in millimetres')).toHaveValue('0');
   await expect(page.getByLabel('Group Y Position in millimetres')).toHaveValue('0');
 });
 
-test('duplicating a cabinet from one selected piece keeps Add Shelf', async ({ page }) => {
+test('duplicating one cabinet piece copies only that piece', async ({ page }) => {
   await gotoMm(page);
   await page.getByRole('tab', { name: 'Library' }).click();
   await page.getByRole('button', { name: /Base 600/ }).click();
@@ -479,8 +524,29 @@ test('duplicating a cabinet from one selected piece keeps Add Shelf', async ({ p
   await expect(page.getByRole('button', { name: 'Add Shelf' })).toBeVisible();
 
   await page.getByRole('button', { name: 'Duplicate' }).click();
-  await expect(page.getByText('Base 600 group duplicated')).toBeVisible();
-  await expect(page.getByText('Configurable cabinet · 6 pieces')).toBeVisible();
+  await expect(page.getByText('Part duplicated')).toBeVisible();
+  await expect(page.getByText('7 parts').first()).toBeVisible();
+});
+
+test('a demoted cabinet can restore Add Shelf from its pieces', async ({ page }) => {
+  await gotoMm(page);
+  await page.getByRole('tab', { name: 'Library' }).click();
+  await page.getByRole('button', { name: /Base 600/ }).click();
+  await page.getByRole('button', { name: 'Clear', exact: true }).click();
+
+  const canvasBox = await page.locator('canvas').boundingBox();
+  if (!canvasBox) throw new Error('viewport canvas has no bounding box');
+  await page.mouse.click(canvasBox.x + canvasBox.width / 2, canvasBox.y + canvasBox.height * 0.54);
+  await expect(page.getByRole('button', { name: 'Add Shelf' })).toBeVisible();
+
+  const heightInput = page.getByLabel('Height in millimetres');
+  await heightInput.fill('700');
+  await heightInput.blur();
+  await expect(page.getByRole('button', { name: 'Add Shelf' })).toHaveCount(0);
+  await expect(page.getByRole('button', { name: 'Restore cabinet' })).toBeVisible();
+
+  await page.getByRole('button', { name: 'Restore cabinet' }).click();
+  await expect(page.getByText('Cabinet controls restored')).toBeVisible();
   await expect(page.getByRole('button', { name: 'Add Shelf' })).toBeVisible();
 });
 
@@ -812,6 +878,38 @@ test('a selected panel shows clearance to the nearest facing neighbour', async (
   await yPosition.fill('200');
   await yPosition.blur();
   await expect(page.getByTestId('selection-dimension').filter({ hasText: '173 mm' })).toBeVisible();
+});
+
+test('clicking a clearance label sets the gap', async ({ page }) => {
+  await gotoMm(page);
+  await insertShelf(page);
+  await insertShelf(page);
+  await expect(page.locator('canvas')).toBeVisible();
+  const yPosition = page.getByLabel('Y Position in millimetres');
+  await yPosition.fill('200');
+  await yPosition.blur();
+  const label = page.getByTestId('selection-dimension').filter({ hasText: '173 mm' });
+  await expect(label).toBeVisible();
+  await label.click();
+  const input = page.getByRole('textbox', { name: 'Clearance' });
+  await expect(input).toBeVisible();
+  await input.fill('200');
+  await input.press('Enter');
+  await expect(page.getByTestId('selection-dimension').filter({ hasText: '200 mm' })).toBeVisible();
+});
+
+test('a selected cabinet shows overall width, height, and depth', async ({ page }) => {
+  await gotoMm(page);
+  await page.getByRole('tab', { name: 'Library' }).click();
+  await page.getByRole('button', { name: /Base 600/ }).click();
+  await expect(page.getByText('Base 600 cabinet added')).toBeVisible();
+  await expect(page.getByTestId('selection-overall-dimension').filter({ hasText: 'W 600 mm' })).toBeVisible();
+  await expect(page.getByTestId('selection-overall-dimension').filter({ hasText: 'H 800 mm' })).toBeVisible();
+  await expect(page.getByTestId('selection-overall-dimension').filter({ hasText: 'D 600 mm' })).toBeVisible();
+
+  await page.getByRole('tab', { name: 'Assembly' }).click();
+  await page.getByRole('treeitem', { name: /Base 600 Top Hide/ }).click();
+  await expect(page.getByTestId('selection-overall-dimension').filter({ hasText: 'H 800 mm' })).toBeVisible();
 });
 
 test('switching to mm converts the dimension fields and round-trips back to cm', async ({

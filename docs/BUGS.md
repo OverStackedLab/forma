@@ -1,8 +1,10 @@
 # Forma Bug Log
 
 Use this file to record reproducible app problems. Give each new bug the next
-number (`BUG-001`, `BUG-002`, and so on), then move it to the resolved table
-when the fix has been verified.
+number (`BUG-001`, `BUG-002`, and so on). While it is open, keep the full
+template under **Open bugs**. When it is fixed, fill **Resolution**, move the
+write-up to **Resolved records** (so the steps and evidence stay), and add a
+one-line summary to the resolved table.
 
 ## Open bugs
 
@@ -126,11 +128,11 @@ Each copy is still a configurable cabinet with Add Shelf.
 
 #### Actual behavior
 
-`duplicateSelected` only groups a copy when the selection matches one group (or, after BUG-018, sits inside one cabinet). Two cabinets are cloned as loose parts. The copies have no `cabinet` config, so Add Shelf is gone.
+`duplicateSelected` only groups a copy when the selection matches one group. Two cabinets are cloned as loose parts. The copies have no `cabinet` config, so Add Shelf is gone.
 
 #### Notes and evidence
 
-`src/store/actions.ts` → `duplicateSelected`. `groupMatching` requires an exact single-group membership; `cabinetContainingSelection` requires every selected id to live in one cabinet. Keyboard shortcut still calls duplicate when the button is hidden (`useKeyboardShortcuts.ts`).
+`src/store/actions.ts` → `duplicateSelected`. `groupMatching` requires an exact single-group membership. Keyboard shortcut still calls duplicate when the button is hidden (`useKeyboardShortcuts.ts`). Related to BUG-022.
 
 #### Resolution
 
@@ -161,7 +163,7 @@ Either the size sliders should not invite a carcass-breaking edit while Add Shel
 
 #### Notes and evidence
 
-`src/store/actions.ts` → `setCustomPartDim` / `invalidatePartiallyEditedCabinets`. Properties shows both per-part dimension sliders and Add Shelf for a single selected member (`RightSidebar.tsx`). Related to BUG-014 (delete) and BUG-018 (duplicate).
+`src/store/actions.ts` → `setCustomPartDim` / `invalidatePartiallyEditedCabinets`. Properties shows both per-part dimension sliders and Add Shelf for a single selected member (`RightSidebar.tsx`). Related to BUG-014 (delete) and BUG-018 (duplicate). A demoted group that still looks like a carcass can use Restore cabinet; load still will not resurrect `cabinet` on its own (BUG-009).
 
 #### Resolution
 
@@ -201,6 +203,191 @@ reproduce the problem.
 
 Leave blank until fixed. Record the change and how it was verified.
 
+## Resolved records
+
+Full write-ups kept after the summary row is added, so later agents can see
+what failed and how it was verified.
+
+### BUG-021 — Add Panel at the same position replaced the previous panel
+
+- **Status:** Resolved
+- **Severity:** Medium
+- **Found:** 2026-08-27
+- **Area:** Panels
+- **App version or commit:** dev @ 367b6f2
+- **Frequency:** Always (second Add Panel / Add Shelf click without changing the millimetre field)
+
+#### Steps to reproduce
+
+1. Insert a Base 600.
+2. Click Add Panel (default 300 mm). A centre panel appears.
+3. Click Add Panel again without changing the position.
+
+#### Expected behavior
+
+A second interior panel is added at the next free offset.
+
+#### Actual behavior
+
+The default stayed 300 mm, so the second click stacked on the same centreline.
+In the viewport that looked like the first panel had been replaced.
+
+#### Notes and evidence
+
+`addCabinetDivider` / `addCabinetShelf` appended the typed millimetres even when
+that centreline was occupied. `InteriorMemberFields` also reset the add field
+to 300 mm after every click.
+
+#### Resolution
+
+`nextFreeInteriorPosition` walks 100 mm (then millimetre-by-millimetre) to a
+free centreline. A second Add Panel at 300 mm lands at 400 mm. Covered by
+domain and actions unit tests and a Base 600 browser check. Verified 2026-08-27.
+
+### BUG-022 — Duplicating one cabinet shelf or panel cloned the whole cabinet
+
+- **Status:** Resolved
+- **Severity:** Medium
+- **Found:** 2026-08-27
+- **Area:** Panels
+- **App version or commit:** dev @ 367b6f2
+- **Frequency:** Always (Duplicate or ⌘D with one cabinet member selected)
+
+#### Steps to reproduce
+
+1. Insert a Base 600.
+2. Click one shelf or panel in the viewport (not the Assembly group row).
+3. Click Duplicate.
+
+#### Expected behavior
+
+Only that piece is copied, offset 80 mm. The original cabinet stays intact
+with Add Shelf.
+
+#### Actual behavior
+
+BUG-018 made Duplicate copy the containing cabinet whenever Add Shelf was
+showing, so one selected shelf produced a second full carcass.
+
+#### Notes and evidence
+
+`duplicateSelected` used `cabinetContainingSelection` as well as
+`groupMatching`. Properties Duplicate is shown for `selection.kind ===
+'single'`, so the button looked like it applied to that shelf.
+
+#### Resolution
+
+Duplicate copies the current selection. A fully selected group still clones as
+a cabinet; a single member clones as a loose part. To copy a whole cabinet,
+select the group in Assembly first. Covered by an actions unit test and a
+Base 600 browser check. Verified 2026-08-27.
+
+### BUG-023 — Reload left the camera on the empty-scene view
+
+- **Status:** Resolved
+- **Severity:** Medium
+- **Found:** 2026-08-27
+- **Area:** Viewport
+- **App version or commit:** dev @ 367b6f2
+- **Frequency:** Always (reload with an autosaved design)
+
+#### Steps to reproduce
+
+1. Insert cabinets or panels so the design no longer fits the default ¾ view.
+2. Wait for Autosaved.
+3. Reload the page.
+
+#### Expected behavior
+
+The camera frames every live part, the same as Frame with nothing selected.
+
+#### Actual behavior
+
+Autosave restored the meshes, but the camera stayed at the empty-canvas
+preset `(2.5, 1.5, 2.7)`, so pieces could sit off-screen.
+
+#### Notes and evidence
+
+`App` hydrated in `useEffect` after the lazy viewport's first sync, which
+framed nothing. `CameraController.frameAll` already existed for the Frame
+button.
+
+#### Resolution
+
+The session restores before the first paint. After the first `builder.sync`,
+the viewport calls `frameAll`. Open File and Restore Version do the same.
+Covered by the persistence reload browser check. Verified 2026-08-27.
+
+### BUG-024 — Duplicating a panel measured from the wrong face
+
+- **Status:** Resolved
+- **Severity:** Medium
+- **Found:** 2026-08-27
+- **Area:** Panels / Viewport
+- **App version or commit:** dev
+- **Frequency:** Always (Duplicate of an interior cabinet panel)
+
+#### Steps to reproduce
+
+1. Insert a Base 600.
+2. Click Add Panel (300 mm). Select the new panel.
+3. Note the clearance to the facing inner neighbour.
+4. Duplicate that panel.
+
+#### Expected behavior
+
+The copy is another interior panel at the next free centreline (400 mm), and
+clearance reads from the same inner faces as Add Panel.
+
+#### Actual behavior
+
+Duplicate offset the copy 80 mm in X and Z as a loose part. The unselected
+cabinet collapsed to one AABB, so the witness measured to the carcass outside
+instead of the facing panel.
+
+#### Notes and evidence
+
+`duplicateSelected` always cloned a single member as a loose part (BUG-022).
+`dimensionNeighborIds` treated any unselected group as one box.
+
+#### Resolution
+
+Duplicating an interior panel calls `addCabinetDivider` at that centreline.
+A single selected piece now measures against individual neighbours, not the
+outer group box. Covered by `interiorMemberPlacement` / actions / neighbor
+unit tests and a Base 600 browser check. Verified 2026-08-27.
+
+### BUG-025 — Add Shelf / Add Panel reset existing panel positions
+
+- **Status:** Resolved
+- **Severity:** Medium
+- **Found:** 2026-08-27
+- **Area:** Panels
+- **App version or commit:** dev
+- **Frequency:** Always (Add Panel or Add Shelf after an interior panel exists)
+
+#### Steps to reproduce
+
+1. Insert a Base 600.
+2. Add Panel at 300 mm. Select that panel and place it (gizmo, nudge, or typed clearance).
+3. Click Add Panel or Add Shelf.
+
+#### Expected behavior
+
+The existing panel stays a panel at the placed centreline. The new member is added beside it.
+
+#### Actual behavior
+
+The rebuild reused member ids by layout index. Adding a bay inserted extra shelf slots before the panels, so the placed panel's id became a shelf and a new panel appeared at the parametric centreline. Add also selected the whole carcass, so Properties jumped off the piece being placed. Live gizmo / typed-gap offsets were not written back into `dividerPositionsMm` / `shelfPositionsMm`, so the next rebuild snapped them home.
+
+#### Notes and evidence
+
+`commitCabinetResize` used `group.partIds[index] ?? nextCustomId()`. Layout order is carcass, then all bay shelves, then panels.
+
+#### Resolution
+
+`assignCabinetMemberIds` reuses ids by role. Add Shelf / Add Panel read live interior centrelines before rebuilding. A partial selection stays on surviving members. Covered by `assignCabinetMemberIds` and actions unit tests. Verified 2026-08-27.
+
 ## Resolved bugs
 
 | ID | Summary | Resolution | Verified |
@@ -219,4 +406,9 @@ Leave blank until fixed. Record the change and how it was verified.
 | BUG-015 | A selected group had no rotation sliders | Properties already showed group position, but rotation fields only existed for a single part. Selecting a group or cabinet now shows Group Rotation (X/Y/Z); each axis turns every member around the shared centroid. Covered by a group-rotation unit test and a browser regression. | 2026-08-20 |
 | BUG-016 | Selecting several groups hid all transform sliders | `groupMatching` only resolves an exact single-group membership, so Group Position/Rotation never mounted for two groups. Any multi-select of two or more parts now shows shared position and rotation sliders around the selection pivot; cabinet size sliders stay off so 18 mm panels are not squashed. Covered by multi-group unit tests and a two-cabinet browser regression. | 2026-08-20 |
 | BUG-017 | Group Y Position was not 0 on the floor | Group Y used the member-origin centroid, so an 800 mm cabinet on the grid read ~400 mm. Y is now the underside of the combined AABB; X and Z stay the shared centre. Covered by domain and actions unit tests and a Base 600 group browser check. | 2026-08-22 |
-| BUG-018 | Duplicating a cabinet member dropped Add Shelf | Viewport clicks select one piece (BUG-006) while Add Shelf still shows for that carcass. Duplicate now copies the containing cabinet, not the lone panel. Covered by an actions unit test and a Base 600 browser check. | 2026-08-27 |
+| BUG-018 | Duplicating a cabinet member dropped Add Shelf | Viewport clicks select one piece (BUG-006) while Add Shelf still shows for that carcass. The copy of a lone member is a loose part; the original cabinet keeps Add Shelf. Cloning a whole cabinet requires selecting the group (see BUG-022). | 2026-08-27 |
+| BUG-021 | Add Panel at the same position replaced the previous panel | See Resolved records. Second Add Panel / Add Shelf walks 100 mm to a free centreline. | 2026-08-27 |
+| BUG-022 | Duplicating one cabinet piece cloned the whole cabinet | See Resolved records. Duplicate copies the selection; select the Assembly group row to clone a cabinet. | 2026-08-27 |
+| BUG-023 | Reload left the camera on the empty-scene view | See Resolved records. Reload, Open File, and Restore Version call `frameAll`. | 2026-08-27 |
+| BUG-024 | Duplicating a panel measured from the wrong face | See Resolved records. Duplicate of an interior panel is Add Panel at the next free centreline; a single selected piece measures to individual neighbours. | 2026-08-27 |
+| BUG-025 | Add Shelf / Add Panel reset existing panel positions | See Resolved records. Rebuilds reuse ids by role and keep live centrelines. | 2026-08-27 |

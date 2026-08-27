@@ -1,21 +1,49 @@
 import * as THREE from 'three';
-import { formatLength } from '@/domain/units';
-import { selectionUnits, dimensionNeighborIds } from '@/domain/parts';
+import { convertedValue, formatLength, parseLength, type DisplayUnit } from '@/domain/units';
+import { cabinetContainingSelection, selectionUnits, dimensionNeighborIds } from '@/domain/parts';
 import type { Group } from '@/domain/types';
+import { nudgeSelected } from '@/store/actions';
 import { useUiStore } from '@/store/uiStore';
 import { combinedWorldBounds } from './bounds';
 import type { ModelBuilder } from './ModelBuilder';
 import type { SceneManager } from './SceneManager';
-import { gapsBetweenBoxes, nearestFacingGaps, type Aabb, type GapDimension, type Vec3 } from './selectionGap';
+import {
+  gapsBetweenBoxes,
+  gapDeltaMm,
+  nearestFacingGaps,
+  overallDimensions,
+  type Aabb,
+  type Axis,
+  type GapDimension,
+  type Vec3,
+} from './selectionGap';
 
 const LINE_COLOR = 0x4fa3ff;
 const LABEL_CLASS =
-  'pointer-events-none absolute hidden -translate-x-1/2 -translate-y-[130%] rounded-[5px] border border-select/40 bg-canvas px-1.5 py-0.5 font-mono text-[11px] text-select';
+  'pointer-events-auto absolute z-[7] hidden -translate-x-1/2 -translate-y-[130%] cursor-text select-none rounded-[5px] border border-select/40 bg-canvas px-1.5 py-0.5 font-mono text-[11px] text-select';
+const OVERALL_LABEL_CLASS =
+  'pointer-events-none absolute z-[7] hidden -translate-x-1/2 -translate-y-[130%] select-none rounded-[5px] border border-select/40 bg-canvas px-1.5 py-0.5 font-mono text-[11px] text-select';
+const INPUT_CLASS =
+  'w-[4.2rem] border-0 bg-transparent p-0 text-center font-mono text-[11px] text-select outline-none';
+const AXIS_LETTER: Record<Axis, string> = { x: 'W', y: 'H', z: 'D' };
+const AXIS_TITLE: Record<Axis, string> = { x: 'Width', y: 'Height', z: 'Depth' };
+
+type GapEdit = {
+  index: number;
+  input: HTMLInputElement;
+  cancelled: boolean;
+  axis: Axis;
+  gapMm: number;
+  movableIsHigh: boolean;
+};
 
 /**
- * SketchUp-style clearance dimensions. Two selected units lock that pair.
+ * SketchUp-style selection dimensions. Two selected units lock that pair.
  * One selected unit shows the nearest facing gap in each direction so a
- * panel can be placed without picking a second object first.
+ * panel can be placed without picking a second object first. A cabinet (or
+ * fully selected group) also draws overall W/H/D. Click a clearance label
+ * to type a new gap; the gizmo's parts move to match. Overall labels are
+ * display-only.
  */
 export class SelectionDimensions {
   private readonly group = new THREE.Group();
@@ -28,6 +56,7 @@ export class SelectionDimensions {
   private readonly labels: HTMLElement[] = [];
   private dimensions: GapDimension[] = [];
   private signature = '';
+  private editing: GapEdit | null = null;
 
   constructor(private readonly scene: SceneManager) {
     this.group.renderOrder = 10;
@@ -89,7 +118,12 @@ export class SelectionDimensions {
       const box = combinedWorldBounds(partIds.map((id) => builder.getRoot(id)));
       if (box) others.push(box);
     }
-    this.draw(nearestFacingGaps(selectedBox, others));
+    const overallIds = previewOverallIds(groups, selectedIds, selected);
+    const overallBox = overallIds
+      ? combinedWorldBounds(overallIds.map((id) => builder.getRoot(id)))
+      : null;
+    const overall = overallBox ? overallDimensions(aabbFromBox(overallBox)) : [];
+    this.draw([...overall, ...nearestFacingGaps(selectedBox, others)]);
   }
 
   updateLabels(): void {
@@ -105,11 +139,18 @@ export class SelectionDimensions {
     this.dimensions.forEach((dimension, index) => {
       const el = this.labels[index];
       if (!el) return;
+      const isOverall = dimension.kind === 'overall';
+      el.className = isOverall ? OVERALL_LABEL_CLASS : LABEL_CLASS;
+      el.dataset.testid = isOverall ? 'selection-overall-dimension' : 'selection-dimension';
+      el.title = isOverall ? AXIS_TITLE[dimension.axis] : 'Set clearance';
       const mid = midpoint(dimension.line[0], dimension.line[1]).project(this.scene.camera);
       el.style.display = mid.z < 1 ? 'block' : 'none';
       el.style.left = `${(mid.x * 0.5 + 0.5) * width}px`;
       el.style.top = `${(-mid.y * 0.5 + 0.5) * height}px`;
-      el.textContent = `${formatLength(dimension.gapMm, unit)} ${unit}`;
+      if (this.editing?.index === index) return;
+      el.textContent = isOverall
+        ? `${AXIS_LETTER[dimension.axis]} ${formatLength(dimension.gapMm, unit)} ${unit}`
+        : `${formatLength(dimension.gapMm, unit)} ${unit}`;
     });
   }
 
@@ -126,6 +167,7 @@ export class SelectionDimensions {
     const signature = dimensions
       .map((dimension) =>
         [
+          dimension.kind,
           dimension.axis,
           dimension.gapMm.toFixed(2),
           dimension.line[0].x,
@@ -167,6 +209,13 @@ export class SelectionDimensions {
       const el = document.createElement('div');
       el.className = LABEL_CLASS;
       el.dataset.testid = 'selection-dimension';
+      el.title = 'Set clearance';
+      el.addEventListener('pointerdown', (event) => event.stopPropagation());
+      el.addEventListener('click', (event) => {
+        event.stopPropagation();
+        event.preventDefault();
+        this.beginEdit(this.labels.indexOf(el));
+      });
       root.appendChild(el);
       this.labels.push(el);
     }
@@ -176,7 +225,83 @@ export class SelectionDimensions {
     }
   }
 
+  private beginEdit(index: number): void {
+    if (this.editing?.index === index) {
+      this.editing.input.focus();
+      return;
+    }
+    this.commitEdit();
+    const el = this.labels[index];
+    const dimension = this.dimensions[index];
+    if (!el || !dimension || dimension.kind === 'overall') return;
+
+    const unit = useUiStore.getState().displayUnit;
+    const input = document.createElement('input');
+    input.type = 'text';
+    input.inputMode = 'decimal';
+    input.setAttribute('aria-label', 'Clearance');
+    input.className = INPUT_CLASS;
+    input.value = String(convertedValue(dimension.gapMm, unit));
+    this.editing = {
+      index,
+      input,
+      cancelled: false,
+      axis: dimension.axis,
+      gapMm: dimension.gapMm,
+      movableIsHigh: dimension.movableIsHigh,
+    };
+    el.textContent = '';
+    el.append(input, document.createTextNode(` ${unit}`));
+    input.addEventListener('pointerdown', (event) => event.stopPropagation());
+    input.addEventListener('keydown', (event) => {
+      event.stopPropagation();
+      if (event.key === 'Enter') {
+        event.preventDefault();
+        this.finishEdit();
+      } else if (event.key === 'Escape') {
+        event.preventDefault();
+        this.cancelEdit();
+      }
+    });
+    input.addEventListener('blur', () => this.finishEdit());
+    input.focus();
+    input.select();
+  }
+
+  private finishEdit(): void {
+    const editing = this.editing;
+    this.editing = null;
+    if (!editing) return;
+    if (!editing.cancelled) this.applyEdit(editing);
+    editing.input.remove();
+  }
+
+  private applyEdit(editing: GapEdit): void {
+    const unit = useUiStore.getState().displayUnit;
+    const raw = editing.input.value;
+    if (typedMatchesDisplay(raw, editing.gapMm, unit)) return;
+    const target = parseLength(raw, unit);
+    const delta = target === null ? null : gapDeltaMm(editing.movableIsHigh, editing.gapMm, target);
+    if (delta === null || delta === 0) return;
+    nudgeSelected({
+      x: editing.axis === 'x' ? delta : 0,
+      y: editing.axis === 'y' ? delta : 0,
+      z: editing.axis === 'z' ? delta : 0,
+    });
+  }
+
+  private commitEdit(): void {
+    this.finishEdit();
+  }
+
+  private cancelEdit(): void {
+    if (!this.editing) return;
+    this.editing.cancelled = true;
+    this.finishEdit();
+  }
+
   private hideLabels(): void {
+    this.cancelEdit();
     for (const el of this.labels) el.style.display = 'none';
   }
 
@@ -193,6 +318,30 @@ export class SelectionDimensions {
     this.lines.removeFromParent();
     this.lines = null;
   }
+}
+
+function previewOverallIds(
+  groups: readonly Group[],
+  selectedIds: readonly string[],
+  selected: { kind: 'group' | 'part'; partIds: readonly string[] },
+): readonly string[] | null {
+  const cabinet = cabinetContainingSelection(groups, selectedIds);
+  if (cabinet) return cabinet.partIds;
+  if (selected.kind === 'group') return selected.partIds;
+  return null;
+}
+
+function aabbFromBox(box: THREE.Box3): Aabb {
+  return {
+    min: { x: box.min.x, y: box.min.y, z: box.min.z },
+    max: { x: box.max.x, y: box.max.y, z: box.max.z },
+  };
+}
+
+function typedMatchesDisplay(raw: string, gapMm: number, unit: DisplayUnit): boolean {
+  const typed = raw.trim().replace(/,/g, '').toLowerCase();
+  const shown = String(convertedValue(gapMm, unit));
+  return typed === shown || typed === `${shown} ${unit}` || typed === `${shown}${unit}`;
 }
 
 function addSegment(positions: number[], segment: [Vec3, Vec3]): void {

@@ -15,7 +15,8 @@ Three top-level modes: **Model** (the editor), **Cut List** (auto-generated BOM
 with CSV export), and **Render** (presentation view with camera presets and PNG
 export). Model view includes orthographic Front / Side / Top plus a 3D
 perspective. Selecting a piece shows clearance to the nearest facing neighbour;
-selecting two pieces or groups locks that pair.
+selecting two pieces or groups locks that pair. Click a clearance label to
+type the gap. A selected cabinet also shows overall width, height, and depth.
 
 ## Running it
 

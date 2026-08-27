@@ -1,4 +1,5 @@
 import type {
+  CabinetConfig,
   CabinetPreset,
   CustomPart,
   DimensionAxis,
@@ -24,6 +25,185 @@ export type CabinetLayoutPart = Omit<CustomPart, 'id'> & {
 /** The heights a shelf centreline may occupy — the shelf stays inside the carcass interior. */
 export function shelfPositionRange(heightMm: number): { min: number; max: number } {
   return { min: PANEL_THICKNESS * 1.5, max: heightMm - PANEL_THICKNESS * 1.5 };
+}
+
+/** Step used when Add Shelf / Add Panel needs the next free centreline. */
+const INTERIOR_POSITION_STEP = 100;
+
+/**
+ * A centreline that does not overlap an existing shelf or interior panel.
+ * Occupied requests walk 100 mm toward the far interior, then back, then
+ * millimetre-by-millimetre so a second Add Panel click is never a no-op.
+ */
+export function nextFreeInteriorPosition(
+  existing: readonly number[],
+  requested: number,
+  range: { min: number; max: number },
+): number | null {
+  if (!Number.isFinite(requested)) return null;
+  const occupied = (value: number) =>
+    existing.some((candidate) => Math.abs(candidate - value) < PANEL_THICKNESS);
+
+  const start = Math.min(range.max, Math.max(range.min, Math.round(requested)));
+  if (!occupied(start)) return start;
+
+  for (let value = start + INTERIOR_POSITION_STEP; value <= range.max + INTERIOR_POSITION_STEP; value += INTERIOR_POSITION_STEP) {
+    const clamped = Math.min(range.max, value);
+    if (!occupied(clamped)) return clamped;
+    if (clamped === range.max) break;
+  }
+  for (let value = start - INTERIOR_POSITION_STEP; value >= range.min - INTERIOR_POSITION_STEP; value -= INTERIOR_POSITION_STEP) {
+    const clamped = Math.max(range.min, value);
+    if (!occupied(clamped)) return clamped;
+    if (clamped === range.min) break;
+  }
+  for (let value = range.min; value <= range.max; value++) {
+    if (!occupied(value)) return value;
+  }
+  return null;
+}
+
+export type InteriorMember = { kind: 'shelf' | 'divider'; positionMm: number };
+
+/**
+ * The parametric centreline a generated shelf or interior panel occupies.
+ * Carcass pieces (sides, top, bottom, back) return null.
+ */
+export function interiorMemberPlacement(
+  cabinet: CabinetConfig,
+  partIds: readonly string[],
+  partId: string,
+): InteriorMember | null {
+  const layout = buildCabinetLayout({
+    id: cabinet.presetId ?? 'base-600',
+    label: 'Cabinet',
+    icon: 'cabinet',
+    width: cabinet.width,
+    height: cabinet.height,
+    depth: cabinet.depth,
+    shelfCount: cabinet.shelfCount,
+    shelfPositionsMm: cabinet.shelfPositionsMm,
+    dividerPositionsMm: cabinet.dividerPositionsMm,
+  });
+  if (layout.length !== partIds.length) return null;
+  const index = partIds.indexOf(partId);
+  if (index < CABINET_CARCASS_COUNT) return null;
+
+  const panelXs = dividerPositions(cabinet);
+  const shelfYs = shelfPositions(cabinet);
+  const shelfPartCount = layout.length - CABINET_CARCASS_COUNT - panelXs.length;
+  if (index < CABINET_CARCASS_COUNT + shelfPartCount) {
+    const bayCount = shelfYs.length === 0 ? 1 : shelfPartCount / shelfYs.length;
+    if (bayCount < 1 || !Number.isInteger(bayCount)) return null;
+    const positionMm = shelfYs[Math.floor((index - CABINET_CARCASS_COUNT) / bayCount)];
+    return positionMm === undefined ? null : { kind: 'shelf', positionMm };
+  }
+  const positionMm = panelXs[index - CABINET_CARCASS_COUNT - shelfPartCount];
+  return positionMm === undefined ? null : { kind: 'divider', positionMm };
+}
+
+export type CabinetLayoutSlot =
+  | { kind: 'carcass'; index: number }
+  | { kind: 'shelf'; row: number; bay: number }
+  | { kind: 'divider'; index: number };
+
+/**
+ * Role of each generated member. Shelves sit after the carcass and grow when
+ * a panel splits bays, so index-stable id reuse would turn a panel into a
+ * shelf on the next Add Panel / Add Shelf.
+ */
+export function cabinetLayoutSlots(
+  cabinet: CabinetConfig,
+  layoutLength: number,
+): CabinetLayoutSlot[] {
+  const panelCount = dividerPositions(cabinet).length;
+  const shelfPartCount = Math.max(0, layoutLength - CABINET_CARCASS_COUNT - panelCount);
+  const shelfYs = shelfPositions(cabinet);
+  const bayCount = shelfYs.length === 0 ? 1 : shelfPartCount / Math.max(shelfYs.length, 1);
+  const slots: CabinetLayoutSlot[] = [];
+  for (let index = 0; index < layoutLength; index++) {
+    if (index < CABINET_CARCASS_COUNT) {
+      slots.push({ kind: 'carcass', index });
+      continue;
+    }
+    if (index < CABINET_CARCASS_COUNT + shelfPartCount && Number.isInteger(bayCount) && bayCount >= 1) {
+      const shelfIndex = index - CABINET_CARCASS_COUNT;
+      slots.push({
+        kind: 'shelf',
+        row: Math.floor(shelfIndex / bayCount),
+        bay: shelfIndex % bayCount,
+      });
+      continue;
+    }
+    if (index < CABINET_CARCASS_COUNT + shelfPartCount) {
+      slots.push({ kind: 'shelf', row: index - CABINET_CARCASS_COUNT, bay: 0 });
+      continue;
+    }
+    slots.push({
+      kind: 'divider',
+      index: index - CABINET_CARCASS_COUNT - shelfPartCount,
+    });
+  }
+  return slots;
+}
+
+/**
+ * Reuses carcass / shelf / panel ids by role so adding a bay does not remap a
+ * panel id onto a new shelf slot. Unmatched slots mint ids; leftover ids drop.
+ */
+export function assignCabinetMemberIds(
+  previousPartIds: readonly string[],
+  previousCabinet: CabinetConfig,
+  nextLayoutLength: number,
+  nextCabinet: CabinetConfig,
+  mintId: () => string,
+): string[] {
+  const previousLayoutLength = buildCabinetLayout({
+    id: previousCabinet.presetId ?? 'base-600',
+    label: 'Cabinet',
+    icon: 'cabinet',
+    width: previousCabinet.width,
+    height: previousCabinet.height,
+    depth: previousCabinet.depth,
+    shelfCount: previousCabinet.shelfCount,
+    shelfPositionsMm: previousCabinet.shelfPositionsMm,
+    dividerPositionsMm: previousCabinet.dividerPositionsMm,
+  }).length;
+  if (previousLayoutLength !== previousPartIds.length) {
+    return Array.from({ length: nextLayoutLength }, (_, index) => previousPartIds[index] ?? mintId());
+  }
+
+  const previousSlots = cabinetLayoutSlots(previousCabinet, previousPartIds.length);
+  const nextSlots = cabinetLayoutSlots(nextCabinet, nextLayoutLength);
+  const carcass = new Map<number, string>();
+  const shelves: { id: string; row: number; bay: number }[] = [];
+  const panels: { id: string; index: number }[] = [];
+  for (const [index, id] of previousPartIds.entries()) {
+    const slot = previousSlots[index];
+    if (!slot) continue;
+    if (slot.kind === 'carcass') carcass.set(slot.index, id);
+    else if (slot.kind === 'shelf') shelves.push({ id, row: slot.row, bay: slot.bay });
+    else panels.push({ id, index: slot.index });
+  }
+
+  const used = new Set<string>();
+  function take(id: string | undefined): string | undefined {
+    if (!id || used.has(id)) return undefined;
+    used.add(id);
+    return id;
+  }
+
+  return nextSlots.map((slot) => {
+    if (slot.kind === 'carcass') return take(carcass.get(slot.index)) ?? mintId();
+    if (slot.kind === 'shelf') {
+      const exact = shelves.find((item) => item.row === slot.row && item.bay === slot.bay);
+      const reused =
+        take(exact?.id) ??
+        take(shelves.find((item) => item.row === slot.row && !used.has(item.id))?.id);
+      return reused ?? mintId();
+    }
+    return take(panels.find((item) => item.index === slot.index)?.id) ?? mintId();
+  });
 }
 
 type ShelfSpec = {

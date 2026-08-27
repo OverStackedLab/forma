@@ -1,4 +1,5 @@
 import type { Transform } from '@/domain/types';
+import type { NudgeFrame } from '@/domain/nudge';
 import type { CameraPreset } from './CameraController';
 
 /** One bound of the first selection that the second selection should match. */
@@ -35,6 +36,9 @@ export type ViewportApi = {
     movingIds: readonly string[],
     edge: AlignEdge,
   ) => Record<string, Transform> | null;
+  isGizmoDragging: () => boolean;
+  /** Camera right / up / look for arrow-key nudges while the move gizmo is on. */
+  viewNudgeFrame: () => NudgeFrame;
 };
 
 let current: ViewportApi | null = null;

@@ -61,3 +61,18 @@ export function formatLength(mm: number, unit: DisplayUnit): string {
     maximumFractionDigits: decimalsFor(unit),
   });
 }
+
+/**
+ * Parses a typed length in the current display unit. A trailing mm/cm/in
+ * suffix overrides. Returns millimetres, or null when the text is not a number.
+ */
+export function parseLength(raw: string, unit: DisplayUnit): number | null {
+  const trimmed = raw.trim().replace(/,/g, '');
+  const match = trimmed.match(/^(-?\d*\.?\d+)\s*(mm|cm|in)?$/i);
+  if (!match) return null;
+  const value = Number(match[1]);
+  if (!Number.isFinite(value)) return null;
+  const suffix = match[2]?.toLowerCase();
+  const parsedUnit = suffix === 'mm' || suffix === 'cm' || suffix === 'in' ? suffix : unit;
+  return toMm(value, parsedUnit);
+}

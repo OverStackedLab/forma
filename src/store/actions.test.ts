@@ -14,6 +14,7 @@ import {
   deleteParts,
   duplicateSelected,
   newDocument,
+  nudgeSelected,
   openFile,
   removeCabinetDivider,
   removeCabinetShelf,
@@ -21,6 +22,7 @@ import {
   renamePart,
   resizeCabinetFromGizmo,
   resetTransforms,
+  restoreSelectedCabinet,
   saveToFile,
   saveVersion,
   setCabinetDim,
@@ -228,6 +230,60 @@ describe('library construction actions', () => {
     expect(useDocumentStore.getState().groups[0]?.cabinet).toBeUndefined();
   });
 
+  it('restores cabinet controls on a demoted carcass without rebuilding it', () => {
+    addCabinetPreset('base-600');
+    const group = useDocumentStore.getState().groups[0]!;
+    const leftId = group.partIds[0]!;
+    setCustomPartDim(leftId, 'h', 700);
+    expect(useDocumentStore.getState().groups[0]?.cabinet).toBeUndefined();
+
+    restoreSelectedCabinet();
+
+    const state = useDocumentStore.getState();
+    expect(state.groups[0]?.cabinet).toMatchObject({
+      width: 600,
+      height: 800,
+      depth: 600,
+      shelfCount: 1,
+    });
+    expect(state.customParts.find((part) => part.id === leftId)?.h).toBe(700);
+    expect(useUiStore.getState().toast?.message).toBe('Cabinet controls restored');
+  });
+
+  it('nudges the gizmo selection and leaves the first of two units fixed', () => {
+    addCustomPanel('shelf');
+    addCustomPanel('shelf');
+    const [first, second] = useDocumentStore.getState().customParts.map((part) => part.id);
+    const firstX = useDocumentStore.getState().transforms[first!]!.position[0];
+    const secondX = useDocumentStore.getState().transforms[second!]!.position[0];
+    useUiStore.setState({ selectedPartIds: [first!, second!] });
+
+    nudgeSelected({ x: 10, y: 0, z: 0 });
+
+    const state = useDocumentStore.getState();
+    expect(state.transforms[first!]!.position[0]).toBeCloseTo(firstX, 8);
+    expect(state.transforms[second!]!.position[0]).toBeCloseTo(secondX + 0.01, 8);
+  });
+
+  it('restores a cabinet after a shelf thickness edit that hid Add Shelf', () => {
+    addCabinetPreset('base-600');
+    const shelfId = useDocumentStore.getState().customParts.find((part) =>
+      part.label.includes('Shelf'),
+    )!.id;
+    setCustomPartDim(shelfId, 'h', 700);
+    expect(useDocumentStore.getState().groups[0]?.cabinet).toBeUndefined();
+
+    restoreSelectedCabinet();
+
+    expect(useDocumentStore.getState().groups[0]?.cabinet).toMatchObject({
+      width: 600,
+      height: 800,
+      depth: 600,
+      shelfCount: 1,
+    });
+    expect(useDocumentStore.getState().customParts.find((part) => part.id === shelfId)?.h).toBe(700);
+  });
+
   it('keeps cabinet config after a member is moved, rotated or renamed', () => {
     addCabinetPreset('base-400');
     const group = useDocumentStore.getState().groups[0]!;
@@ -286,20 +342,121 @@ describe('library construction actions', () => {
     expect(state.groups.find((group) => group.id === copy.id)?.cabinet?.width).toBe(900);
   });
 
-  it('duplicates the whole cabinet when only one member is selected', () => {
+  it('duplicates only the selected cabinet member, not the whole carcass', () => {
     addCabinetPreset('base-600');
     const source = useDocumentStore.getState().groups[0]!;
-    useUiStore.getState().setSelection([source.partIds[0]!]);
+    const memberId = source.partIds[0]!;
+    useUiStore.getState().setSelection([memberId]);
 
     duplicateSelected();
 
     const state = useDocumentStore.getState();
-    const copy = state.groups[1]!;
-    expect(state.groups).toHaveLength(2);
-    expect(state.customParts).toHaveLength(12);
-    expect(copy.cabinet).toEqual(source.cabinet);
-    expect(copy.partIds).toHaveLength(source.partIds.length);
-    expect(useUiStore.getState().selectedPartIds).toEqual(copy.partIds);
+    expect(state.groups).toHaveLength(1);
+    expect(state.customParts).toHaveLength(7);
+    expect(state.groups[0]?.cabinet).toEqual(source.cabinet);
+    expect(useUiStore.getState().selectedPartIds).toHaveLength(1);
+    expect(useUiStore.getState().selectedPartIds[0]).not.toBe(memberId);
+  });
+
+  it('places a second Add Panel click on the next free centreline', () => {
+    addCabinetPreset('base-600');
+    const group = useDocumentStore.getState().groups[0]!;
+    addCabinetDivider(group.id, 300);
+    addCabinetDivider(group.id, 300);
+    expect(useDocumentStore.getState().groups[0]?.cabinet?.dividerPositionsMm).toEqual([300, 400]);
+    expect(useUiStore.getState().toast?.message).toBe('Panel added at 400 mm');
+  });
+
+  it('duplicates an interior panel like Add Panel, not as a loose offset copy', () => {
+    addCabinetPreset('base-600');
+    const group = useDocumentStore.getState().groups[0]!;
+    addCabinetDivider(group.id, 300);
+    const panelId = useDocumentStore.getState().groups[0]!.partIds.at(-1)!;
+    useUiStore.getState().setSelection([panelId]);
+
+    duplicateSelected();
+
+    const state = useDocumentStore.getState();
+    expect(state.groups).toHaveLength(1);
+    expect(state.groups[0]?.cabinet?.dividerPositionsMm).toEqual([300, 400]);
+    expect(state.customParts).toHaveLength(10);
+    expect(useUiStore.getState().selectedPartIds).toHaveLength(1);
+    expect(useUiStore.getState().selectedPartIds[0]).not.toBe(panelId);
+    expect(useUiStore.getState().toast?.message).toBe('Panel added at 400 mm');
+  });
+
+  it('keeps an interior panel id and selection when adding another panel', () => {
+    addCabinetPreset('base-600');
+    const group = useDocumentStore.getState().groups[0]!;
+    addCabinetDivider(group.id, 300);
+    const panel = useDocumentStore.getState().customParts.find((part) =>
+      part.label.includes('Panel 1'),
+    )!;
+    useUiStore.getState().setSelection([panel.id]);
+
+    addCabinetDivider(group.id, 300);
+
+    const next = useDocumentStore.getState();
+    const still = next.customParts.find((part) => part.id === panel.id);
+    expect(still?.label).toContain('Panel');
+    expect(still?.thicknessAxis).toBe('w');
+    expect(next.groups[0]?.cabinet?.dividerPositionsMm).toEqual([300, 400]);
+    expect(useUiStore.getState().selectedPartIds).toEqual([panel.id]);
+  });
+
+  it('keeps a nudged panel offset when Add Shelf rebuilds the carcass', () => {
+    addCabinetPreset('base-600');
+    const group = useDocumentStore.getState().groups[0]!;
+    addCabinetDivider(group.id, 300);
+    const panel = useDocumentStore.getState().customParts.find((part) =>
+      part.label.includes('Panel 1'),
+    )!;
+    useUiStore.getState().setSelection([panel.id]);
+    nudgeSelected({ x: 40, y: 0, z: 0 });
+
+    addCabinetShelf(group.id, 250);
+
+    const next = useDocumentStore.getState();
+    expect(next.groups[0]?.cabinet?.dividerPositionsMm).toEqual([340]);
+    expect(Math.round((next.transforms[panel.id]!.position[0] ?? 0) * 1000)).toBe(40);
+    expect(next.customParts.find((part) => part.id === panel.id)?.label).toContain('Panel');
+  });
+
+  it('keeps an interior panel id and selection when adding another panel', () => {
+    addCabinetPreset('base-600');
+    const group = useDocumentStore.getState().groups[0]!;
+    addCabinetDivider(group.id, 300);
+    const panel = useDocumentStore.getState().customParts.find((part) =>
+      part.label.includes('Panel 1'),
+    )!;
+    useUiStore.getState().setSelection([panel.id]);
+
+    addCabinetDivider(group.id, 300);
+
+    const state = useDocumentStore.getState();
+    const still = state.customParts.find((part) => part.id === panel.id);
+    expect(still?.label).toContain('Panel');
+    expect(still?.thicknessAxis).toBe('w');
+    expect(state.groups[0]?.cabinet?.dividerPositionsMm).toEqual([300, 400]);
+    expect(useUiStore.getState().selectedPartIds).toEqual([panel.id]);
+  });
+
+  it('keeps a nudged panel offset when Add Shelf rebuilds the carcass', () => {
+    addCabinetPreset('base-600');
+    const group = useDocumentStore.getState().groups[0]!;
+    addCabinetDivider(group.id, 300);
+    const panel = useDocumentStore.getState().customParts.find((part) =>
+      part.label.includes('Panel 1'),
+    )!;
+    useUiStore.getState().setSelection([panel.id]);
+    nudgeSelected({ x: 40, y: 0, z: 0 });
+
+    addCabinetShelf(group.id, 250);
+
+    const state = useDocumentStore.getState();
+    expect(state.groups[0]?.cabinet?.dividerPositionsMm).toEqual([340]);
+    expect(Math.round((state.transforms[panel.id]!.position[0] ?? 0) * 1000)).toBe(40);
+    expect(state.customParts.find((part) => part.id === panel.id)?.label).toContain('Panel');
   });
 
   it('adds, moves and removes cabinet shelves by explicit position', () => {

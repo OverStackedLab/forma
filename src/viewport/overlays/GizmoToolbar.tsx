@@ -32,7 +32,7 @@ export function GizmoToolbar() {
           type="button"
           aria-pressed={gizmoMode === mode}
           aria-label={`${label} (${key})`}
-          title={`${label} — ${key}`}
+          title={mode === 'translate' ? 'Move — G · arrow keys nudge' : `${label} — ${key}`}
           className={buttonClass(gizmoMode === mode)}
           onClick={() => setGizmoMode(mode)}
         >
