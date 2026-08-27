@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { convertedValue, convertRange, toMm } from '@/domain/units';
+import { convertedValue, convertRange, toMm, DISPLAY_UNIT_NAMES } from '@/domain/units';
 import { coerceGridSize, GRID_SIZE_LIMITS_M } from '@/domain/workspace';
 import { useDocumentStore } from '@/store/documentStore';
 import { useUiStore } from '@/store/uiStore';
@@ -82,7 +82,7 @@ function GridSizeField() {
     setDraft(String(convertedValue(next * 1000, unit)));
   };
 
-  const unitName = unit === 'mm' ? 'millimetres' : 'centimetres';
+  const unitName = DISPLAY_UNIT_NAMES[unit];
   return (
     <label className="flex items-center gap-1.5 whitespace-nowrap text-ink/45">
       Grid

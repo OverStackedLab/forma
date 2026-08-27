@@ -34,6 +34,7 @@ describe('csvHeaders', () => {
       'Grain',
     ]);
     expect(csvHeaders('cm')[4]).toBe('W (cm)');
+    expect(csvHeaders('in')[4]).toBe('W (in)');
   });
 });
 
@@ -47,6 +48,12 @@ describe('toCSV', () => {
   it('converts dimensions and thickness into the display unit', () => {
     const lines = toCSV([row()], 'cm').split('\r\n');
     expect(lines[1]).toBe('Sheet Good,Shelf,1,Oak,80,1.8,30,1.8,Front,Along width');
+  });
+
+  it('converts dimensions into inches', () => {
+    const lines = toCSV([row()], 'in').split('\r\n');
+    expect(lines[0]).toContain('W (in)');
+    expect(lines[1]).toBe('Sheet Good,Shelf,1,Oak,31.5,0.71,11.81,0.71,Front,Along width');
   });
 
   it('leaves thickness blank for purchased hardware', () => {

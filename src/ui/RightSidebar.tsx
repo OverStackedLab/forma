@@ -15,7 +15,7 @@ import { WALNUT_GRAIN_URL } from '@/domain/walnutGrain';
 import { cabinetContainingSelection, groupMatching, selectionPositionMetres, selectionUnits } from '@/domain/parts';
 import { quaternionToEulerDegrees } from '@/domain/rotation';
 import type { CabinetConfig } from '@/domain/types';
-import { convertedValue, convertRange, fromMm, toMm, type DisplayUnit } from '@/domain/units';
+import { convertedValue, convertRange, toMm, DISPLAY_UNIT_NAMES, type DisplayUnit } from '@/domain/units';
 import { dividerPositions, shelfPositions } from '@/domain/cabinets';
 import {
   addCabinetDivider,
@@ -97,8 +97,6 @@ const CABINET_DIM_FIELDS = [
   { key: 'depth', label: 'Cabinet Depth' },
 ] as const;
 
-const UNIT_NAMES: Record<DisplayUnit, string> = { mm: 'millimetres', cm: 'centimetres' };
-
 const ROTATION_AXES: { axis: 'x' | 'y' | 'z'; label: string }[] = [
   { axis: 'x', label: 'X Angle' },
   { axis: 'y', label: 'Y Angle' },
@@ -151,7 +149,7 @@ function PositionFields({ partId }: { partId: string }) {
           max={range.max}
           step={range.step}
           unit={unit}
-          unitName={UNIT_NAMES[unit]}
+          unitName={DISPLAY_UNIT_NAMES[unit]}
           onChange={(v) => setPositionAxis(partId, axis, toMm(v, unit))}
         />
       ))}
@@ -186,7 +184,7 @@ function SelectionPositionFields({
           max={range.max}
           step={range.step}
           unit={unit}
-          unitName={UNIT_NAMES[unit]}
+          unitName={DISPLAY_UNIT_NAMES[unit]}
           onChange={(value) => setSelectionPositionAxis(partIds, axis, toMm(value, unit))}
         />
       ))}
@@ -254,12 +252,12 @@ function SelectionSizeFields({
         <SliderField
           key={axis}
           label={asGroup ? label : label.replace('Group ', '')}
-          value={fromMm(size[key], unit)}
+          value={convertedValue(size[key], unit)}
           min={range.min}
           max={range.max}
           step={range.step}
           unit={unit}
-          unitName={UNIT_NAMES[unit]}
+          unitName={DISPLAY_UNIT_NAMES[unit]}
           onChange={(value) => setSelectionSizeAxis(partIds, axis, toMm(value, unit))}
         />
       ))}
@@ -478,7 +476,7 @@ function InteriorMemberFields({
               </p>
               <div className={rowClass}>
                 <DraftNumberInput
-                  ariaLabel={`${itemLabel} ${index + 1} position in ${UNIT_NAMES[unit]}`}
+                  ariaLabel={`${itemLabel} ${index + 1} position in ${DISPLAY_UNIT_NAMES[unit]}`}
                   value={convertedValue(positionMm, unit)}
                   widthClass="w-16"
                   onCommit={(value) =>
@@ -505,7 +503,7 @@ function InteriorMemberFields({
         <div className={rowClass}>
           <input
             type="number"
-            aria-label={`New ${itemLower} position in ${UNIT_NAMES[unit]}`}
+            aria-label={`New ${itemLower} position in ${DISPLAY_UNIT_NAMES[unit]}`}
             value={addDraft}
             onChange={(e) => setAddDraft(e.target.value)}
             onKeyDown={(e) => {
@@ -534,7 +532,7 @@ function InteriorMemberFields({
           <span className="flex-none text-[11px] leading-none text-ink/45">every</span>
           <input
             type="number"
-            aria-label={`${itemLabel} spacing in ${UNIT_NAMES[unit]}`}
+            aria-label={`${itemLabel} spacing in ${DISPLAY_UNIT_NAMES[unit]}`}
             value={spacingDraft}
             onChange={(e) => setSpacingDraft(e.target.value)}
             onKeyDown={(e) => {
@@ -707,22 +705,22 @@ function PropertiesTab() {
               <>
                 <SliderField
                   label="Diameter"
-                  value={fromMm(Math.max(selection.size.w, selection.size.d), unit)}
+                  value={convertedValue(Math.max(selection.size.w, selection.size.d), unit)}
                   min={convertRange(CUSTOM_PANEL_LIMITS.w, unit).min}
                   max={convertRange(CUSTOM_PANEL_LIMITS.w, unit).max}
                   step={convertRange(CUSTOM_PANEL_LIMITS.w, unit).step}
                   unit={unit}
-                  unitName={UNIT_NAMES[unit]}
+                  unitName={DISPLAY_UNIT_NAMES[unit]}
                   onChange={(value) => setHardwareDiameter(selection.spec.id, toMm(value, unit))}
                 />
                 <SliderField
                   label="Height"
-                  value={fromMm(selection.size.h, unit)}
+                  value={convertedValue(selection.size.h, unit)}
                   min={convertRange(CUSTOM_PANEL_LIMITS.h, unit).min}
                   max={convertRange(CUSTOM_PANEL_LIMITS.h, unit).max}
                   step={convertRange(CUSTOM_PANEL_LIMITS.h, unit).step}
                   unit={unit}
-                  unitName={UNIT_NAMES[unit]}
+                  unitName={DISPLAY_UNIT_NAMES[unit]}
                   onChange={(value) => setCustomPartDim(selection.spec.id, 'h', toMm(value, unit))}
                 />
               </>
@@ -730,22 +728,22 @@ function PropertiesTab() {
               <>
                 <SliderField
                   label="Diameter"
-                  value={fromMm(Math.max(selection.size.w, selection.size.h), unit)}
+                  value={convertedValue(Math.max(selection.size.w, selection.size.h), unit)}
                   min={convertRange(CUSTOM_PANEL_LIMITS.w, unit).min}
                   max={convertRange(CUSTOM_PANEL_LIMITS.w, unit).max}
                   step={convertRange(CUSTOM_PANEL_LIMITS.w, unit).step}
                   unit={unit}
-                  unitName={UNIT_NAMES[unit]}
+                  unitName={DISPLAY_UNIT_NAMES[unit]}
                   onChange={(value) => setHardwareDiameter(selection.spec.id, toMm(value, unit))}
                 />
                 <SliderField
                   label="Projection"
-                  value={fromMm(selection.size.d, unit)}
+                  value={convertedValue(selection.size.d, unit)}
                   min={convertRange(CUSTOM_PANEL_LIMITS.d, unit).min}
                   max={convertRange(CUSTOM_PANEL_LIMITS.d, unit).max}
                   step={convertRange(CUSTOM_PANEL_LIMITS.d, unit).step}
                   unit={unit}
-                  unitName={UNIT_NAMES[unit]}
+                  unitName={DISPLAY_UNIT_NAMES[unit]}
                   onChange={(value) => setCustomPartDim(selection.spec.id, 'd', toMm(value, unit))}
                 />
               </>
@@ -753,32 +751,32 @@ function PropertiesTab() {
               <>
                 <SliderField
                   label="Length"
-                  value={fromMm(selection.size.w, unit)}
+                  value={convertedValue(selection.size.w, unit)}
                   min={convertRange(CUSTOM_PANEL_LIMITS.w, unit).min}
                   max={convertRange(CUSTOM_PANEL_LIMITS.w, unit).max}
                   step={convertRange(CUSTOM_PANEL_LIMITS.w, unit).step}
                   unit={unit}
-                  unitName={UNIT_NAMES[unit]}
+                  unitName={DISPLAY_UNIT_NAMES[unit]}
                   onChange={(value) => setCustomPartDim(selection.spec.id, 'w', toMm(value, unit))}
                 />
                 <SliderField
                   label="Width"
-                  value={fromMm(selection.size.h, unit)}
+                  value={convertedValue(selection.size.h, unit)}
                   min={convertRange(CUSTOM_PANEL_LIMITS.h, unit).min}
                   max={convertRange(CUSTOM_PANEL_LIMITS.h, unit).max}
                   step={convertRange(CUSTOM_PANEL_LIMITS.h, unit).step}
                   unit={unit}
-                  unitName={UNIT_NAMES[unit]}
+                  unitName={DISPLAY_UNIT_NAMES[unit]}
                   onChange={(value) => setCustomPartDim(selection.spec.id, 'h', toMm(value, unit))}
                 />
                 <SliderField
                   label="Projection"
-                  value={fromMm(selection.size.d, unit)}
+                  value={convertedValue(selection.size.d, unit)}
                   min={convertRange(CUSTOM_PANEL_LIMITS.d, unit).min}
                   max={convertRange(CUSTOM_PANEL_LIMITS.d, unit).max}
                   step={convertRange(CUSTOM_PANEL_LIMITS.d, unit).step}
                   unit={unit}
-                  unitName={UNIT_NAMES[unit]}
+                  unitName={DISPLAY_UNIT_NAMES[unit]}
                   onChange={(value) => setCustomPartDim(selection.spec.id, 'd', toMm(value, unit))}
                 />
               </>
@@ -789,12 +787,12 @@ function PropertiesTab() {
               <SliderField
                 key={field.key}
                 label={field.label}
-                value={fromMm(selection.size[field.key], unit)}
+                value={convertedValue(selection.size[field.key], unit)}
                 min={range.min}
                 max={range.max}
                 step={range.step}
                 unit={unit}
-                unitName={UNIT_NAMES[unit]}
+                unitName={DISPLAY_UNIT_NAMES[unit]}
                 onChange={(v) => setCustomPartDim(selection.spec.id, field.key, toMm(v, unit))}
               />
             );
@@ -817,12 +815,12 @@ function PropertiesTab() {
               <SliderField
                 key={key}
                 label={label}
-                value={fromMm(matchedGroup.cabinet![key], unit)}
+                value={convertedValue(matchedGroup.cabinet![key], unit)}
                 min={range.min}
                 max={range.max}
                 step={range.step}
                 unit={unit}
-                unitName={UNIT_NAMES[unit]}
+                unitName={DISPLAY_UNIT_NAMES[unit]}
                 onChange={(value) => setCabinetDim(matchedGroup.id, key, toMm(value, unit))}
               />
             );

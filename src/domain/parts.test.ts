@@ -4,6 +4,7 @@ import {
   cabinetContainingSelection,
   groupContaining,
   groupInclusion,
+  dimensionNeighborIds,
   gizmoPartIds,
   groupMatching,
   livePartIds,
@@ -158,6 +159,21 @@ describe('selectionUnits', () => {
       { kind: 'part', id: 'a', partIds: ['a'] },
       { kind: 'part', id: 'loose', partIds: ['loose'] },
     ]);
+  });
+});
+
+describe('dimensionNeighborIds', () => {
+  const first: Group = { id: 'group-1', label: 'First', partIds: ['a', 'b', 'c'] };
+  const second: Group = { id: 'group-2', label: 'Second', partIds: ['d', 'e'] };
+
+  it('treats an unselected group as one body', () => {
+    expect(dimensionNeighborIds([first, second], ['a', 'b', 'c', 'd', 'e'], ['d', 'e'])).toEqual([
+      ['a', 'b', 'c'],
+    ]);
+  });
+
+  it('leaves siblings of a partially selected group as individual parts', () => {
+    expect(dimensionNeighborIds([first], ['a', 'b', 'c'], ['b'])).toEqual([['a'], ['c']]);
   });
 });
 

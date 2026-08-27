@@ -1,17 +1,29 @@
-export type DisplayUnit = 'mm' | 'cm';
+export type DisplayUnit = 'mm' | 'cm' | 'in';
 
-export const DISPLAY_UNITS: readonly DisplayUnit[] = ['cm', 'mm'];
+export const DISPLAY_UNITS: readonly DisplayUnit[] = ['cm', 'mm', 'in'];
+
+export const DISPLAY_UNIT_NAMES: Record<DisplayUnit, string> = {
+  mm: 'millimetres',
+  cm: 'centimetres',
+  in: 'inches',
+};
+
+const MM_PER: Record<DisplayUnit, number> = {
+  mm: 1,
+  cm: 10,
+  in: 25.4,
+};
 
 export type Range = { min: number; max: number; step: number };
 
 /** Millimetres to the given display unit. */
 export function fromMm(mm: number, unit: DisplayUnit): number {
-  return unit === 'cm' ? mm / 10 : mm;
+  return mm / MM_PER[unit];
 }
 
 /** The given display unit back to millimetres — the domain's only unit. */
 export function toMm(value: number, unit: DisplayUnit): number {
-  return unit === 'cm' ? value * 10 : value;
+  return value * MM_PER[unit];
 }
 
 /** A mm-denominated slider range (min/max/step), converted for display. */
@@ -23,9 +35,11 @@ export function convertRange(range: Range, unit: DisplayUnit): Range {
   };
 }
 
-/** Decimal places worth showing at this unit — mm is whole numbers, cm allows one decimal. */
+/** Decimal places worth showing at this unit. */
 export function decimalsFor(unit: DisplayUnit): number {
-  return unit === 'cm' ? 1 : 0;
+  if (unit === 'in') return 2;
+  if (unit === 'cm') return 1;
+  return 0;
 }
 
 /** Millimetres converted to the display unit and rounded to its precision, as a plain number. */
@@ -37,10 +51,10 @@ export function convertedValue(mm: number, unit: DisplayUnit): number {
 
 /**
  * Formats a millimetre value in the given display unit, thousands-separated —
- * for on-screen display. A whole number of cm shows no decimal (80, not
- * 80.0); a fractional one shows up to one (1.8). CSV export uses
- * `convertedValue` instead: a comma thousands-separator would need
- * CSV-quoting and can confuse a spreadsheet's numeric parsing.
+ * for on-screen display. A whole number shows no trailing zeros (80, not
+ * 80.0); a fractional one shows up to the unit's precision (1.8 cm, 31.5 in).
+ * CSV export uses `convertedValue` instead: a comma thousands-separator would
+ * need CSV-quoting and can confuse a spreadsheet's numeric parsing.
  */
 export function formatLength(mm: number, unit: DisplayUnit): string {
   return convertedValue(mm, unit).toLocaleString('en-US', {

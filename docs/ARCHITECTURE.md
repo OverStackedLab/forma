@@ -37,8 +37,8 @@ reconciles the two views.
 about — part sizes, cabinet dimensions, cut-list numbers — is millimetres.
 Everything three.js touches is metres, because transforms come straight off
 `Object3D`. The conversion is the `MM = 1/1000` constant in `geometry.ts` plus
-explicit `*1000` / `/1000` in actions. Centimetres exist only as a display
-preference (default) and are never stored.
+explicit `*1000` / `/1000` in actions. Centimetres and inches exist only as a
+display preference (default cm) and are never stored.
 
 **Size and placement are separate objects.** Each part is a root `Group` carrying
 placement (position / quaternion / gizmo scale) around a `Mesh` carrying the
@@ -69,12 +69,12 @@ through the React tree, the viewport registers a small imperative API as a modul
 singleton on mount and clears it on unmount; callers use optional chaining since
 the lazy chunk may not be loaded yet.
 
-**Two selected units show clearance in the scene.** `selectionUnits` collapses a
-flat part selection into rigid groups. When there are exactly two units,
-`gizmoPartIds` hands the gizmo only the second unit so the first stays put.
-`SelectionDimensions` reads live halo-excluding AABBs and `gapsBetweenBoxes`
-draws witnesses on every axis where the boxes are separated. Touching or
-overlapping faces stay quiet. Render mode hides the overlay.
+**Clearance witnesses follow the selection.** `selectionUnits` collapses a
+flat part selection into rigid groups. One unit shows the nearest facing gap
+in each direction (`nearestFacingGaps`, skipping members of the same selected
+group). Two units lock that pair; `gizmoPartIds` hands the gizmo only the
+second so the first stays put. `SelectionDimensions` reads live halo-excluding
+AABBs. Touching or overlapping faces stay quiet. Render mode hides the overlay.
 
 **Persistence is schema-versioned.** Autosave is debounced into `localStorage`
 under a versioned envelope (currently schema 5), with migrations from schema 4

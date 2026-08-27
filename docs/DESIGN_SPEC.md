@@ -70,7 +70,7 @@ Version History is an absolutely-positioned overlay panel on the right (`width:3
 
 **Center cluster** — segmented mode switcher, `justify-self:center`. Container: background `#1A1815`, `border:1px solid rgba(255,255,255,.08)`, `border-radius:9px`, `padding:3px`, `gap:2px`. Three pills (Model / Cut List / Render), each `padding:7px 16px`, `border-radius:7px`, 12.5px/600, `gap:6px`, with a 14px inline SVG icon. Active pill: background `#33302A`, text `#EEE9E2`. Inactive: transparent, `rgba(238,233,226,.55)`.
 
-**Right cluster** (`gap:6px`): unit toggle · divider · Undo, Redo (32×32 icon buttons, disabled at 0.5 opacity / `rgba(238,233,226,.25)` when the stack is empty) · divider · Measure toggle · History toggle · divider · New File, Save to File, Open File · divider · **Save Version** primary button (`height:32px`, `padding:0 14px`, `border-radius:7px`, background `#C68A46`, text `#1A1815` 12.5px/700). New File confirms before replacing a non-empty or named design, resets document/history state, and preserves workspace preferences.
+**Right cluster** (`gap:6px`): unit toggle (cm · mm · in; default cm) · divider · Undo, Redo (32×32 icon buttons, disabled at 0.5 opacity / `rgba(238,233,226,.25)` when the stack is empty) · divider · Measure toggle · History toggle · divider · New File, Save to File, Open File · divider · **Save Version** primary button (`height:32px`, `padding:0 14px`, `border-radius:7px`, background `#C68A46`, text `#1A1815` 12.5px/700). New File confirms before replacing a non-empty or named design, resets document/history state, and preserves workspace preferences.
 
 Icon button base: 32×32, `border-radius:7px`, transparent background, `rgba(238,233,226,.7)`. Active/toggled: background `rgba(198,138,70,.18)`, color `#C68A46`.
 
@@ -109,14 +109,14 @@ All cards are `draggable="true"` and carry a `text/plain` payload of `{kind}:{id
 Full-bleed WebGL canvas with DOM overlays:
 
 - **Gizmo toolbar** — top-left, `position:absolute`, floating pill group. Buttons 34×34, `border-radius:8px`, `border:1px solid rgba(26,24,21,.12)`, background `rgba(255,255,255,.6)`, icon color `#1A1815`. Active: background and border `#C68A46`. Order: Select · Pan · Move · Rotate · Scale · | · Grid toggle · Snap toggle. Material Symbols glyphs: `arrow_selector_tool`, `pan_tool`, `open_with`, `rotate_right`, `resize`, `grid_on`, `swipe_left_alt`.
-- **View buttons** — top-right pill: Front · Side · Top · 3D · Frame. Front / Side / Top lock a true orthographic elevation (no foreshortening; left-drag pans). 3D restores the perspective ¾ view. Frame flies to the current selection (or the whole scene).
+- **View buttons** — top-right pill: 3D · Front · Side · Top · Frame. Front / Side / Top lock a true orthographic elevation (no foreshortening; left-drag pans). 3D restores the perspective ¾ view. Frame flies to the current selection (or the whole scene).
 - **Measure banner** — top-center when measure mode is on: `background:rgba(26,24,21,.85)`, `color:#EEE9E2`, 11.5px, `padding:6px 14px`, `border-radius:20px`. Copy: "Click two points on the model to measure".
 - **Measure label** — follows the midpoint of the measured segment, `transform:translate(-50%,-130%)`, `background:#1A1815`, `color:#4FA3FF`, IBM Plex Mono 11px, `border:1px solid rgba(79,163,255,.4)`, `border-radius:5px`, `pointer-events:none`. Content: `{n} {unit}`.
-- **Selection dimensions** — when exactly two pieces or groups are selected, witness lines and a length label in `#4FA3FF` show the clearance on each axis where the boxes are separated. Hidden in Render.
+- **Selection dimensions** — one selected piece or group draws witness lines and a length label in `#4FA3FF` to the nearest facing neighbour in each direction. Two selected units lock that pair. Hidden in Render.
 - **Marquee rectangle** — `border:1px solid #4FA3FF`, `background:rgba(79,163,255,.14)`, `pointer-events:none`, `z-index:6`.
 - **Hint line** — bottom-left, 11px IBM Plex Mono `rgba(26,24,21,.5)`: "Drag to orbit · Shift-drag to box select · G/R/S transform · H pan · F frame · ⌘D duplicate · ⌘A select all · Del delete".
-- **Render bar** — bottom-center, Render mode only: `background:rgba(26,24,21,.85)`, `border-radius:12px`, `padding:8px`. Camera preset buttons (Front / Side / Top / 3D) at `rgba(255,255,255,.06)`, then a divider, then the `#C68A46` **Export Image** button.
-- **Grid extent** — a typed numeric field in the bottom status bar. It follows the global mm/cm preference, accepts 100 mm (10 cm) increments from 1–20 m, and is kept with the other local viewport preferences rather than presented as furniture data.
+- **Render bar** — bottom-center, Render mode only: `background:rgba(26,24,21,.85)`, `border-radius:12px`, `padding:8px`. Camera preset buttons (3D / Front / Side / Top) at `rgba(255,255,255,.06)`, then a divider, then the `#C68A46` **Export Image** button.
+- **Grid extent** — a typed numeric field in the bottom status bar. It follows the global mm/cm/in preference, accepts 100 mm (10 cm) increments from 1–20 m, and is kept with the other local viewport preferences rather than presented as furniture data.
 
 **Scene configuration** (units: three.js world units are meters; all UI values are millimetres — divide by 1000 at the geometry boundary):
 
@@ -196,7 +196,8 @@ The CSV export must serialize exactly what the table shows, including custom pan
 - **Click** a part in the viewport (raycast against the model group) or a row in the Assembly tree → select it. A viewport click on a grouped piece selects that piece, not the group (BUG-006).
 - **Click empty space** → clear selection.
 - **Shift-click** a part → add/toggle that part. Shift-click (or ⌘/Ctrl-click) a group row, or use the group checkbox, adds or removes every member.
-- **Two selected units** (two parts, two groups, or one of each) draw clearance dimensions in the viewport on axes where the boxes are separated. The first stays fixed; the gizmo attaches only to the second, so the gap updates while you move it (same order as Align).
+- **One selected unit** draws clearance to the nearest facing neighbour in each direction (above/below, left/right, front/back), so a shelf can be moved on its own. A fully selected group is one body and does not dimension to its own members.
+- **Two selected units** (two parts, two groups, or one of each) lock that pair. The first stays fixed; the gizmo attaches only to the second, so the gap updates while you move it (same order as Align).
 - **Shift-drag** → marquee box select. Critical detail: the marquee must start **lazily on pointer *move*** once the pointer passes a ~5px threshold, *not* on pointerdown. Committing on pointerdown swallows shift-click additive selection, because a zero-movement shift-click then never reaches the raycast path. While the marquee is active, disable OrbitControls and re-enable on release. Hit test by projecting each visible part's world position to screen space and testing containment. Holding ⌘/Ctrl with the marquee adds to the existing selection instead of replacing it. An empty box clears the selection.
 - **Select All** — the button or ⌘A. Must exclude deleted parts.
 - Selection is always an array, even for one part. The gizmo attaches to a temporary group when more than one part is selected, except for exactly two selection units, where it drives only the second.
@@ -210,7 +211,7 @@ Toggle in the gizmo toolbar. When on, translation magnetically snaps to nearby p
 ### Measuring
 Toggle in the toolbar. Click two points on the model; each click raycasts and records a hit point. Renders two 8 mm spheres and a dashed line in `#4FA3FF`, with a DOM label at the projected midpoint showing the distance in the current display unit. A third click starts a fresh measurement.
 
-Selecting exactly two pieces or groups also draws SketchUp-style witnesses and a length label for each axis with a positive clearance (side-by-side, stacked, or front-to-back). Touching or overlapping faces stay quiet. The overlay reads live mesh bounds so a gizmo drag of the second unit stays truthful, and it hides in Render.
+Selecting a piece or group draws SketchUp-style witnesses to the nearest facing neighbour in each direction. Selecting exactly two pieces or groups locks that pair instead. Touching or overlapping faces stay quiet. The overlay reads live mesh bounds so a gizmo drag stays truthful, and it hides in Render.
 
 ### Keyboard
 | Key | Action |

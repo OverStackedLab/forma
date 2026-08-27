@@ -1,20 +1,21 @@
 import * as THREE from 'three';
 import { formatLength } from '@/domain/units';
-import { selectionUnits } from '@/domain/parts';
+import { selectionUnits, dimensionNeighborIds } from '@/domain/parts';
 import type { Group } from '@/domain/types';
 import { useUiStore } from '@/store/uiStore';
 import { combinedWorldBounds } from './bounds';
 import type { ModelBuilder } from './ModelBuilder';
 import type { SceneManager } from './SceneManager';
-import { gapsBetweenBoxes, type GapDimension, type Vec3 } from './selectionGap';
+import { gapsBetweenBoxes, nearestFacingGaps, type Aabb, type GapDimension, type Vec3 } from './selectionGap';
 
 const LINE_COLOR = 0x4fa3ff;
 const LABEL_CLASS =
   'pointer-events-none absolute hidden -translate-x-1/2 -translate-y-[130%] rounded-[5px] border border-select/40 bg-canvas px-1.5 py-0.5 font-mono text-[11px] text-select';
 
 /**
- * SketchUp-style clearance dimensions between exactly two selected pieces or
- * groups. Rebuilt from live mesh bounds so a gizmo drag stays truthful.
+ * SketchUp-style clearance dimensions. Two selected units lock that pair.
+ * One selected unit shows the nearest facing gap in each direction so a
+ * panel can be placed without picking a second object first.
  */
 export class SelectionDimensions {
   private readonly group = new THREE.Group();
@@ -42,29 +43,53 @@ export class SelectionDimensions {
     if (!visible) this.hideLabels();
   }
 
-  sync(builder: ModelBuilder, selectedIds: readonly string[], groups: readonly Group[]): void {
+  sync(
+    builder: ModelBuilder,
+    selectedIds: readonly string[],
+    groups: readonly Group[],
+    visibleIds: readonly string[],
+  ): void {
     if (!this.group.visible) {
       this.clear();
       return;
     }
     const units = selectionUnits(groups, selectedIds);
-    if (units.length !== 2) {
+    if (units.length === 2) {
+      const first = units[0];
+      const second = units[1];
+      if (!first || !second) {
+        this.clear();
+        return;
+      }
+      const boxA = combinedWorldBounds(first.partIds.map((id) => builder.getRoot(id)));
+      const boxB = combinedWorldBounds(second.partIds.map((id) => builder.getRoot(id)));
+      if (!boxA || !boxB) {
+        this.clear();
+        return;
+      }
+      this.draw(gapsBetweenBoxes(boxA, boxB));
+      return;
+    }
+    if (units.length !== 1) {
       this.clear();
       return;
     }
-    const first = units[0];
-    const second = units[1];
-    if (!first || !second) {
+    const selected = units[0];
+    if (!selected) {
       this.clear();
       return;
     }
-    const boxA = combinedWorldBounds(first.partIds.map((id) => builder.getRoot(id)));
-    const boxB = combinedWorldBounds(second.partIds.map((id) => builder.getRoot(id)));
-    if (!boxA || !boxB) {
+    const selectedBox = combinedWorldBounds(selected.partIds.map((id) => builder.getRoot(id)));
+    if (!selectedBox) {
       this.clear();
       return;
     }
-    this.draw(gapsBetweenBoxes(boxA, boxB));
+    const others: Aabb[] = [];
+    for (const partIds of dimensionNeighborIds(groups, visibleIds, selected.partIds)) {
+      const box = combinedWorldBounds(partIds.map((id) => builder.getRoot(id)));
+      if (box) others.push(box);
+    }
+    this.draw(nearestFacingGaps(selectedBox, others));
   }
 
   updateLabels(): void {
