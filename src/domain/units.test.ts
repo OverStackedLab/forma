@@ -14,9 +14,17 @@ describe('fromMm / toMm', () => {
     expect(toMm(1.8, 'cm')).toBeCloseTo(18, 10);
   });
 
+  it('divides/multiplies by 25.4 for inches', () => {
+    expect(fromMm(762, 'in')).toBe(30);
+    expect(fromMm(25.4, 'in')).toBe(1);
+    expect(toMm(30, 'in')).toBeCloseTo(762, 10);
+    expect(toMm(1, 'in')).toBeCloseTo(25.4, 10);
+  });
+
   it('round-trips through mm and back', () => {
     for (const mm of [18, 300, 800, 1234.5]) {
       expect(toMm(fromMm(mm, 'cm'), 'cm')).toBeCloseTo(mm, 10);
+      expect(toMm(fromMm(mm, 'in'), 'in')).toBeCloseTo(mm, 10);
     }
   });
 });
@@ -34,12 +42,20 @@ describe('convertRange', () => {
     const range = { min: 3, max: 3000, step: 1 };
     expect(convertRange(range, 'mm')).toEqual(range);
   });
+
+  it('scales into inches', () => {
+    const range = convertRange({ min: 25.4, max: 2540, step: 25.4 }, 'in');
+    expect(range.min).toBeCloseTo(1, 10);
+    expect(range.max).toBeCloseTo(100, 10);
+    expect(range.step).toBeCloseTo(1, 10);
+  });
 });
 
 describe('decimalsFor', () => {
-  it('shows whole numbers for mm and one decimal for cm', () => {
+  it('shows whole numbers for mm, one decimal for cm, two for inches', () => {
     expect(decimalsFor('mm')).toBe(0);
     expect(decimalsFor('cm')).toBe(1);
+    expect(decimalsFor('in')).toBe(2);
   });
 });
 
@@ -48,6 +64,8 @@ describe('convertedValue', () => {
     expect(convertedValue(1400, 'mm')).toBe(1400);
     expect(convertedValue(1400, 'cm')).toBe(140);
     expect(convertedValue(18, 'cm')).toBe(1.8);
+    expect(convertedValue(800, 'in')).toBe(31.5);
+    expect(convertedValue(762, 'in')).toBe(30);
   });
 });
 
@@ -63,5 +81,10 @@ describe('formatLength', () => {
 
   it('shows one decimal only when the cm value is fractional', () => {
     expect(formatLength(18, 'cm')).toBe('1.8');
+  });
+
+  it('shows two decimals for fractional inches and omits them for a whole inch', () => {
+    expect(formatLength(800, 'in')).toBe('31.5');
+    expect(formatLength(762, 'in')).toBe('30');
   });
 });

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { axisGap, gapsBetweenBoxes, sharedOnAxis, type Aabb } from './selectionGap';
+import { axisGap, facesOnAxis, gapsBetweenBoxes, nearestFacingGaps, sharedOnAxis, type Aabb } from './selectionGap';
 
 function box(min: [number, number, number], max: [number, number, number]): Aabb {
   return {
@@ -50,5 +50,44 @@ describe('gapsBetweenBoxes', () => {
     const gaps = gapsBetweenBoxes(lower, upper);
     expect(gaps.map((gap) => gap.axis)).toEqual(['y']);
     expect(gaps[0]?.gapMm).toBeCloseTo(182);
+  });
+});
+
+describe('facesOnAxis', () => {
+  it('requires overlap on the other two axes', () => {
+    const shelf = box([0, 0, 0], [0.8, 0.018, 0.3]);
+    const above = box([0, 0.2, 0], [0.8, 0.218, 0.3]);
+    const aside = box([2, 0.2, 0], [2.8, 0.218, 0.3]);
+    expect(facesOnAxis(shelf, above, 'y')).toBe(true);
+    expect(facesOnAxis(shelf, aside, 'y')).toBe(false);
+  });
+});
+
+describe('nearestFacingGaps', () => {
+  it('reads the nearest facing neighbour above and below a shelf', () => {
+    const selected = box([0, 0.2, 0], [0.8, 0.218, 0.3]);
+    const floor = box([0, 0, 0], [0.8, 0.018, 0.3]);
+    const top = box([0, 0.5, 0], [0.8, 0.518, 0.3]);
+    const far = box([0, 1, 0], [0.8, 1.018, 0.3]);
+    const gaps = nearestFacingGaps(selected, [floor, top, far]);
+    expect(gaps).toHaveLength(2);
+    expect(gaps[0]?.axis).toBe('y');
+    expect(gaps[0]?.gapMm).toBeCloseTo(182);
+    expect(gaps[1]?.gapMm).toBeCloseTo(282);
+  });
+
+  it('ignores a nearer piece that does not face the selection', () => {
+    const selected = box([0, 0, 0], [0.8, 0.018, 0.3]);
+    const facing = box([0, 0.2, 0], [0.8, 0.218, 0.3]);
+    const closerAside = box([2, 0.1, 0], [2.8, 0.118, 0.3]);
+    const gaps = nearestFacingGaps(selected, [facing, closerAside]);
+    expect(gaps.find((gap) => gap.axis === 'y')?.gapMm).toBeCloseTo(182);
+  });
+
+  it('falls back to the closest neighbour when none share a footprint', () => {
+    const selected = box([0.5, 0.2, 0], [0.9, 0.218, 0.3]);
+    const beside = box([0, 0, 0], [0.4, 0.018, 0.3]);
+    const gaps = nearestFacingGaps(selected, [beside]);
+    expect(gaps.find((gap) => gap.axis === 'y')?.gapMm).toBeCloseTo(182);
   });
 });

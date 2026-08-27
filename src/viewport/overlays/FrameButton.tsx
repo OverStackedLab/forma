@@ -3,10 +3,10 @@ import type { CameraPreset } from '../CameraController';
 import { viewportApi } from '../viewportApi';
 
 const VIEWS: { id: CameraPreset; label: string }[] = [
+  { id: 'angle', label: '3D' },
   { id: 'front', label: 'Front' },
   { id: 'side', label: 'Side' },
   { id: 'top', label: 'Top' },
-  { id: 'angle', label: '3D' },
 ];
 
 const buttonClass =

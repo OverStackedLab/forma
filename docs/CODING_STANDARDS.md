@@ -113,10 +113,10 @@ Everything under `src/domain/` must stay unit-testable in Node:
 | --- | --- | --- |
 | Part sizes, cabinet dims, BOM, manufacturing metadata | **millimetres** | Domain, catalog, BOM |
 | Transform `position` | **metres** | Document store / Three.js world |
-| Display preference | `mm` \| `cm` (default **cm**) | `uiStore.displayUnit` only |
+| Display preference | `mm` \| `cm` \| `in` (default **cm**) | `uiStore.displayUnit` only |
 
 Convert at the boundary (`MM = 1/1000` in `geometry.ts`; actions use `* 1000` /
-`/ 1000`). Never store centimetres in the document.
+`/ 1000`). Never store centimetres or inches in the document.
 
 ### Single source of live parts
 

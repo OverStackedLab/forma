@@ -202,6 +202,9 @@ export function Viewport() {
         builder,
         ui.viewMode === 'render' ? [] : ui.selectedPartIds,
         doc.groups,
+        doc.customParts
+          .map((part) => part.id)
+          .filter((id) => !doc.hiddenIds.includes(id)),
       );
       dimensions.updateLabels();
     });

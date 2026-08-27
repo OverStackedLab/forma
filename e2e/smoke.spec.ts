@@ -48,6 +48,8 @@ test('boots to an empty scene with no starting model', async ({ page }) => {
   await page.goto('/');
 
   await expect(page.getByRole('tab', { name: 'cm' })).toHaveAttribute('aria-selected', 'true');
+  await expect(page.getByRole('tab', { name: 'mm' })).toBeVisible();
+  await expect(page.getByRole('tab', { name: 'in' })).toBeVisible();
   await expect(page.getByRole('tab', { name: 'Model' })).toHaveAttribute('aria-selected', 'true');
   await expect(page.locator('canvas')).toBeVisible();
   await expect(page.getByText('0 parts').first()).toBeVisible();
@@ -784,6 +786,17 @@ test('two selected panels show the clearance between them', async ({ page }) => 
   await expect(page.getByTestId('selection-dimension').filter({ hasText: '173 mm' })).toBeVisible();
 });
 
+test('a selected panel shows clearance to the nearest facing neighbour', async ({ page }) => {
+  await gotoMm(page);
+  await insertShelf(page);
+  await insertShelf(page);
+  await expect(page.locator('canvas')).toBeVisible();
+  const yPosition = page.getByLabel('Y Position in millimetres');
+  await yPosition.fill('200');
+  await yPosition.blur();
+  await expect(page.getByTestId('selection-dimension').filter({ hasText: '173 mm' })).toBeVisible();
+});
+
 test('switching to mm converts the dimension fields and round-trips back to cm', async ({
   page,
 }) => {
@@ -804,6 +817,20 @@ test('switching to mm converts the dimension fields and round-trips back to cm',
 
   await page.getByRole('tab', { name: 'cm' }).click();
   await expect(page.getByLabel('Width in centimetres')).toHaveValue('90');
+});
+
+test('switching to inches converts the dimension fields', async ({ page }) => {
+  await page.goto('/');
+  await insertShelf(page);
+
+  await page.getByRole('tab', { name: 'in' }).click();
+  const widthInput = page.getByLabel('Width in inches');
+  await expect(widthInput).toHaveValue('31.5');
+
+  await widthInput.fill('36');
+  await widthInput.blur();
+  await page.getByRole('tab', { name: 'mm' }).click();
+  await expect(page.getByLabel('Width in millimetres')).toHaveValue('914');
 });
 
 test('the cm setting carries through to the Cut List table and CSV headers', async ({ page }) => {
@@ -1135,7 +1162,7 @@ test('the grid size preference survives a reload', async ({ page }) => {
   await gridSize.blur();
   await expect(gridSize).toHaveValue('550');
 
-  // It follows the same global mm/cm display preference as other dimensions.
+  // It follows the same global mm/cm/in display preference as other dimensions.
   await page.getByRole('tab', { name: 'mm' }).click();
   const gridSizeMm = page.getByLabel('Grid size in millimetres');
   await expect(gridSizeMm).toHaveValue('5500');

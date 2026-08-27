@@ -111,6 +111,36 @@ export function selectionUnits(
 }
 
 /**
+ * Bodies to measure a selection against. Unselected groups stay one box.
+ * Remaining members of a partially selected group stay individual parts, so
+ * a shelf can read clearance to its neighbours in the same cabinet.
+ */
+export function dimensionNeighborIds(
+  groups: readonly Group[],
+  allPartIds: readonly string[],
+  selectedPartIds: readonly string[],
+): string[][] {
+  const selected = new Set(selectedPartIds);
+  const live = new Set(allPartIds);
+  const consumed = new Set<string>();
+  const bodies: string[][] = [];
+
+  for (const group of groups) {
+    const members = group.partIds.filter((id) => live.has(id) && !selected.has(id));
+    if (!members.length) continue;
+    if (group.partIds.some((id) => selected.has(id))) continue;
+    bodies.push(members);
+    members.forEach((id) => consumed.add(id));
+  }
+
+  for (const id of allPartIds) {
+    if (selected.has(id) || consumed.has(id)) continue;
+    bodies.push([id]);
+  }
+  return bodies;
+}
+
+/**
  * Parts the transform gizmo should drive. Two units use the Align convention:
  * the first stays fixed and only the second moves, so clearance witnesses stay
  * live while you place the mover.

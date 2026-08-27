@@ -14,7 +14,8 @@ while preserving the 18 mm panels and 8 mm back.
 Three top-level modes: **Model** (the editor), **Cut List** (auto-generated BOM
 with CSV export), and **Render** (presentation view with camera presets and PNG
 export). Model view includes orthographic Front / Side / Top plus a 3D
-perspective. Selecting two pieces or groups shows the clearance between them.
+perspective. Selecting a piece shows clearance to the nearest facing neighbour;
+selecting two pieces or groups locks that pair.
 
 ## Running it
 
