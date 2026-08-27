@@ -286,6 +286,22 @@ describe('library construction actions', () => {
     expect(state.groups.find((group) => group.id === copy.id)?.cabinet?.width).toBe(900);
   });
 
+  it('duplicates the whole cabinet when only one member is selected', () => {
+    addCabinetPreset('base-600');
+    const source = useDocumentStore.getState().groups[0]!;
+    useUiStore.getState().setSelection([source.partIds[0]!]);
+
+    duplicateSelected();
+
+    const state = useDocumentStore.getState();
+    const copy = state.groups[1]!;
+    expect(state.groups).toHaveLength(2);
+    expect(state.customParts).toHaveLength(12);
+    expect(copy.cabinet).toEqual(source.cabinet);
+    expect(copy.partIds).toHaveLength(source.partIds.length);
+    expect(useUiStore.getState().selectedPartIds).toEqual(copy.partIds);
+  });
+
   it('adds, moves and removes cabinet shelves by explicit position', () => {
     addCabinetPreset('base-600');
     let group = useDocumentStore.getState().groups[0]!;

@@ -467,6 +467,23 @@ test('viewport clicks select one grouped piece while the Assembly group row sele
   await expect(page.getByLabel('Group Y Position in millimetres')).toHaveValue('0');
 });
 
+test('duplicating a cabinet from one selected piece keeps Add Shelf', async ({ page }) => {
+  await gotoMm(page);
+  await page.getByRole('tab', { name: 'Library' }).click();
+  await page.getByRole('button', { name: /Base 600/ }).click();
+  await page.getByRole('button', { name: 'Clear', exact: true }).click();
+
+  const canvasBox = await page.locator('canvas').boundingBox();
+  if (!canvasBox) throw new Error('viewport canvas has no bounding box');
+  await page.mouse.click(canvasBox.x + canvasBox.width / 2, canvasBox.y + canvasBox.height * 0.54);
+  await expect(page.getByRole('button', { name: 'Add Shelf' })).toBeVisible();
+
+  await page.getByRole('button', { name: 'Duplicate' }).click();
+  await expect(page.getByText('Base 600 group duplicated')).toBeVisible();
+  await expect(page.getByText('Configurable cabinet · 6 pieces')).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Add Shelf' })).toBeVisible();
+});
+
 test('Snap Together connects two pieces and is undoable', async ({ page }) => {
   await gotoMm(page);
   await insertShelf(page);

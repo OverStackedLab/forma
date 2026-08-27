@@ -53,3 +53,4 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - A selected group's Y position is the underside on the floor, so a cabinet sitting on the grid reads 0 (BUG-017).
 - Oak uses the photographed grain (lighter honey oak) instead of the procedural brown swatch.
 - Add shelf and Space evenly fields show defaults (300 mm, 3 every 200 mm) and are wide enough to read.
+- Duplicating a cabinet from one selected member clones the whole carcass, so Add Shelf stays on the copy (BUG-018).

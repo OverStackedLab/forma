@@ -21,6 +21,7 @@ import {
   PANEL_PRESETS,
 } from '@/domain/catalog';
 import {
+  cabinetContainingSelection,
   groupMatching,
   livePartIds,
   selectionPositionMetres,
@@ -417,8 +418,13 @@ export function togglePartEdgeBand(id: string, edge: EdgeBandSide): void {
 export function duplicateSelected(): void {
   const s = doc();
   const selectedIds = ui().selectedPartIds;
-  const sourceGroup = groupMatching(s.groups, selectedIds);
-  const sources = selectedIds
+  // A viewport click selects one cabinet piece (BUG-006) while Add Shelf still
+  // shows for that carcass. Duplicate must copy the whole cabinet, not the
+  // lone panel, or the clone has no shelf controls (BUG-018).
+  const sourceGroup =
+    groupMatching(s.groups, selectedIds) ?? cabinetContainingSelection(s.groups, selectedIds);
+  const sourceIds = sourceGroup ? sourceGroup.partIds : selectedIds;
+  const sources = sourceIds
     .map((id) => s.customParts.find((p) => p.id === id))
     .filter((p): p is CustomPart => Boolean(p));
 
@@ -461,7 +467,10 @@ export function duplicateSelected(): void {
     ? {
         id: nextGroupId(),
         label: sourceGroup.label,
-        partIds: sourceGroup.partIds.map((id) => cloneIdBySource.get(id)!),
+        partIds: sourceGroup.partIds.flatMap((id) => {
+          const clonedId = cloneIdBySource.get(id);
+          return clonedId ? [clonedId] : [];
+        }),
         cabinet: sourceGroup.cabinet
           ? {
               ...sourceGroup.cabinet,
