@@ -83,6 +83,30 @@ export const PANEL_PRESETS: readonly PanelPreset[] = [
     edgeBanding: ['w-min', 'w-max', 'h-min', 'h-max'], defaultQuaternion: [0, 0, 0, 1],
   },
   {
+    id: 'axstad-glass-400', label: 'AXSTAD Glass 400', w: 400, h: 800, d: 19, icon: 'panel_glass_door',
+    shape: 'glass-door', category: 'front', description: '400×800×19 mm · 78 mm frame · inset glass',
+    thicknessAxis: 'd', grainAxis: 'h', edgeBanding: ['w-min', 'w-max', 'h-min', 'h-max'],
+    defaultQuaternion: [0, 0, 0, 1],
+  },
+  {
+    id: 'axstad-glass-600', label: 'AXSTAD Glass 600', w: 600, h: 800, d: 19, icon: 'panel_glass_door',
+    shape: 'glass-door', category: 'front', description: '600×800×19 mm · 78 mm frame · inset glass',
+    thicknessAxis: 'd', grainAxis: 'h', edgeBanding: ['w-min', 'w-max', 'h-min', 'h-max'],
+    defaultQuaternion: [0, 0, 0, 1],
+  },
+  {
+    id: 'axstad-glass-400-1000', label: 'AXSTAD Glass 400×1000', w: 400, h: 1000, d: 19, icon: 'panel_glass_door',
+    shape: 'glass-door', category: 'front', description: '400×1000×19 mm · 78 mm frame · inset glass',
+    thicknessAxis: 'd', grainAxis: 'h', edgeBanding: ['w-min', 'w-max', 'h-min', 'h-max'],
+    defaultQuaternion: [0, 0, 0, 1],
+  },
+  {
+    id: 'axstad-glass-600-1000', label: 'AXSTAD Glass 600×1000', w: 600, h: 1000, d: 19, icon: 'panel_glass_door',
+    shape: 'glass-door', category: 'front', description: '600×1000×19 mm · 78 mm frame · inset glass',
+    thicknessAxis: 'd', grainAxis: 'h', edgeBanding: ['w-min', 'w-max', 'h-min', 'h-max'],
+    defaultQuaternion: [0, 0, 0, 1],
+  },
+  {
     id: 'knob', label: 'Knob', w: 32, h: 32, d: 25, icon: 'panel_knob', shape: 'cylinder',
     category: 'hardware', description: 'Ø32 × 25 mm projection', thicknessAxis: null,
     grainAxis: null, edgeBanding: [], defaultQuaternion: [0, 0, 0, 1],
@@ -95,6 +119,11 @@ export const PANEL_PRESETS: readonly PanelPreset[] = [
   {
     id: 'eneryda', label: 'ENERYDA', w: 112, h: 17, d: 30, icon: 'panel_handle', shape: 'eneryda',
     category: 'hardware', description: '112 mm · 96 mm centres · IKEA 703.475.16', thicknessAxis: null,
+    grainAxis: null, edgeBanding: [], defaultQuaternion: [0, 0, 0, 1],
+  },
+  {
+    id: 'borghamn', label: 'BORGHAMN', w: 170, h: 10, d: 36, icon: 'panel_handle', shape: 'borghamn',
+    category: 'hardware', description: '170 mm · 160 mm centres · IKEA 203.160.46', thicknessAxis: null,
     grainAxis: null, edgeBanding: [], defaultQuaternion: [0, 0, 0, 1],
   },
   {

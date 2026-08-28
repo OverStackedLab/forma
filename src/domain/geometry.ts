@@ -1,6 +1,15 @@
 import { resolveAppearance } from './catalog';
 import { OAK_GRAIN_URL } from './oakGrain';
 import { WALNUT_GRAIN_URL } from './walnutGrain';
+import {
+  BORGHAMN_BAR_MM,
+  BORGHAMN_CENTRES_MM,
+  BORGHAMN_FOOT_MM,
+  BORGHAMN_LENGTH_MM,
+  BORGHAMN_PROJECTION_MM,
+  borghamnCenterline,
+} from './borghamn';
+import { axstadGlassPieces } from './glassDoor';
 import type { PanelShape, PartSpec } from './types';
 
 /**
@@ -27,6 +36,7 @@ export class GeometryCache {
   private cylinder: TBufferGeometry | null = null;
   private bagganas: TBufferGeometry | null = null;
   private eneryda: TBufferGeometry | null = null;
+  private borghamn: TBufferGeometry | null = null;
   private enhetLeg: TBufferGeometry | null = null;
 
   constructor(private readonly THREE: ThreeModule) {}
@@ -126,6 +136,71 @@ export class GeometryCache {
   }
 
   /**
+   * IKEA BORGHAMN (203.160.46): 10×10 mm square bar bent into a U, 170 mm
+   * overall, 160 mm centres, 36 mm projection. Built in mm, then packed into
+   * the unit box like ENERYDA.
+   */
+  unitBorghamn(): TBufferGeometry {
+    if (!this.borghamn) {
+      const half = BORGHAMN_BAR_MM / 2;
+      const points = borghamnCenterline();
+      const a = points[0];
+      const b = points[1];
+      const c = points[2];
+      const d = points[3];
+      const e = points[4];
+      const f = points[5];
+      if (!a || !b || !c || !d || !e || !f) return this.unitBox();
+      const vec = (point: { x: number; y: number; z: number }) =>
+        new this.THREE.Vector3(point.x, point.y, point.z);
+
+      const path = new this.THREE.CurvePath<import('three').Vector3>();
+      path.add(new this.THREE.LineCurve3(vec(a), vec(b)));
+      path.add(new this.THREE.QuadraticBezierCurve3(
+        vec(b),
+        new this.THREE.Vector3(a.x, 0, c.z),
+        vec(c),
+      ));
+      path.add(new this.THREE.LineCurve3(vec(c), vec(d)));
+      path.add(new this.THREE.QuadraticBezierCurve3(
+        vec(d),
+        new this.THREE.Vector3(e.x, 0, d.z),
+        vec(e),
+      ));
+      path.add(new this.THREE.LineCurve3(vec(e), vec(f)));
+
+      const shape = new this.THREE.Shape();
+      shape.moveTo(-half, -half);
+      shape.lineTo(half, -half);
+      shape.lineTo(half, half);
+      shape.lineTo(-half, half);
+      shape.closePath();
+
+      const bar = new this.THREE.ExtrudeGeometry(shape, {
+        steps: 72,
+        bevelEnabled: false,
+        extrudePath: path,
+      });
+
+      const foot = new this.THREE.BoxGeometry(BORGHAMN_BAR_MM, BORGHAMN_BAR_MM, BORGHAMN_FOOT_MM);
+      const leftFoot = foot.clone();
+      leftFoot.translate(-BORGHAMN_CENTRES_MM / 2, 0, BORGHAMN_FOOT_MM / 2);
+      const rightFoot = foot.clone();
+      rightFoot.translate(BORGHAMN_CENTRES_MM / 2, 0, BORGHAMN_FOOT_MM / 2);
+      foot.dispose();
+
+      const merged = this.mergeGeometries([bar, leftFoot, rightFoot]);
+      bar.dispose();
+      leftFoot.dispose();
+      rightFoot.dispose();
+
+      this.normalizeToUnitBox(merged, BORGHAMN_LENGTH_MM, BORGHAMN_BAR_MM, BORGHAMN_PROJECTION_MM);
+      this.borghamn = merged;
+    }
+    return this.borghamn;
+  }
+
+  /**
    * IKEA ENHET cabinet leg (104.490.18): Ø50 mm mounting plate, steel tube,
    * threaded adjuster and plastic foot. Nominal height 125 mm (adjustable
    * 110–135). Built in mm with Y up, then packed into the unit box.
@@ -179,6 +254,7 @@ export class GeometryCache {
   forShape(shape: PanelShape): TBufferGeometry {
     if (shape === 'bagganas') return this.unitBagganas();
     if (shape === 'eneryda') return this.unitEneryda();
+    if (shape === 'borghamn') return this.unitBorghamn();
     if (shape === 'enhet-leg') return this.unitEnhetLeg();
     if (shape === 'cylinder') return this.unitCylinder();
     return this.unitBox();
@@ -276,6 +352,8 @@ export class GeometryCache {
     this.bagganas = null;
     this.eneryda?.dispose();
     this.eneryda = null;
+    this.borghamn?.dispose();
+    this.borghamn = null;
     this.enhetLeg?.dispose();
     this.enhetLeg = null;
   }
@@ -290,6 +368,8 @@ export class MaterialCache {
   private readonly cache = new Map<string, TMaterial>();
   private oakMap: TTexture | null = null;
   private walnutMap: TTexture | null = null;
+  private glassMat: TMaterial | null = null;
+  private ghostMat: TMaterial | null = null;
 
   constructor(private readonly THREE: ThreeModule) {}
 
@@ -309,6 +389,37 @@ export class MaterialCache {
       this.cache.set(key, m);
     }
     return m;
+  }
+
+  /**
+   * Clear inset pane. Opacity instead of transmission so it reads without an
+   * environment map — transmission goes black in this studio lighting.
+   */
+  glass(): TMaterial {
+    if (!this.glassMat) {
+      this.glassMat = new this.THREE.MeshStandardMaterial({
+        color: '#c5dde8',
+        roughness: 0.08,
+        metalness: 0.18,
+        transparent: true,
+        opacity: 0.28,
+        depthWrite: false,
+      });
+    }
+    return this.glassMat;
+  }
+
+  /** Full-door pick/halo target that does not occlude the glass. */
+  ghost(): TMaterial {
+    if (!this.ghostMat) {
+      this.ghostMat = new this.THREE.MeshStandardMaterial({
+        transparent: true,
+        opacity: 0,
+        depthWrite: false,
+        colorWrite: false,
+      });
+    }
+    return this.ghostMat;
   }
 
   private naturalGrain(materialId: string | undefined, colorId: string | undefined): TTexture | null {
@@ -339,6 +450,10 @@ export class MaterialCache {
   dispose(): void {
     for (const m of this.cache.values()) m.dispose();
     this.cache.clear();
+    this.glassMat?.dispose();
+    this.ghostMat?.dispose();
+    this.glassMat = null;
+    this.ghostMat = null;
     this.oakMap?.dispose();
     this.walnutMap?.dispose();
     this.oakMap = null;
@@ -364,9 +479,13 @@ export type PartNode = {
 export function createPartNode(
   THREE: ThreeModule,
   geometries: GeometryCache,
+  materials: MaterialCache,
   spec: PartSpec,
   material: TMaterial,
 ): PartNode {
+  if (spec.shape === 'glass-door') {
+    return createGlassDoorNode(THREE, geometries, materials, spec, material);
+  }
   const root = new THREE.Group();
   const geometry = geometries.forShape(spec.shape);
   const mesh = new THREE.Mesh(geometry, material);
@@ -386,6 +505,60 @@ export function createPartNode(
     },
     setMaterial(m) {
       mesh.material = m;
+    },
+  };
+  node.update(spec);
+  return node;
+}
+
+function createGlassDoorNode(
+  THREE: ThreeModule,
+  geometries: GeometryCache,
+  materials: MaterialCache,
+  spec: PartSpec,
+  material: TMaterial,
+): PartNode {
+  const root = new THREE.Group();
+  const box = geometries.unitBox();
+  const highlight = new THREE.Mesh(box, materials.ghost());
+  highlight.castShadow = false;
+  highlight.receiveShadow = false;
+  highlight.userData.partId = spec.id;
+  const frames: TMesh[] = [];
+  for (let i = 0; i < 4; i++) {
+    const frame = new THREE.Mesh(box, material);
+    frame.castShadow = true;
+    frame.receiveShadow = true;
+    frame.userData.partId = spec.id;
+    root.add(frame);
+    frames.push(frame);
+  }
+  const glass = new THREE.Mesh(box, materials.glass());
+  glass.castShadow = false;
+  glass.receiveShadow = true;
+  glass.renderOrder = 2;
+  glass.userData.partId = spec.id;
+  root.add(glass);
+  root.add(highlight);
+  root.name = spec.id;
+  root.userData.partId = spec.id;
+
+  const node: PartNode = {
+    id: spec.id,
+    root,
+    highlightTarget: highlight,
+    update(next) {
+      highlight.scale.set(next.size.x * MM, next.size.y * MM, next.size.z * MM);
+      const pieces = axstadGlassPieces(next.size.x, next.size.y, next.size.z);
+      pieces.forEach((piece, index) => {
+        const mesh = piece.role === 'glass' ? glass : frames[index];
+        if (!mesh) return;
+        mesh.scale.set(piece.size.x * MM, piece.size.y * MM, piece.size.z * MM);
+        mesh.position.set(piece.position.x * MM, piece.position.y * MM, piece.position.z * MM);
+      });
+    },
+    setMaterial(m) {
+      for (const frame of frames) frame.material = m;
     },
   };
   node.update(spec);

@@ -94,6 +94,20 @@ describe('library construction actions', () => {
     });
   });
 
+  it('adds BORGHAMN as a square-bar handle', () => {
+    addCustomPanel('borghamn');
+    expect(useDocumentStore.getState().customParts[0]).toMatchObject({
+      label: 'BORGHAMN',
+      category: 'hardware',
+      shape: 'borghamn',
+      w: 170,
+      h: 10,
+      d: 36,
+      thicknessAxis: null,
+      grainAxis: null,
+    });
+  });
+
   it('adds BAGGANÄS with its disc-knob profile', () => {
     addCustomPanel('bagganas');
     expect(useDocumentStore.getState().customParts[0]).toMatchObject({

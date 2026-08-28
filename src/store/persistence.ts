@@ -148,10 +148,14 @@ function inferredPreset(label: string) {
   const normalized = label.toLowerCase();
   if (normalized.includes('enhet'))
     return PANEL_PRESETS.find((preset) => preset.id === 'enhet-leg');
+  if (normalized.includes('borghamn'))
+    return PANEL_PRESETS.find((preset) => preset.id === 'borghamn');
   if (normalized.includes('eneryda') || normalized.includes('handle'))
     return PANEL_PRESETS.find((preset) => preset.id === 'eneryda');
   if (normalized.includes('baggan')) return PANEL_PRESETS.find((preset) => preset.id === 'bagganas');
   if (normalized.includes('knob')) return PANEL_PRESETS.find((preset) => preset.id === 'knob');
+  if (normalized.includes('axstad') || normalized.includes('glass'))
+    return PANEL_PRESETS.find((preset) => preset.id === 'axstad-glass-400');
   if (normalized.includes('door')) return PANEL_PRESETS.find((preset) => preset.id === 'door');
   if (normalized.includes('back')) return PANEL_PRESETS.find((preset) => preset.id === 'back');
   if (normalized.includes('divider')) return PANEL_PRESETS.find((preset) => preset.id === 'divider');
@@ -168,7 +172,9 @@ function normalizePart(value: unknown): CustomPart | null {
     && part.shape !== 'cylinder'
     && part.shape !== 'bagganas'
     && part.shape !== 'eneryda'
+    && part.shape !== 'borghamn'
     && part.shape !== 'enhet-leg'
+    && part.shape !== 'glass-door'
   )
     return null;
   const clampDimension = (axis: 'w' | 'h' | 'd') => {
@@ -194,7 +200,7 @@ function normalizePart(value: unknown): CustomPart | null {
   const category =
     part.category === 'panel' || part.category === 'front' || part.category === 'hardware'
       ? part.category
-      : preset?.category ?? (shape === 'cylinder' || shape === 'bagganas' || shape === 'eneryda' || shape === 'enhet-leg' ? 'hardware' : 'panel');
+      : preset?.category ?? (shape === 'cylinder' || shape === 'bagganas' || shape === 'eneryda' || shape === 'borghamn' || shape === 'enhet-leg' ? 'hardware' : 'panel');
   const grainAxis =
     part.grainAxis === 'w' || part.grainAxis === 'h' || part.grainAxis === 'd'
       ? part.grainAxis
@@ -216,7 +222,7 @@ function normalizePart(value: unknown): CustomPart | null {
     h,
     d,
     shape,
-    thicknessAxis: category === 'hardware' || shape === 'cylinder' || shape === 'bagganas' || shape === 'eneryda' || shape === 'enhet-leg'
+    thicknessAxis: category === 'hardware' || shape === 'cylinder' || shape === 'bagganas' || shape === 'eneryda' || shape === 'borghamn' || shape === 'enhet-leg'
       ? null
       : validAxis ? thicknessAxis as DimensionAxis : undefined,
     grainAxis,

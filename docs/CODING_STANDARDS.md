@@ -394,7 +394,7 @@ Read these before changing picking, history, cabinets, or materials:
   template while open; keep the write-up under Resolved records and a summary
   row when resolved). Next unused id after BUG-028.
 - Non-bug follow-ups → next `IMP-###` in [`IMPROVEMENTS.md`](./IMPROVEMENTS.md).
-  Next unused id after IMP-015.
+  Next unused id after IMP-018.
 - Do not invent tracker entries in PR descriptions only — write them in those
   files so the next agent can find them
 

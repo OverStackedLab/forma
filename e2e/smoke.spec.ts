@@ -70,7 +70,9 @@ test('boots to an empty scene with no starting model', async ({ page }) => {
   await expect(page.getByRole('heading', { name: 'Hardware' }).first()).toBeVisible();
   await expect(page.getByRole('button', { name: 'Shelf' })).toBeVisible();
   await expect(page.getByRole('button', { name: 'Door' })).toBeVisible();
+  await expect(page.getByRole('button', { name: /AXSTAD Glass 400 400×800/ })).toBeVisible();
   await expect(page.getByRole('button', { name: /ENHET/ })).toBeVisible();
+  await expect(page.getByRole('button', { name: /BORGHAMN/ })).toBeVisible();
 
   expect(errors).toEqual([]);
 });
@@ -283,7 +285,7 @@ test('switching gizmo tools preserves the current selection', async ({ page }) =
     await expect(page.getByText('1 selected')).toBeVisible();
   }
 
-  await page.getByRole('button', { name: 'Frame' }).click();
+  await page.getByRole('button', { name: 'Frame', exact: true }).click();
   await expect(page.getByText('1 selected')).toBeVisible();
 });
 
@@ -360,6 +362,24 @@ test('inserting a library panel keeps the Library tab open', async ({ page }) =>
   await expect(page.getByRole('tab', { name: 'Properties' })).toHaveAttribute('aria-selected', 'true');
 });
 
+test('an AXSTAD glass door inserts as a front with an inset pane', async ({ page }) => {
+  await page.goto('/');
+  await page.getByRole('tab', { name: 'Library' }).click();
+  await page.getByRole('button', { name: /AXSTAD Glass 400 400×800/ }).click();
+  await expect(page.getByText('AXSTAD Glass 400 added to scene')).toBeVisible();
+  await page.getByRole('tab', { name: 'Assembly' }).click();
+  await expect(page.getByRole('treeitem', { name: /AXSTAD Glass 400/ })).toBeVisible();
+});
+
+test('a BORGHAMN handle inserts as square-bar hardware', async ({ page }) => {
+  await page.goto('/');
+  await page.getByRole('tab', { name: 'Library' }).click();
+  await page.getByRole('button', { name: /BORGHAMN 170 mm/ }).click();
+  await expect(page.getByText('BORGHAMN added to scene')).toBeVisible();
+  await page.getByRole('tab', { name: 'Assembly' }).click();
+  await expect(page.getByRole('treeitem', { name: /BORGHAMN/ })).toBeVisible();
+});
+
 test('the Properties tab has its own finish picker, in sync with Finish', async ({ page }) => {
   await page.goto('/');
   await insertShelf(page);
@@ -420,7 +440,7 @@ test('model mode offers front, side and top views', async ({ page }) => {
   await page.getByRole('button', { name: 'Side', exact: true }).click();
   await page.getByRole('button', { name: 'Top', exact: true }).click();
   await page.getByRole('button', { name: '3D' }).click();
-  await expect(page.getByRole('button', { name: 'Frame' })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Frame', exact: true })).toBeVisible();
 });
 
 test('grouping two panels lets you reselect and ungroup them as one unit', async ({ page }) => {
@@ -1121,7 +1141,7 @@ test('resizing with the scale gizmo updates the Dimensions fields to match', asy
   // real headroom — deep in a long sequential suite the browser can be too
   // busy to hit 60fps, and a tight wait here reads as the drag missing the
   // gizmo entirely.
-  await page.getByRole('button', { name: 'Frame' }).click();
+  await page.getByRole('button', { name: 'Frame', exact: true }).click();
   await page.waitForTimeout(1500);
   await page.getByRole('button', { name: 'Scale (S)' }).click();
   await page.waitForTimeout(500);
@@ -1171,7 +1191,7 @@ test('resizing a cabinet with the scale gizmo updates its parametric dimensions'
   await page.getByRole('button', { name: /Base 600/ }).click();
   await expect(page.locator('canvas')).toBeVisible();
 
-  await page.getByRole('button', { name: 'Frame' }).click();
+  await page.getByRole('button', { name: 'Frame', exact: true }).click();
   await page.waitForTimeout(1500);
   await page.getByRole('button', { name: 'Scale (S)' }).click();
   await page.waitForTimeout(500);
