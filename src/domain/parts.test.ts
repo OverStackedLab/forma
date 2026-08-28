@@ -8,6 +8,8 @@ import {
   gizmoPartIds,
   groupMatching,
   livePartIds,
+  partsInGroupOrder,
+  reorderById,
   selectionPositionMetres,
   selectionTogglingGroup,
   selectionUnits,
@@ -78,6 +80,43 @@ describe('selectionTogglingGroup', () => {
 
   it('removes only that group when every member is selected', () => {
     expect(selectionTogglingGroup(['a', 'b', 'x'], members)).toEqual(['x']);
+  });
+});
+
+describe('reorderById', () => {
+  const items = [{ id: 'a' }, { id: 'b' }, { id: 'c' }];
+
+  it('moves an item before another', () => {
+    expect(reorderById(items, 'c', 'a', 'before').map((item) => item.id)).toEqual(['c', 'a', 'b']);
+  });
+
+  it('moves an item after another', () => {
+    expect(reorderById(items, 'a', 'b', 'after').map((item) => item.id)).toEqual(['b', 'a', 'c']);
+    expect(reorderById(items, 'a', 'c', 'after').map((item) => item.id)).toEqual(['b', 'c', 'a']);
+  });
+
+  it('returns a copy when the ids are missing or the same', () => {
+    expect(reorderById(items, 'a', 'a', 'before')).toEqual(items);
+    expect(reorderById(items, 'z', 'a', 'before')).toEqual(items);
+  });
+});
+
+describe('partsInGroupOrder', () => {
+  it('emits group members as blocks, then leftover loose parts', () => {
+    const groups: Group[] = [
+      { id: 'g2', label: 'Second', partIds: ['custom-2'] },
+      { id: 'g1', label: 'First', partIds: ['custom-1'] },
+    ];
+    const extra: CustomPart = {
+      ...shelf,
+      id: 'custom-3',
+      label: 'Loose',
+    };
+    expect(partsInGroupOrder([shelf, extra, divider], groups).map((part) => part.id)).toEqual([
+      'custom-2',
+      'custom-1',
+      'custom-3',
+    ]);
   });
 });
 

@@ -10,6 +10,7 @@ import {
   EyeOff,
   FilePlus2,
   Grid3x3,
+  GripVertical,
   Hand,
   History,
   Magnet,
@@ -69,6 +70,7 @@ const ICONS: Record<string, LucideIcon> = {
   // Assembly tree
   visibility: Eye,
   visibility_off: EyeOff,
+  grip: GripVertical,
 
   // Library panels
   panel_shelf: Rows3,

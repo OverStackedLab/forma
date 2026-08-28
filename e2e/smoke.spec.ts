@@ -23,6 +23,10 @@ async function useMm(page: Page): Promise<void> {
   await page.getByRole('tab', { name: 'mm' }).click();
 }
 
+function groupRow(page: Page, label: string) {
+  return page.getByRole('treeitem', { name: new RegExp(`${label} \\d+ Hide ${label}`) });
+}
+
 async function gotoMm(page: Page): Promise<void> {
   await page.goto('/');
   await useMm(page);
@@ -361,15 +365,18 @@ test('the Properties tab has its own finish picker, in sync with Finish', async 
   await insertShelf(page);
   await expect(page.getByRole('tab', { name: 'Properties' })).toHaveAttribute('aria-selected', 'true');
 
-  // Apply a finish without ever visiting the Finish tab.
-  await page.getByRole('button', { name: 'Dark Gray' }).click();
-  await expect(page.getByRole('button', { name: 'Dark Gray' })).toHaveAttribute('aria-pressed', 'true');
+  // Apply a finish without ever visiting the Finish tab. The name must be
+  // exact: 'Dark Gray' is also a prefix of the 'Dark Gray-Green' swatch.
+  await page.getByRole('button', { name: 'Dark Gray', exact: true }).click();
+  await expect(page.getByRole('button', { name: 'Dark Gray', exact: true }))
+    .toHaveAttribute('aria-pressed', 'true');
 
   // Finish reflects the same override for the same part — one shared
   // FinishPicker, not two copies that could drift apart.
   await page.getByRole('tab', { name: 'Color' }).click();
   await expect(page.getByText('Editing: Shelf')).toBeVisible();
-  await expect(page.getByRole('button', { name: 'Dark Gray' })).toHaveAttribute('aria-pressed', 'true');
+  await expect(page.getByRole('button', { name: 'Dark Gray', exact: true }))
+    .toHaveAttribute('aria-pressed', 'true');
   await expect(page.getByText('Use design color')).toBeVisible();
 });
 
@@ -378,7 +385,7 @@ test('a mixed-finish selection is clear and can be unified in one click', async 
   await insertShelf(page);
   await page.getByRole('button', { name: 'Oak', exact: true }).click();
   await insertShelf(page);
-  await page.getByRole('button', { name: 'Dark Gray' }).click();
+  await page.getByRole('button', { name: 'Dark Gray', exact: true }).click();
   await page.getByRole('tab', { name: 'Assembly' }).click();
 
   const shelves = page.getByRole('treeitem', { name: 'Shelf Hide Shelf' });
@@ -503,7 +510,7 @@ test('viewport clicks select one grouped piece while the Assembly group row sele
 
   await page.getByRole('tab', { name: 'Assembly' }).click();
   await expect(page.getByText('1 selected')).toBeVisible();
-  await page.getByRole('treeitem', { name: /Select Base 600 .*Base 600 6 Hide Base 600/ }).click();
+  await groupRow(page, 'Base 600').click();
   await expect(page.getByText('Editing: Base 600')).toBeVisible();
   await expect(page.getByText('Configurable cabinet · 6 pieces')).toBeVisible();
   await expect(page.getByRole('button', { name: 'Add Shelf' })).toBeVisible();
@@ -581,9 +588,7 @@ test('Snap Together moves a whole group without breaking its cabinet configurati
   await page.getByRole('button', { name: /Base 600/ }).click();
   await page.getByRole('tab', { name: 'Assembly' }).click();
 
-  const cabinets = page.getByRole('treeitem', {
-    name: /Select Base 600 .*Base 600 6 Hide Base 600/,
-  });
+  const cabinets = groupRow(page, 'Base 600');
   await expect(cabinets).toHaveCount(2);
   await cabinets.nth(0).click();
   await cabinets.nth(1).click({ modifiers: ['Shift'] });
@@ -604,12 +609,8 @@ test('Align Left lines a wall cabinet up with a floor cabinet without dropping i
   await page.getByRole('button', { name: /Wall 600/ }).click();
   await page.getByRole('tab', { name: 'Assembly' }).click();
 
-  const base = page.getByRole('treeitem', {
-    name: /Select Base 600 .*Base 600 6 Hide Base 600/,
-  });
-  const wall = page.getByRole('treeitem', {
-    name: /Select Wall 600 .*Wall 600 6 Hide Wall 600/,
-  });
+  const base = groupRow(page, 'Base 600');
+  const wall = groupRow(page, 'Wall 600');
   await wall.click();
   const wallY = page.getByLabel('Group Y Position in millimetres');
   const hangHeight = await wallY.inputValue();
@@ -682,8 +683,10 @@ test('snap to floor preserves a fully selected cabinet structure', async ({ page
   await page.getByRole('button', { name: 'Snap to Floor' }).click();
   await expect(page.getByText('Already on the floor')).toBeVisible();
 
+  // Y Position is the part centre: an 800-high carcass with an 18 mm top
+  // puts that panel's centreline at 800 - 18 / 2.
   await page.getByRole('treeitem', { name: /Base 600 Top Hide/ }).click();
-  await expect(page.getByLabel('Y Position in millimetres')).toHaveValue('711');
+  await expect(page.getByLabel('Y Position in millimetres')).toHaveValue('791');
 });
 
 test('changing a panel height keeps its grounded face anchored', async ({
@@ -814,9 +817,7 @@ test('selecting two groups shows shared position and rotation sliders', async ({
   await page.getByRole('button', { name: /Base 600/ }).click();
   await page.getByRole('tab', { name: 'Assembly' }).click();
 
-  const cabinets = page.getByRole('treeitem', {
-    name: /Select Base 600 .*Base 600 6 Hide Base 600/,
-  });
+  const cabinets = groupRow(page, 'Base 600');
   await cabinets.nth(0).click();
   await cabinets.nth(1).click({ modifiers: ['Shift'] });
   await expect(page.getByText('12 selected')).toBeVisible();
@@ -832,7 +833,7 @@ test('selecting two groups shows shared position and rotation sliders', async ({
   await expect(page.getByLabel('Y Angle in degrees')).toHaveValue('0');
 });
 
-test('Assembly group checkboxes add a second group without replacing the first', async ({
+test('Shift-clicking an Assembly group row adds it without replacing the first', async ({
   page,
 }) => {
   await gotoMm(page);
@@ -841,17 +842,52 @@ test('Assembly group checkboxes add a second group without replacing the first',
   await page.getByRole('button', { name: /Base 600/ }).click();
   await page.getByRole('tab', { name: 'Assembly' }).click();
 
-  const boxes = page.getByRole('checkbox', { name: 'Select Base 600' });
-  await expect(boxes).toHaveCount(2);
-  // The last insert is already selected. Checking the other group adds it.
+  const cabinets = groupRow(page, 'Base 600');
+  await expect(cabinets).toHaveCount(2);
   await expect(page.getByText('6 selected')).toBeVisible();
-  await expect(boxes.nth(1)).toBeChecked();
-  await boxes.nth(0).click();
+  await cabinets.nth(0).click({ modifiers: ['Shift'] });
   await expect(page.getByText('12 selected')).toBeVisible();
   await expect(page.getByLabel('X Position in millimetres')).toBeVisible();
-  await boxes.nth(0).click();
+  await cabinets.nth(0).click({ modifiers: ['Shift'] });
   await expect(page.getByText('6 selected')).toBeVisible();
   await expect(page.getByText('Editing: Base 600')).toBeVisible();
+});
+
+test('dragging an Assembly group row reorders cabinets', async ({ page }) => {
+  await gotoMm(page);
+  await page.getByRole('tab', { name: 'Library' }).click();
+  await page.getByRole('button', { name: /Base 600/ }).click();
+  await page.getByRole('button', { name: /Wall 600/ }).click();
+  await page.getByRole('tab', { name: 'Assembly' }).click();
+
+  const base = groupRow(page, 'Base 600');
+  const wall = groupRow(page, 'Wall 600');
+  await expect(base).toBeVisible();
+  await expect(wall).toBeVisible();
+  await page.getByRole('button', { name: 'Reorder Wall 600' }).dragTo(
+    page.getByRole('button', { name: 'Reorder Base 600' }),
+    { targetPosition: { x: 8, y: 4 } },
+  );
+  const handles = page.getByRole('button', { name: /Reorder (Base|Wall) 600/ });
+  await expect(handles.nth(0)).toHaveAttribute('aria-label', 'Reorder Wall 600');
+  await expect(handles.nth(1)).toHaveAttribute('aria-label', 'Reorder Base 600');
+});
+
+test('a moved interior panel stays put when Add Shelf rebuilds', async ({ page }) => {
+  await gotoMm(page);
+  await page.getByRole('tab', { name: 'Library' }).click();
+  await page.getByRole('button', { name: /Base 600/ }).click();
+  await page.getByRole('button', { name: 'Add Panel' }).click();
+  await expect(page.getByLabel('Panel 1 position in millimetres')).toHaveValue('300');
+
+  await page.getByRole('tab', { name: 'Assembly' }).click();
+  await page.getByRole('treeitem', { name: /Panel 1 Hide/ }).click();
+  await page.getByLabel('X Position in millimetres').fill('40');
+  await page.getByLabel('X Position in millimetres').blur();
+  await expect(page.getByLabel('Panel 1 position in millimetres')).toHaveValue('340');
+
+  await page.getByRole('button', { name: 'Add Shelf' }).click();
+  await expect(page.getByLabel('Panel 1 position in millimetres')).toHaveValue('340');
 });
 
 test('two selected panels show the clearance between them', async ({ page }) => {
@@ -898,18 +934,69 @@ test('clicking a clearance label sets the gap', async ({ page }) => {
   await expect(page.getByTestId('selection-dimension').filter({ hasText: '200 mm' })).toBeVisible();
 });
 
-test('a selected cabinet shows overall width, height, and depth', async ({ page }) => {
+test('flush faces draw an alignment witness', async ({ page }) => {
+  await gotoMm(page);
+  await insertShelf(page);
+  await insertShelf(page);
+  await expect(page.locator('canvas')).toBeVisible();
+  const yPosition = page.getByLabel('Y Position in millimetres');
+  await yPosition.fill('27');
+  await yPosition.blur();
+  await page.getByRole('button', { name: 'Move (G)' }).click();
+  await expect(page.getByTestId('selection-align-dimension').filter({ hasText: '0 mm' })).toBeVisible();
+  await page.getByRole('button', { name: 'Scale (S)' }).click();
+  await expect(page.getByTestId('selection-align-dimension')).toHaveCount(0);
+});
+
+test('a moving group shows alignment when it lines up with another group', async ({ page }) => {
+  await gotoMm(page);
+  await page.getByRole('tab', { name: 'Library' }).click();
+  await page.getByRole('button', { name: /Base 600/ }).click();
+  await page.getByRole('button', { name: /Wall 600/ }).click();
+  await page.getByRole('tab', { name: 'Assembly' }).click();
+  const base = groupRow(page, 'Base 600');
+  const wall = groupRow(page, 'Wall 600');
+  await base.click();
+  await wall.click({ modifiers: ['Shift'] });
+  await page.getByRole('button', { name: 'Align Left' }).click();
+  await expect(page.getByText('Wall 600 aligned left with Base 600')).toBeVisible();
+  await page.getByRole('button', { name: 'Move (G)' }).click();
+  await expect(page.getByTestId('selection-align-dimension').filter({ hasText: '0 mm' }).first()).toBeVisible();
+});
+
+test('overall width, height, and depth belong to the scale gizmo', async ({ page }) => {
   await gotoMm(page);
   await page.getByRole('tab', { name: 'Library' }).click();
   await page.getByRole('button', { name: /Base 600/ }).click();
   await expect(page.getByText('Base 600 cabinet added')).toBeVisible();
+
+  // BUG-038: size witnesses are part of the resize gesture, so the move gizmo
+  // an insert leaves selected must not carry them.
+  await expect(page.getByTestId('selection-overall-dimension')).toHaveCount(0);
+
+  await page.getByRole('button', { name: 'Scale (S)' }).click();
   await expect(page.getByTestId('selection-overall-dimension').filter({ hasText: 'W 600 mm' })).toBeVisible();
   await expect(page.getByTestId('selection-overall-dimension').filter({ hasText: 'H 800 mm' })).toBeVisible();
   await expect(page.getByTestId('selection-overall-dimension').filter({ hasText: 'D 600 mm' })).toBeVisible();
 
-  await page.getByRole('tab', { name: 'Assembly' }).click();
-  await page.getByRole('treeitem', { name: /Base 600 Top Hide/ }).click();
-  await expect(page.getByTestId('selection-overall-dimension').filter({ hasText: 'H 800 mm' })).toBeVisible();
+  await page.getByRole('button', { name: 'Move (G)' }).click();
+  await expect(page.getByTestId('selection-overall-dimension')).toHaveCount(0);
+});
+
+test('typing an overall witness with the scale gizmo resizes the selection', async ({ page }) => {
+  await gotoMm(page);
+  await insertShelf(page);
+  await expect(page.locator('canvas')).toBeVisible();
+  await page.getByRole('button', { name: 'Scale (S)' }).click();
+  const label = page.getByTestId('selection-overall-dimension').filter({ hasText: 'W 800 mm' });
+  await expect(label).toBeVisible();
+  await label.click();
+  const input = page.getByRole('textbox', { name: 'Width' });
+  await expect(input).toBeVisible();
+  await input.fill('900');
+  await input.press('Enter');
+  await expect(page.getByLabel('Width in millimetres')).toHaveValue('900');
+  await expect(page.getByTestId('selection-overall-dimension').filter({ hasText: 'W 900 mm' })).toBeVisible();
 });
 
 test('switching to mm converts the dimension fields and round-trips back to cm', async ({
@@ -1279,6 +1366,46 @@ test('opening a file that is not a Forma document shows an error instead of clea
   await page.locator('input[type="file"]').setInputFiles(path);
   await expect(page.getByText('Not a Forma file, or an unsupported version')).toBeVisible();
   await expect(page.getByRole('button', { name: 'Shelf' }).first()).toBeVisible();
+});
+
+test('opening an empty file explains that the save may not have finished', async ({ page }) => {
+  await page.goto('/');
+  await insertShelf(page);
+
+  const path = test.info().outputPath('empty-save.forma.json');
+  await writeFile(path, '');
+
+  await page.locator('input[type="file"]').setInputFiles(path);
+  await expect(page.getByText('That file is empty. It may not have finished saving.')).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Shelf' }).first()).toBeVisible();
+});
+
+test('opening a schema-4 file with a UTF-8 BOM still loads', async ({ page }) => {
+  await page.goto('/');
+
+  const path = test.info().outputPath('Bom File.forma.json');
+  await writeFile(
+    path,
+    `\uFEFF${JSON.stringify({
+      schemaVersion: '4',
+      doc: {
+        defaultMaterialId: 'ash',
+        defaultColorId: 'white',
+        defaultHardwareFinishId: 'matte-black',
+        overrides: {},
+        customParts: [],
+        hiddenIds: [],
+        transforms: {},
+        groups: [],
+        docTitle: 'Inside JSON',
+        versions: [],
+        currentVersionId: null,
+      },
+    })}`,
+  );
+
+  await page.locator('input[type="file"]').setInputFiles(path);
+  await expect(page.getByText('Bom File', { exact: true })).toBeVisible();
 });
 
 test('the grid size preference survives a reload', async ({ page }) => {

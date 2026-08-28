@@ -1,7 +1,7 @@
 import { useMemo } from 'react';
 import { computeBOM } from '@/domain/bom';
 import { SHEET } from '@/domain/catalog';
-import { csvHeaders, toCSV } from '@/domain/csv';
+import { csvHeaders, toCSV, CSV_BOM } from '@/domain/csv';
 import { formatLength } from '@/domain/units';
 import { useDocumentStore } from '@/store/documentStore';
 import { useUiStore } from '@/store/uiStore';
@@ -30,8 +30,10 @@ export function CutList() {
   );
 
   const handleExport = () => {
+    // The BOM is added here rather than in `toCSV` so the serializer stays a
+    // pure string function that unit tests can compare directly.
     downloadBlob(
-      new Blob([toCSV(bom.rows, unit)], { type: 'text/csv;charset=utf-8' }),
+      new Blob([CSV_BOM, toCSV(bom.rows, unit)], { type: 'text/csv;charset=utf-8' }),
       'cut-list.csv',
     );
     showToast('Cut list exported');

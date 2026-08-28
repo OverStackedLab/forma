@@ -55,9 +55,11 @@ generates ordinary panels bundled into a `Group` carrying a `cabinet` config.
 Because the config survives, changing the cabinet's width rebuilds the carcass
 parametrically while preserving the 18 mm panels and 8 mm back. Member ids stay
 bound to carcass / shelf / panel roles across Add Shelf and Add Panel, and those
-adds read live centrelines so a typed or gizmo'd placement is not overwritten. Changing only some
-members' size, or deleting a side/top/bottom/back, clears the config — the group
-demotes to a plain group, because it can no longer be regenerated faithfully.
+adds read live centrelines so a typed or gizmo'd placement is not overwritten.
+Moving a shelf or interior panel writes that centreline back onto `cabinet` so
+Properties and the next add keep it. Changing only some members' size, or
+deleting a side/top/bottom/back, clears the config — the group demotes to a
+plain group, because it can no longer be regenerated faithfully.
 Moving or renaming members does not, and deleting a generated shelf or interior
 panel updates the config instead of demoting.
 
@@ -80,8 +82,14 @@ box; a single selected piece reads individual parts so it can clear to an inner
 face, not the outer AABB of an unselected cabinet. Two units lock that pair;
 `gizmoPartIds` hands the gizmo only the second so the first stays put.
 `SelectionDimensions` reads live halo-excluding AABBs. Click a clearance label
-to type a gap; `nudgeSelected` moves the gizmo parts along that axis. Overall
-labels are display-only. Touching or overlapping faces stay quiet. Render mode
+to type a gap; `nudgeSelected` moves the gizmo parts along that axis. Flush
+faces draw in the accent colour (`kind: 'align'`) only while the move gizmo
+is on, including when a moving group's min or max lines up with another
+group. Alignment lines span the shared face or the gap between boxes so they
+do not collapse to a point at contact. Overall labels are
+display-only unless the scale gizmo is on, in which case typing calls
+`setSelectedOverallDim` (cabinet parametric resize, single-part catalog size,
+or rigid group scale). Overlapping interiors stay quiet. Render mode
 hides the overlay.
 
 **Persistence is schema-versioned.** Autosave is debounced into `localStorage`
@@ -139,11 +147,14 @@ with it:
   projection controls, metal finishes, rounded geometry, and their own Cut
   List section rather than pretending to be sheet goods.
 - The Assembly tree is flat for loose parts and hierarchical for saved groups
-  and generated cabinets. A checkbox on each group row adds or removes every
-  member without replacing the rest of the selection.
+  and generated cabinets. Groups list first, in `groups` order, then leftover
+  pieces. Drag a group handle to reorder; Shift-click (or ⌘/Ctrl-click) a group
+  row adds or removes every member without replacing the rest of the selection.
 - Saved documents are currently schema 5. Schema 4 applies the current appearance
   defaults. Schema-3 panel designs migrate to world-aligned dimensions and
-  explicit manufacturing metadata. A schema-1 save (sideboard dims, leg/handle/base
+  explicit manufacturing metadata. File text is parsed by `loadFormaText` so a
+  UTF-8 BOM, string `schemaVersion`, or a bare document still loads. A schema-1
+  save (sideboard dims, leg/handle/base
   style, deleted-fixed-ids) has no sensible mapping onto an empty-canvas design
   — what would you do with its generated doors and legs? — so `persistence.ts`
   treats it as unmigratable and falls back to a fresh empty document rather than

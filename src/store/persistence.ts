@@ -41,6 +41,13 @@ const SCHEMA_VERSION = 5;
 const DEBOUNCE_MS = 600;
 
 type Envelope = { schemaVersion: number; doc: FormaDocument };
+type UnknownRecord = Record<string, unknown>;
+
+function asRecord(value: unknown): UnknownRecord | null {
+  return value !== null && typeof value === 'object' && !Array.isArray(value)
+    ? value as UnknownRecord
+    : null;
+}
 
 /** One-time catalog rebrand: replace whatever design defaults were saved. */
 function withProductAppearanceDefaults(doc: FormaDocument): FormaDocument {
@@ -53,10 +60,66 @@ function withProductAppearanceDefaults(doc: FormaDocument): FormaDocument {
   };
 }
 
+function readSchemaVersion(value: unknown): number | null {
+  if (typeof value === 'number' && Number.isInteger(value)) return value;
+  if (typeof value === 'string' && /^\d+$/.test(value.trim())) return Number(value.trim());
+  return null;
+}
+
+function looksLikeDocument(value: unknown): value is UnknownRecord {
+  const record = asRecord(value);
+  return Boolean(record && (Array.isArray(record.customParts) || Array.isArray(record.groups)));
+}
+
+/** Accepts `{ schemaVersion, doc }`, a string version, `document` as an alias, or a bare doc. */
+function coerceEnvelope(raw: unknown): { schemaVersion: number; doc: unknown } | null {
+  const record = asRecord(raw);
+  if (!record) return null;
+  const version = readSchemaVersion(record.schemaVersion);
+  const nested = record.doc ?? record.document;
+  if (version !== null && asRecord(nested)) return { schemaVersion: version, doc: nested };
+  if (version === null && looksLikeDocument(nested)) {
+    return { schemaVersion: SCHEMA_VERSION, doc: nested };
+  }
+  if (version === null && looksLikeDocument(record)) {
+    return { schemaVersion: SCHEMA_VERSION, doc: record };
+  }
+  return null;
+}
+
+export type FormaLoadFailure = 'empty' | 'invalid-json' | 'unsupported';
+export type FormaLoadResult =
+  | { ok: true; doc: FormaDocument }
+  | { ok: false; reason: FormaLoadFailure };
+
+/**
+ * Parses a `.forma.json` body. Strips a UTF-8 BOM, accepts a string
+ * schemaVersion, and treats a truncated empty save as empty rather than
+ * invalid JSON.
+ */
+export function loadFormaText(raw: string): FormaLoadResult {
+  const text = raw.replace(/^\uFEFF/, '').trim();
+  if (!text) return { ok: false, reason: 'empty' };
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(text);
+  } catch {
+    return { ok: false, reason: 'invalid-json' };
+  }
+  if (typeof parsed === 'string') {
+    try {
+      parsed = JSON.parse(parsed);
+    } catch {
+      return { ok: false, reason: 'invalid-json' };
+    }
+  }
+  const doc = migrate(parsed);
+  return doc ? { ok: true, doc } : { ok: false, reason: 'unsupported' };
+}
+
 function migrate(raw: unknown): FormaDocument | null {
-  if (!raw || typeof raw !== 'object') return null;
-  const envelope = raw as Partial<Envelope>;
-  if (typeof envelope.schemaVersion !== 'number' || !envelope.doc) return null;
+  const envelope = coerceEnvelope(raw);
+  if (!envelope) return null;
 
   switch (envelope.schemaVersion) {
     case SCHEMA_VERSION:
@@ -69,14 +132,6 @@ function migrate(raw: unknown): FormaDocument | null {
       // Older sideboard-shaped saves, or a version we no longer understand.
       return null;
   }
-}
-
-type UnknownRecord = Record<string, unknown>;
-
-function asRecord(value: unknown): UnknownRecord | null {
-  return value !== null && typeof value === 'object' && !Array.isArray(value)
-    ? value as UnknownRecord
-    : null;
 }
 
 function validTuple(value: unknown, length: number): number[] | null {
@@ -386,7 +441,7 @@ function normalizeSnapshot(value: unknown, legacyAxes = false): DocumentSnapshot
 }
 
 /** Guards against a hand-edited or partially-written payload. */
-function normalize(value: Partial<FormaDocument>, legacyAxes = false): FormaDocument {
+function normalize(value: unknown, legacyAxes = false): FormaDocument {
   const base = createDefaultDocument();
   const raw = asRecord(value) ?? {};
   const snapshot = normalizeSnapshot(raw, legacyAxes);
@@ -423,7 +478,8 @@ export function loadDocument(): FormaDocument | null {
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
     if (!raw) return null;
-    return migrate(JSON.parse(raw));
+    const result = loadFormaText(raw);
+    return result.ok ? result.doc : null;
   } catch {
     return null;
   }

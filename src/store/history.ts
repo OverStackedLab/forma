@@ -1,6 +1,6 @@
 import { livePartIds } from '@/domain/parts';
 import type { DocumentSnapshot, FormaDocument } from '@/domain/types';
-import { snapshotDocument, useDocumentStore } from './documentStore';
+import { DOC_KEYS, snapshotDocument, useDocumentStore } from './documentStore';
 import { pruneSelection } from './uiStore';
 
 const MAX_DEPTH = 50;
@@ -45,22 +45,64 @@ function fullSnapshot(): FormaDocument {
   return {
     ...snapshotDocument(state),
     docTitle: state.docTitle,
-    versions: structuredClone(state.versions),
+    // Shared, not cloned. `SavedVersion` objects are never mutated in place —
+    // `saveVersion`, `normalize` and `syncHistoryDocumentMeta` all replace the
+    // array — and `applySnapshot` deep-clones on the way back in, so a per-commit
+    // deep clone of the whole version history bought nothing (IMP-016).
+    versions: state.versions,
     currentVersionId: state.currentVersionId,
   };
 }
 
-function sameSnapshot(a: DocumentSnapshot | FormaDocument, b: DocumentSnapshot | FormaDocument): boolean {
+/**
+ * Serialized form of a saved version's document, cached per version object.
+ * Reconciliation runs on every commit and used to re-stringify every
+ * checkpoint each time, so a design with ten versions serialized eleven whole
+ * documents per edit (IMP-016).
+ */
+const versionKeys = new WeakMap<DocumentSnapshot, string>();
+
+function versionKey(snapshot: DocumentSnapshot): string {
+  let key = versionKeys.get(snapshot);
+  if (key === undefined) {
+    key = JSON.stringify(snapshot);
+    versionKeys.set(snapshot, key);
+  }
+  return key;
+}
+
+/**
+ * Structural equality of two *store states*, slice by slice.
+ *
+ * Zustand replaces only the slices a mutation writes, so an unchanged slice is
+ * reference-identical and needs no comparison at all. Serializing the whole
+ * document twice per commit — as this used to — meant a gizmo release paid for
+ * every part, override and transform in the design regardless of how little it
+ * touched (IMP-016). The result is the same as comparing the two documents
+ * whole: identical references are trivially equal, and anything else still
+ * falls back to a structural comparison.
+ */
+function sameDocument(a: FormaDocument, b: FormaDocument): boolean {
+  if (a.docTitle !== b.docTitle || a.currentVersionId !== b.currentVersionId) return false;
+  if (a.versions !== b.versions && !sameSnapshot(a.versions, b.versions)) return false;
+  return DOC_KEYS.every((key) => a[key] === b[key] || sameSnapshot(a[key], b[key]));
+}
+
+function sameSnapshot(a: unknown, b: unknown): boolean {
   return JSON.stringify(a) === JSON.stringify(b);
 }
 
 function reconcileCurrentVersion(): void {
   const state = useDocumentStore.getState();
-  const current = snapshotDocument(state);
+  if (!state.versions.length) {
+    if (state.currentVersionId !== null) useDocumentStore.setState({ currentVersionId: null });
+    return;
+  }
+  const current = JSON.stringify(snapshotDocument(state));
   let matchingId: string | null = null;
   for (let i = state.versions.length - 1; i >= 0; i--) {
     const version = state.versions[i]!;
-    if (sameSnapshot(version.doc, current)) {
+    if (versionKey(version.doc) === current) {
       matchingId = version.id;
       break;
     }
@@ -69,10 +111,11 @@ function reconcileCurrentVersion(): void {
 }
 
 export function commit(mutate: () => void): void {
+  const stateBefore = useDocumentStore.getState();
   const before = fullSnapshot();
   mutate();
   reconcileCurrentVersion();
-  if (sameSnapshot(before, fullSnapshot())) return;
+  if (sameDocument(stateBefore, useDocumentStore.getState())) return;
   undoStack.push(before);
   if (undoStack.length > MAX_DEPTH) undoStack.shift();
   redoStack.length = 0;

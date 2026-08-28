@@ -49,6 +49,51 @@ export function selectionTogglingGroup(
   return [...new Set([...selectedIds, ...groupPartIds])];
 }
 
+/** Moves `sourceId` before or after `targetId` in a list of identified items. */
+export function reorderById<T extends { id: string }>(
+  items: readonly T[],
+  sourceId: string,
+  targetId: string,
+  place: 'before' | 'after',
+): T[] {
+  const from = items.findIndex((item) => item.id === sourceId);
+  const target = items.findIndex((item) => item.id === targetId);
+  if (from < 0 || target < 0 || sourceId === targetId) return [...items];
+  let to = place === 'after' ? target + 1 : target;
+  const next = [...items];
+  const removed = next.splice(from, 1);
+  const item = removed[0];
+  if (!item) return [...items];
+  if (from < to) to -= 1;
+  next.splice(to, 0, item);
+  return next;
+}
+
+/**
+ * Group members as blocks in `groups` order, then leftover loose parts in
+ * their previous relative order — the Assembly tree's top-level sequence.
+ */
+export function partsInGroupOrder(
+  customParts: readonly CustomPart[],
+  groups: readonly Group[],
+): CustomPart[] {
+  const byId = new Map(customParts.map((part) => [part.id, part]));
+  const used = new Set<string>();
+  const ordered: CustomPart[] = [];
+  for (const group of groups) {
+    for (const id of group.partIds) {
+      const part = byId.get(id);
+      if (!part || used.has(id)) continue;
+      ordered.push(part);
+      used.add(id);
+    }
+  }
+  for (const part of customParts) {
+    if (!used.has(part.id)) ordered.push(part);
+  }
+  return ordered;
+}
+
 /** The group whose membership exactly matches this selection, if any. */
 export function groupMatching(groups: readonly Group[], selectedIds: readonly string[]): Group | undefined {
   if (selectedIds.length < 2) return undefined;

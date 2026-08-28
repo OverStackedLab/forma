@@ -33,11 +33,13 @@ import {
   setGroupRotationAxis,
   setHardwareDiameter,
   setPositionAxis,
+  setSelectedOverallDim,
   setSelectionPositionAxis,
   setSelectionRotationAxis,
   selectGroup,
   titleFromFilename,
   toggleGroupSelection,
+  reorderGroups,
 } from './actions';
 import { createDefaultDocument, useDocumentStore } from './documentStore';
 import { canUndo, clearHistory, redo, undo } from './history';
@@ -163,6 +165,21 @@ describe('library construction actions', () => {
     expect(members[4]).toMatchObject({ w: 764, h: 764, d: 8 });
     expect(state.transforms[resized.partIds[0]!]!.position[0]).toBeCloseTo(-0.391, 8);
     expect(state.transforms[resized.partIds[1]!]!.position[0]).toBeCloseTo(0.391, 8);
+  });
+
+  it('types an overall witness onto a selected panel or a full cabinet', () => {
+    addCustomPanel('shelf');
+    const shelf = useDocumentStore.getState().customParts[0]!;
+    useUiStore.getState().setSelection([shelf.id]);
+    setSelectedOverallDim('x', 900);
+    expect(useDocumentStore.getState().customParts[0]?.w).toBe(900);
+
+    newDocument();
+    addCabinetPreset('base-600');
+    const group = useDocumentStore.getState().groups[0]!;
+    useUiStore.getState().setSelection([...group.partIds]);
+    setSelectedOverallDim('x', 800);
+    expect(useDocumentStore.getState().groups[0]?.cabinet?.width).toBe(800);
   });
 
   it('turns a full-cabinet gizmo scale into one parametric resize around the shared pivot', () => {
@@ -414,12 +431,25 @@ describe('library construction actions', () => {
     useUiStore.getState().setSelection([panel.id]);
     nudgeSelected({ x: 40, y: 0, z: 0 });
 
+    expect(useDocumentStore.getState().groups[0]?.cabinet?.dividerPositionsMm).toEqual([340]);
+
     addCabinetShelf(group.id, 250);
 
     const next = useDocumentStore.getState();
     expect(next.groups[0]?.cabinet?.dividerPositionsMm).toEqual([340]);
     expect(Math.round((next.transforms[panel.id]!.position[0] ?? 0) * 1000)).toBe(40);
     expect(next.customParts.find((part) => part.id === panel.id)?.label).toContain('Panel');
+  });
+
+  it('writes a typed panel position into the cabinet before Add Shelf', () => {
+    addCabinetPreset('base-600');
+    const group = useDocumentStore.getState().groups[0]!;
+    addCabinetDivider(group.id, 300);
+    const panel = useDocumentStore.getState().customParts.find((part) =>
+      part.label.includes('Panel 1'),
+    )!;
+    setPositionAxis(panel.id, 'x', 40);
+    expect(useDocumentStore.getState().groups[0]?.cabinet?.dividerPositionsMm).toEqual([340]);
   });
 
   it('keeps an interior panel id and selection when adding another panel', () => {
@@ -760,6 +790,25 @@ describe('library construction actions', () => {
     toggleGroupSelection(first!.id);
     expect(useUiStore.getState().selectedPartIds).toEqual(second!.partIds);
   });
+
+  it('reorders groups in the assembly list and packs their parts', () => {
+    addCabinetPreset('base-600');
+    addCabinetPreset('wall-600');
+    const [base, wall] = useDocumentStore.getState().groups;
+    expect(base?.label).toBe('Base 600');
+    expect(wall?.label).toBe('Wall 600');
+
+    reorderGroups(wall!.id, base!.id, 'before');
+
+    const state = useDocumentStore.getState();
+    expect(state.groups.map((group) => group.label)).toEqual(['Wall 600', 'Base 600']);
+    expect(state.customParts[0]?.id).toBe(state.groups[0]?.partIds[0]);
+    expect(undo()).toBe(true);
+    expect(useDocumentStore.getState().groups.map((group) => group.label)).toEqual([
+      'Base 600',
+      'Wall 600',
+    ]);
+  });
 });
 
 describe('save and open title', () => {
@@ -846,5 +895,23 @@ describe('save and open title', () => {
     await openFile(file);
 
     expect(useDocumentStore.getState().docTitle).toBe('From Disk');
+  });
+
+  it('toasts a specific message when the opened file is empty', async () => {
+    const file = new File([''], 'Broken Save.forma.json', { type: 'application/json' });
+    await openFile(file);
+    expect(useUiStore.getState().toast?.message).toBe(
+      'That file is empty. It may not have finished saving.',
+    );
+  });
+
+  it('still refuses a file that is not a Forma document', async () => {
+    const file = new File([JSON.stringify({ hello: 'world' })], 'notes.json', {
+      type: 'application/json',
+    });
+    await openFile(file);
+    expect(useUiStore.getState().toast?.message).toBe(
+      'Not a Forma file, or an unsupported version',
+    );
   });
 });

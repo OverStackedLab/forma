@@ -7,6 +7,7 @@ import {
   addCabinetPreset,
   renameGroup,
   renamePart,
+  reorderGroups,
   selectAll,
   selectGroup,
   toggleGroupSelection,
@@ -42,25 +43,19 @@ type TreeItem =
   | { kind: 'part'; spec: PartSpec }
   | { kind: 'group'; group: Group; members: PartSpec[] };
 
-/** Groups are rendered at the position of their first surviving member. */
+/** Groups in document order, then leftover loose parts. */
 function buildTreeItems(specs: readonly PartSpec[], groups: readonly Group[]): TreeItem[] {
-  const groupOfPart = new Map<string, Group>();
-  for (const g of groups) for (const id of g.partIds) groupOfPart.set(id, g);
-
+  const specById = new Map(specs.map((spec) => [spec.id, spec]));
+  const grouped = new Set(groups.flatMap((group) => group.partIds));
   const items: TreeItem[] = [];
-  const emitted = new Set<string>();
-  for (const spec of specs) {
-    const group = groupOfPart.get(spec.id);
-    if (!group) {
-      items.push({ kind: 'part', spec });
-      continue;
-    }
-    if (emitted.has(group.id)) continue;
-    emitted.add(group.id);
+  for (const group of groups) {
     const members = group.partIds
-      .map((id) => specs.find((s) => s.id === id))
-      .filter((s): s is PartSpec => Boolean(s));
-    items.push({ kind: 'group', group, members });
+      .map((id) => specById.get(id))
+      .filter((spec): spec is PartSpec => Boolean(spec));
+    if (members.length) items.push({ kind: 'group', group, members });
+  }
+  for (const spec of specs) {
+    if (!grouped.has(spec.id)) items.push({ kind: 'part', spec });
   }
   return items;
 }
@@ -79,6 +74,10 @@ function AssemblyTree() {
   const hidden = new Set(hiddenIds);
   const selected = new Set(selectedPartIds);
   const items = useMemo(() => buildTreeItems(specs, groups), [specs, groups]);
+  const [dragId, setDragId] = useState<string | null>(null);
+  const [drop, setDrop] = useState<{ id: string; place: 'before' | 'after' } | null>(null);
+  const groupItems = items.filter((item) => item.kind === 'group');
+  const canReorder = groupItems.length > 1;
 
   return (
     <>
@@ -141,9 +140,24 @@ function AssemblyTree() {
               members={item.members}
               selectedPartIds={selectedPartIds}
               hidden={hidden}
+              canReorder={canReorder}
+              dropPlace={drop?.id === item.group.id ? drop.place : null}
               onToggleMember={(id, additive) =>
                 additive ? toggleSelection(id) : setSelection([id])
               }
+              onDragStart={() => setDragId(item.group.id)}
+              onDragOver={(place) => {
+                if (dragId && dragId !== item.group.id) setDrop({ id: item.group.id, place });
+              }}
+              onDrop={(place) => {
+                if (dragId) reorderGroups(dragId, item.group.id, place);
+                setDragId(null);
+                setDrop(null);
+              }}
+              onDragEnd={() => {
+                setDragId(null);
+                setDrop(null);
+              }}
             />
           ),
         )}
@@ -212,13 +226,25 @@ function GroupRow({
   members,
   selectedPartIds,
   hidden,
+  canReorder,
+  dropPlace,
   onToggleMember,
+  onDragStart,
+  onDragOver,
+  onDrop,
+  onDragEnd,
 }: {
   group: Group;
   members: PartSpec[];
   selectedPartIds: readonly string[];
   hidden: Set<string>;
+  canReorder: boolean;
+  dropPlace: 'before' | 'after' | null;
   onToggleMember: (id: string, additive: boolean) => void;
+  onDragStart: () => void;
+  onDragOver: (place: 'before' | 'after') => void;
+  onDrop: (place: 'before' | 'after') => void;
+  onDragEnd: () => void;
 }) {
   const [expanded, setExpanded] = useState(true);
   const selected = new Set(selectedPartIds);
@@ -243,26 +269,45 @@ function GroupRow({
             selectGroup(group.id);
           }
         }}
+        onDragOver={(e) => {
+          if (!canReorder) return;
+          e.preventDefault();
+          const rect = e.currentTarget.getBoundingClientRect();
+          onDragOver(e.clientY < rect.top + rect.height / 2 ? 'before' : 'after');
+        }}
+        onDrop={(e) => {
+          e.preventDefault();
+          const rect = e.currentTarget.getBoundingClientRect();
+          onDrop(e.clientY < rect.top + rect.height / 2 ? 'before' : 'after');
+        }}
         className={`flex h-7 cursor-pointer items-center gap-1 rounded-md pr-2.5 pl-1 text-[12.5px] font-semibold ${
           allSelected ? 'bg-select/16 text-ink' : 'text-ink/85 hover:bg-white/4'
+        } ${
+          dropPlace === 'before'
+            ? 'border-t-2 border-select'
+            : dropPlace === 'after'
+              ? 'border-b-2 border-select'
+              : ''
         }`}
       >
-        <label
-          className="flex h-5 w-5 flex-none cursor-pointer items-center justify-center"
-          onClick={(e) => e.stopPropagation()}
-        >
-          <input
-            type="checkbox"
-            checked={allSelected}
-            ref={(el) => {
-              if (el) el.indeterminate = inclusion === 'partial';
-            }}
+        {canReorder && (
+          <div
+            draggable
+            role="button"
+            aria-label={`Reorder ${group.label}`}
+            title="Drag to reorder"
             onClick={(e) => e.stopPropagation()}
-            onChange={() => toggleGroupSelection(group.id)}
-            aria-label={`Select ${group.label}`}
-            className="group-select-checkbox"
-          />
-        </label>
+            onDragStart={(e) => {
+              e.dataTransfer.setData('text/plain', group.id);
+              e.dataTransfer.effectAllowed = 'move';
+              onDragStart();
+            }}
+            onDragEnd={onDragEnd}
+            className="flex h-5 w-5 flex-none cursor-grab items-center justify-center text-ink/35 active:cursor-grabbing"
+          >
+            <Icon name="grip" size={14} />
+          </div>
+        )}
         <button
           type="button"
           aria-label={expanded ? 'Collapse group' : 'Expand group'}

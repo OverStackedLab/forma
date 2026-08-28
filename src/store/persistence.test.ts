@@ -8,7 +8,7 @@ import {
 } from './actions';
 import { createDefaultDocument, useDocumentStore } from './documentStore';
 import { clearHistory } from './history';
-import { migrate, normalize, SCHEMA_VERSION } from './persistence';
+import { loadFormaText, migrate, normalize, SCHEMA_VERSION } from './persistence';
 import { useUiStore } from './uiStore';
 
 describe('persistence.migrate', () => {
@@ -52,8 +52,32 @@ describe('persistence.migrate', () => {
     expect(result?.transforms.knob?.quaternion).toEqual([0, 0, 0, 1]);
   });
 
-  it('rejects a payload with no schema version', () => {
-    expect(migrate({ doc: createDefaultDocument() })).toBeNull();
+  it('rejects a payload that is not a Forma envelope or document', () => {
+    expect(migrate({ hello: 'world' })).toBeNull();
+  });
+
+  it('accepts a wrapped document that omitted schemaVersion', () => {
+    const doc = createDefaultDocument();
+    expect(migrate({ doc })?.defaultMaterialId).toBe(doc.defaultMaterialId);
+  });
+
+  it('accepts schemaVersion stored as a string', () => {
+    const doc = {
+      ...createDefaultDocument(),
+      defaultColorId: 'dark-gray' as const,
+    };
+    expect(migrate({ schemaVersion: '4', doc })?.defaultColorId).toBe('white');
+    expect(migrate({ schemaVersion: '5', doc })?.defaultColorId).toBe('dark-gray');
+  });
+
+  it('accepts document as an alias for doc', () => {
+    const doc = createDefaultDocument();
+    expect(migrate({ schemaVersion: 5, document: doc })?.customParts).toEqual(doc.customParts);
+  });
+
+  it('accepts a bare document without an envelope', () => {
+    const doc = createDefaultDocument();
+    expect(migrate(doc)?.groups).toEqual(doc.groups);
   });
 
   // Schema 1 was the parametric-sideboard shape; there's no sensible mapping
@@ -184,5 +208,37 @@ describe('persistence.normalize', () => {
     });
     expect(reloaded?.groups[0]?.cabinet).toBeUndefined();
     expect(reloaded?.groups[0]?.label).toBe('Base 600');
+  });
+});
+
+describe('persistence.loadFormaText', () => {
+  it('strips a UTF-8 BOM before parsing', () => {
+    const envelope = { schemaVersion: SCHEMA_VERSION, doc: createDefaultDocument() };
+    const result = loadFormaText(`\uFEFF${JSON.stringify(envelope)}`);
+    expect(result.ok).toBe(true);
+    if (result.ok) expect(result.doc.defaultMaterialId).toBe(envelope.doc.defaultMaterialId);
+  });
+
+  it('unwraps a JSON string that was encoded twice', () => {
+    const envelope = { schemaVersion: SCHEMA_VERSION, doc: createDefaultDocument() };
+    const result = loadFormaText(JSON.stringify(JSON.stringify(envelope)));
+    expect(result.ok).toBe(true);
+  });
+
+  it('reports an empty truncated save separately from invalid JSON', () => {
+    expect(loadFormaText('')).toEqual({ ok: false, reason: 'empty' });
+    expect(loadFormaText('\uFEFF  \n')).toEqual({ ok: false, reason: 'empty' });
+    expect(loadFormaText('{')).toEqual({ ok: false, reason: 'invalid-json' });
+  });
+
+  it('reports unsupported versions without throwing', () => {
+    expect(loadFormaText(JSON.stringify({ hello: 'world' }))).toEqual({
+      ok: false,
+      reason: 'unsupported',
+    });
+    expect(loadFormaText(JSON.stringify({ schemaVersion: 1, doc: { dims: { width: 900 } } }))).toEqual({
+      ok: false,
+      reason: 'unsupported',
+    });
   });
 });

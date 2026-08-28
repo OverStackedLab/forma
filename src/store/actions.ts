@@ -1,7 +1,7 @@
 import {
   assignCabinetMemberIds,
   buildCabinetLayout,
-  CABINET_CARCASS_COUNT,
+  cabinetLayoutSlots,
   distributedDividerPositions,
   distributedShelfPositions,
   dividerPositionRange,
@@ -21,6 +21,7 @@ import {
   findFinish,
   isHardwareFinishId,
   isLegHardwareShape,
+  isRoundHardwareShape,
   PANEL_PRESETS,
 } from '@/domain/catalog';
 import {
@@ -28,6 +29,8 @@ import {
   gizmoPartIds,
   groupMatching,
   livePartIds,
+  partsInGroupOrder,
+  reorderById,
   selectionPositionMetres,
   selectionTogglingGroup,
   selectionUnits,
@@ -36,6 +39,7 @@ import { inferCabinetConfig, restorableCabinetGroup } from '@/domain/restoreCabi
 import { eulerDegreesToQuaternion, invertQuaternion, multiplyQuaternions, quaternionToEulerDegrees } from '@/domain/rotation';
 import {
   halfExtentAlongNormalMm,
+  localDimensionForWorldAxis,
   orientedHalfExtentsMm,
   rotateVectorByQuaternion,
   type Vector3,
@@ -51,6 +55,7 @@ import type {
   Group,
   SavedVersion,
   Transform,
+  Transforms,
 } from '@/domain/types';
 import { downloadBlob } from '@/ui/download';
 import { viewportApi, type AlignEdge } from '@/viewport/viewportApi';
@@ -61,7 +66,7 @@ import {
   useDocumentStore,
 } from './documentStore';
 import { clearHistory, commit, syncHistoryDocumentMeta } from './history';
-import { migrate, SCHEMA_VERSION } from './persistence';
+import { loadFormaText, SCHEMA_VERSION } from './persistence';
 import { useUiStore } from './uiStore';
 
 export type { AlignEdge };
@@ -152,6 +157,18 @@ function nextInsertionX(state: FormaDocument, newHalfWidthMm: number): number {
   return (rightmostMm + 80 + newHalfWidthMm) / 1000;
 }
 
+/**
+ * Frames a freshly inserted piece. A click from the Library lands it at
+ * `nextInsertionX` — clear of everything already in the scene — which on a wide
+ * design is often outside the viewport, so the insert looked like it did
+ * nothing (BUG-036). A drag-and-drop is already placed where the user was
+ * looking, so it keeps the current camera.
+ */
+function frameInsertedParts(ids: readonly string[], placement?: DropPlacement): void {
+  if (placement || !ids.length) return;
+  viewportApi()?.frameSelection(ids);
+}
+
 export function addCustomPanel(presetId: string, placement?: DropPlacement): void {
   const preset = PANEL_PRESETS.find((p) => p.id === presetId) ?? PANEL_PRESETS[0]!;
   const s = doc();
@@ -202,6 +219,7 @@ export function addCustomPanel(presetId: string, placement?: DropPlacement): voi
   useUiStore.setState((prev) => ({
     gizmoMode: prev.gizmoMode === 'select' || prev.gizmoMode === 'pan' ? 'translate' : prev.gizmoMode,
   }));
+  frameInsertedParts([id], placement);
   u.showToast(`${preset.label} added to scene`);
 }
 
@@ -298,6 +316,7 @@ export function addCabinetPreset(presetId: string, placement?: DropPlacement): v
         ? 'translate'
         : previous.gizmoMode,
   }));
+  frameInsertedParts(ids, placement);
   stateUi.showToast(`${preset.label} cabinet added`);
 }
 
@@ -316,12 +335,30 @@ export function renamePart(id: string, label: string): void {
   });
 }
 
+/**
+ * Reports any group that just lost its parametric config. Demotion used to be
+ * silent, so Add Shelf simply vanished while the user was still looking at
+ * cabinet controls (BUG-020) — and the same surprise applied to a partial
+ * shelf-row edit or delete. Returns true when a message was shown, so callers
+ * can leave their own, less important toast unsaid.
+ */
+function announceDemotions(before: readonly Group[]): boolean {
+  const configurable = new Set(before.filter((group) => group.cabinet).map((group) => group.id));
+  if (!configurable.size) return false;
+  const demoted = doc().groups.filter((group) => configurable.has(group.id) && !group.cabinet);
+  if (!demoted.length) return false;
+  const subject = demoted.length === 1 ? demoted[0]!.label : `${demoted.length} cabinets`;
+  ui().showToast(`${subject} no longer matches a carcass — use Restore cabinet for shelf controls`);
+  return true;
+}
+
 const DIM_AXIS_INDEX = { w: 0, h: 1, d: 2 } as const;
 
 export function setCustomPartDim(id: string, key: 'w' | 'h' | 'd', value: number): void {
   if (!Number.isFinite(value) || value <= 0) return;
   const limits = CUSTOM_PANEL_LIMITS[key];
   const clamped = Math.min(limits.max, Math.max(limits.min, value));
+  const groupsBefore = doc().groups;
   commit(() => {
     useDocumentStore.setState((s) => {
       const t = s.transforms[id];
@@ -357,6 +394,7 @@ export function setCustomPartDim(id: string, key: 'w' | 'h' | 'd', value: number
       };
     });
   });
+  announceDemotions(groupsBefore);
 }
 
 /** Keeps round hardware circular while exposing one Diameter control. */
@@ -448,10 +486,12 @@ export function duplicateSelected(): void {
   const selectedIds = ui().selectedPartIds;
   if (tryDuplicateInteriorMember(s.groups, selectedIds)) return;
 
-  // Only an exact group selection copies the cabinet. A viewport click is one
-  // piece (BUG-006); duplicating that piece must not clone the whole carcass.
-  const sourceGroup = groupMatching(s.groups, selectedIds);
-  const sourceIds = sourceGroup ? sourceGroup.partIds : selectedIds;
+  // Every fully selected group copies as a group, so duplicating two cabinets
+  // yields two cabinets rather than a pile of loose panels (BUG-019). A single
+  // member is still a loose clone — a viewport click is one piece, and copying
+  // it must not clone the whole carcass (BUG-022).
+  const units = selectionUnits(s.groups, selectedIds);
+  const sourceIds = units.flatMap((unit) => unit.partIds);
   const sources = sourceIds
     .map((id) => s.customParts.find((p) => p.id === id))
     .filter((p): p is CustomPart => Boolean(p));
@@ -489,29 +529,33 @@ export function duplicateSelected(): void {
       : { position: [0.08, src.h / 2000, 0.08], quaternion: [0, 0, 0, 1], scale: [1, 1, 1] };
   }
 
-  // Group member order is structural for generated cabinets, so rebuild the
-  // membership from the source group's order rather than selection order.
-  const clonedGroup: Group | undefined = sourceGroup
-    ? {
-        id: nextGroupId(),
-        label: sourceGroup.label,
-        partIds: sourceGroup.partIds.flatMap((id) => {
-          const clonedId = cloneIdBySource.get(id);
-          return clonedId ? [clonedId] : [];
-        }),
-        cabinet: sourceGroup.cabinet
-          ? {
-              ...sourceGroup.cabinet,
-              shelfPositionsMm: sourceGroup.cabinet.shelfPositionsMm
-                ? [...sourceGroup.cabinet.shelfPositionsMm]
-                : undefined,
-              dividerPositionsMm: sourceGroup.cabinet.dividerPositionsMm
-                ? [...sourceGroup.cabinet.dividerPositionsMm]
-                : undefined,
-            }
-          : undefined,
-      }
-    : undefined;
+  // Group member order is structural for generated cabinets, so each clone
+  // rebuilds its membership from the source group's order, not selection order.
+  const clonedGroups: Group[] = [];
+  for (const unit of units) {
+    if (unit.kind !== 'group') continue;
+    const source = s.groups.find((group) => group.id === unit.id);
+    if (!source) continue;
+    clonedGroups.push({
+      id: nextGroupId(),
+      label: source.label,
+      partIds: source.partIds.flatMap((id) => {
+        const clonedId = cloneIdBySource.get(id);
+        return clonedId ? [clonedId] : [];
+      }),
+      cabinet: source.cabinet
+        ? {
+            ...source.cabinet,
+            shelfPositionsMm: source.cabinet.shelfPositionsMm
+              ? [...source.cabinet.shelfPositionsMm]
+              : undefined,
+            dividerPositionsMm: source.cabinet.dividerPositionsMm
+              ? [...source.cabinet.dividerPositionsMm]
+              : undefined,
+          }
+        : undefined,
+    });
+  }
 
   commit(() => {
     useDocumentStore.setState((prev) => {
@@ -524,20 +568,21 @@ export function duplicateSelected(): void {
         customParts: [...prev.customParts, ...clones],
         overrides,
         transforms,
-        groups: clonedGroup ? [...prev.groups, clonedGroup] : prev.groups,
+        groups: clonedGroups.length ? [...prev.groups, ...clonedGroups] : prev.groups,
       };
     });
   });
 
   ui().setSelection(clones.map((c) => c.id));
-  ui().showToast(
-    clonedGroup
-      ? `${clonedGroup.label} group duplicated`
-      : clones.length > 1
-        ? `${clones.length} parts duplicated`
-        : 'Part duplicated',
-  );
+  ui().showToast(duplicateToast(clonedGroups, clones.length));
 }
+
+function duplicateToast(clonedGroups: readonly Group[], cloneCount: number): string {
+  if (clonedGroups.length === 1) return `${clonedGroups[0]!.label} group duplicated`;
+  if (clonedGroups.length > 1) return `${clonedGroups.length} groups duplicated`;
+  return cloneCount > 1 ? `${cloneCount} parts duplicated` : 'Part duplicated';
+}
+
 
 // ─── Deletion and visibility ─────────────────────────────────────────────────
 
@@ -553,32 +598,44 @@ function configAfterInteriorDelete(group: Group, deletedIds: Set<string>): Cabin
   const layout = buildCabinetLayout(cabinetPreset(group, cabinet));
   if (layout.length !== group.partIds.length) return null;
 
-  const panelCount = dividerPositions(cabinet).length;
-  const shelfPartCount = layout.length - CABINET_CARCASS_COUNT - panelCount;
-  if (shelfPartCount < 0) return null;
   const shelfYs = shelfPositions(cabinet);
-  const bayCount = shelfYs.length === 0 ? 1 : shelfPartCount / shelfYs.length;
-  if (shelfYs.length > 0 && (bayCount < 1 || !Number.isInteger(bayCount))) return null;
+  const slots = cabinetLayoutSlots(cabinet, group.partIds.length);
 
-  const removedShelfHeights = new Set<number>();
+  const baysInRow = new Map<number, number>();
+  for (const slot of slots) {
+    if (slot.kind === 'shelf') baysInRow.set(slot.row, (baysInRow.get(slot.row) ?? 0) + 1);
+  }
+
+  const removedBaysInRow = new Map<number, number>();
   const removedPanelIndices = new Set<number>();
   for (const [index, id] of group.partIds.entries()) {
     if (!deletedIds.has(id)) continue;
-    if (index < CABINET_CARCASS_COUNT) return null;
-    if (index < CABINET_CARCASS_COUNT + shelfPartCount) {
-      removedShelfHeights.add(Math.floor((index - CABINET_CARCASS_COUNT) / bayCount));
+    const slot = slots[index];
+    // A side, top, bottom or back is structural — the caller demotes.
+    if (!slot || slot.kind === 'carcass') return null;
+    if (slot.kind === 'shelf') {
+      removedBaysInRow.set(slot.row, (removedBaysInRow.get(slot.row) ?? 0) + 1);
     } else {
-      removedPanelIndices.add(index - CABINET_CARCASS_COUNT - shelfPartCount);
+      removedPanelIndices.add(slot.index);
     }
   }
-  if (!removedShelfHeights.size && !removedPanelIndices.size) return cabinet;
 
-  const nextShelves = shelfYs.filter((_, index) => !removedShelfHeights.has(index));
+  // A shelf row is one centreline shared by every bay. Deleting only some of a
+  // row's boards has no parametric representation, so demote rather than
+  // quietly taking the rest of the row with it (BUG-030).
+  for (const [row, removed] of removedBaysInRow) {
+    if (removed !== (baysInRow.get(row) ?? 0)) return null;
+  }
+
+  const removedShelfRows = new Set(removedBaysInRow.keys());
+  if (!removedShelfRows.size && !removedPanelIndices.size) return cabinet;
+
+  const nextShelves = shelfYs.filter((_, index) => !removedShelfRows.has(index));
   const nextPanels = dividerPositions(cabinet).filter((_, index) => !removedPanelIndices.has(index));
   return {
     ...cabinet,
-    shelfCount: removedShelfHeights.size ? nextShelves.length : cabinet.shelfCount,
-    shelfPositionsMm: removedShelfHeights.size
+    shelfCount: removedShelfRows.size ? nextShelves.length : cabinet.shelfCount,
+    shelfPositionsMm: removedShelfRows.size
       ? nextShelves.length
         ? nextShelves
         : undefined
@@ -647,7 +704,11 @@ export function deleteParts(ids: readonly string[]): void {
   useUiStore.setState((prev) => ({
     selectedPartIds: prev.selectedPartIds.filter((id) => !ids.includes(id)),
   }));
-  ui().showToast(ids.length > 1 ? `${ids.length} parts deleted` : 'Part deleted');
+  // A demotion is the surprising half of the outcome; the deletion itself is
+  // visible in the viewport, so the explanation wins the single toast slot.
+  if (!announceDemotions(state.groups)) {
+    ui().showToast(ids.length > 1 ? `${ids.length} parts deleted` : 'Part deleted');
+  }
 }
 
 // ─── Groups ──────────────────────────────────────────────────────────────────
@@ -744,6 +805,22 @@ export function toggleGroupSelection(groupId: string): void {
   ui().setSelection(selectionTogglingGroup(ui().selectedPartIds, group.partIds));
 }
 
+/** Moves a group before or after another in Assembly. Loose parts stay after. */
+export function reorderGroups(
+  sourceId: string,
+  targetId: string,
+  place: 'before' | 'after',
+): void {
+  if (sourceId === targetId) return;
+  commit(() => {
+    useDocumentStore.setState((s) => {
+      const groups = reorderById(s.groups, sourceId, targetId, place);
+      if (groups.every((group, index) => group.id === s.groups[index]?.id)) return s;
+      return { groups, customParts: partsInGroupOrder(s.customParts, groups) };
+    });
+  });
+}
+
 /** Hides the whole group if any member is visible; otherwise shows every member. */
 export function toggleGroupVisibility(groupId: string): void {
   const s = doc();
@@ -774,35 +851,98 @@ export function togglePartVisibility(id: string): void {
 
 // ─── Transforms ──────────────────────────────────────────────────────────────
 
+/** Positions are held inside this half-extent, in metres, on every axis. */
+const POSITION_LIMIT_M = 10;
+
+/**
+ * One shared correction per axis that brings a batch of positions inside
+ * `POSITION_LIMIT_M`. Clamping each part on its own used to flatten a whole
+ * carcass onto the boundary plane (BUG-031); a single translation moves the
+ * batch as the rigid thing the user was dragging. A selection wider than the
+ * range cannot fit at all — it is pulled back to the low bound rather than
+ * squashed.
+ */
+function sharedPositionCorrection(positions: readonly Transform['position'][]): [number, number, number] {
+  const correction: [number, number, number] = [0, 0, 0];
+  for (const axis of [0, 1, 2] as const) {
+    let lowest = Infinity;
+    let highest = -Infinity;
+    for (const position of positions) {
+      lowest = Math.min(lowest, position[axis]);
+      highest = Math.max(highest, position[axis]);
+    }
+    if (!Number.isFinite(lowest) || !Number.isFinite(highest)) continue;
+    const over = Math.max(0, highest - POSITION_LIMIT_M);
+    const under = Math.max(0, -POSITION_LIMIT_M - lowest);
+    correction[axis] = under - over;
+  }
+  return correction;
+}
+
 /**
  * Called once when a gizmo drag ends, not per frame — so a drag is one undo
  * entry and the store isn't churned at 60 fps.
  */
 export function commitTransforms(next: Record<string, Transform>): void {
-  if (!Object.keys(next).length) return;
-  const sanitized = Object.fromEntries(
-    Object.entries(next).map(([id, transform]) => {
-      const finite = (value: number, fallback: number) => (Number.isFinite(value) ? value : fallback);
-      const position = transform.position.map((value) =>
-        Math.min(10, Math.max(-10, finite(value, 0))),
-      ) as Transform['position'];
-      const rawQuaternion = transform.quaternion.map((value) => finite(value, 0)) as Transform['quaternion'];
-      const length = Math.hypot(...rawQuaternion);
-      const quaternion: Transform['quaternion'] =
-        length > 1e-8
-          ? rawQuaternion.map((value) => value / length) as Transform['quaternion']
-          : [0, 0, 0, 1];
-      const scale = transform.scale.map((value) =>
-        Math.min(100, Math.max(0.001, finite(value, 1))),
-      ) as Transform['scale'];
-      return [id, { position, quaternion, scale } satisfies Transform];
-    }),
-  );
-  commit(() => {
-    useDocumentStore.setState((s) => ({
-      transforms: { ...s.transforms, ...sanitized },
-    }));
+  const entries = Object.entries(next);
+  if (!entries.length) return;
+  const finite = (value: number, fallback: number) => (Number.isFinite(value) ? value : fallback);
+
+  const cleaned = entries.map(([id, transform]) => {
+    const position = transform.position.map((value) => finite(value, 0)) as Transform['position'];
+    const rawQuaternion = transform.quaternion.map((value) => finite(value, 0)) as Transform['quaternion'];
+    const length = Math.hypot(...rawQuaternion);
+    const quaternion: Transform['quaternion'] =
+      length > 1e-8
+        ? rawQuaternion.map((value) => value / length) as Transform['quaternion']
+        : [0, 0, 0, 1];
+    // Magnitude only: a scale handle dragged through the pivot reports a
+    // negative factor, and clamping that to the 0.001 floor annihilated the
+    // part (BUG-035). Mirroring is not a supported edit, so the sign is dropped
+    // and the part keeps its size instead.
+    const scale = transform.scale.map((value) =>
+      Math.min(100, Math.max(0.001, Math.abs(finite(value, 1)))),
+    ) as Transform['scale'];
+    return { id, position, quaternion, scale };
   });
+
+  const groupsBefore = doc().groups;
+  const correction = sharedPositionCorrection(cleaned.map((entry) => entry.position));
+  const sanitized = Object.fromEntries(
+    cleaned.map(({ id, position, quaternion, scale }) => [
+      id,
+      {
+        position: [
+          position[0] + correction[0],
+          position[1] + correction[1],
+          position[2] + correction[2],
+        ],
+        quaternion,
+        scale,
+      } satisfies Transform,
+    ]),
+  );
+
+  commit(() => {
+    useDocumentStore.setState((s) => {
+      const transforms = { ...s.transforms, ...sanitized };
+      // A committed scale is a size edit, so it demotes a partially edited
+      // cabinet exactly as the typed dimension field does (BUG-033). Position
+      // and rotation still never demote.
+      const resized = cleaned
+        .filter(({ id, scale }) => {
+          const previous = s.transforms[id];
+          return previous ? scale.some((value, axis) => value !== previous.scale[axis]) : false;
+        })
+        .map(({ id }) => id);
+      const groups = invalidatePartiallyEditedCabinets(s.groups, resized);
+      return {
+        transforms,
+        groups: groupsWithSyncedInteriors(groups, transforms, Object.keys(sanitized)),
+      };
+    });
+  });
+  announceDemotions(groupsBefore);
 }
 
 /** Translates the gizmo's current parts by a millimetre world delta. */
@@ -844,12 +984,17 @@ function cabinetPreset(group: Group, config: CabinetConfig) {
 }
 
 /** Finds the cabinet's bottom-centre origin and shared assembly orientation. */
-function cabinetPlacement(group: Group, config: CabinetConfig): {
+function cabinetPlacement(
+  group: Group,
+  config: CabinetConfig,
+  transforms: Transforms = doc().transforms,
+): {
   origin: [number, number, number];
   quaternion: Transform['quaternion'];
 } {
   const layout = buildCabinetLayout(cabinetPreset(group, config));
-  const anchor = doc().transforms[group.partIds[0]!] ?? IDENTITY_TRANSFORM;
+  const anchorId = group.partIds[0];
+  const anchor = (anchorId ? transforms[anchorId] : undefined) ?? IDENTITY_TRANSFORM;
   const local = layout[0]?.positionMm ?? [0, 0, 0];
   const offset = rotateVectorByQuaternion(
     {
@@ -874,21 +1019,67 @@ function uniqueSortedMm(values: readonly number[]): number[] {
 }
 
 /**
- * Shelf and panel centrelines from live transforms, so a gizmo / typed-gap
- * move is not discarded the next time Add Shelf or Add Panel rebuilds.
+ * Millimetre tolerance for "the same interior layout". Live centrelines are
+ * read back as rounded integers while an even distribution is fractional
+ * (High 600 spaces four shelves at 450.8, 883.6, 1316.4, 1749.2 mm), so exact
+ * equality could never match and every edit froze the shelves into explicit
+ * positions (BUG-032). `restoreCabinet.matchesEven` uses the same tolerance.
  */
-function liveInteriorCentrelines(group: Group, cabinet: CabinetConfig): {
+const INTERIOR_TOLERANCE_MM = 2;
+
+function sameMm(
+  left: readonly number[],
+  right: readonly number[],
+  toleranceMm: number = INTERIOR_TOLERANCE_MM,
+): boolean {
+  return (
+    left.length === right.length &&
+    left.every((value, index) => Math.abs(value - (right[index] ?? 0)) <= toleranceMm)
+  );
+}
+
+/**
+ * A config the group's current members can actually render. Writing one whose
+ * layout is a different length leaves the group describing more pieces than it
+ * owns, which the next rebuild resolves by remapping ids onto the wrong roles
+ * (BUG-029).
+ */
+function layoutMatchesMembers(group: Group, config: CabinetConfig): boolean {
+  return buildCabinetLayout(cabinetPreset(group, config)).length === group.partIds.length;
+}
+
+/**
+ * Shelf rows and panel centrelines from live transforms, so a gizmo /
+ * typed-gap move is not discarded the next time Add Shelf or Add Panel
+ * rebuilds.
+ *
+ * Shelves are collapsed by layout *row*, not by distinct height. A cabinet
+ * with an interior panel carries one shelf board per bay on a shared
+ * centreline, so reading every board as its own row turned a single moved
+ * shelf into a whole extra row of shelves (BUG-029). Returns null when the
+ * pieces can no longer be described parametrically at all — the caller demotes
+ * rather than writing a config the members do not match.
+ */
+function liveInteriorCentrelines(
+  group: Group,
+  cabinet: CabinetConfig,
+  transforms: Transforms = doc().transforms,
+): {
   shelves: number[];
   panels: number[];
-} {
-  const placement = cabinetPlacement(group, cabinet);
+} | null {
+  const layout = buildCabinetLayout(cabinetPreset(group, cabinet));
+  if (layout.length !== group.partIds.length) return null;
+  const slots = cabinetLayoutSlots(cabinet, group.partIds.length);
+  const placement = cabinetPlacement(group, cabinet, transforms);
   const inverse = invertQuaternion(placement.quaternion);
-  const shelves: number[] = [];
-  const panels: number[] = [];
-  for (const partId of group.partIds) {
-    const role = interiorMemberPlacement(cabinet, group.partIds, partId);
-    if (!role) continue;
-    const world = doc().transforms[partId]?.position;
+  const shelfRows = new Map<number, number[]>();
+  const panelsByIndex = new Map<number, number>();
+
+  for (const [index, partId] of group.partIds.entries()) {
+    const slot = slots[index];
+    if (!slot || slot.kind === 'carcass') continue;
+    const world = transforms[partId]?.position;
     if (!world) continue;
     const local = rotateVectorByQuaternion(
       {
@@ -898,22 +1089,81 @@ function liveInteriorCentrelines(group: Group, cabinet: CabinetConfig): {
       },
       inverse,
     );
-    if (role.kind === 'shelf') shelves.push(local.y * 1000);
-    else panels.push(local.x * 1000 + cabinet.width / 2);
+    if (slot.kind === 'shelf') {
+      const row = shelfRows.get(slot.row) ?? [];
+      row.push(local.y * 1000);
+      shelfRows.set(slot.row, row);
+    } else {
+      panelsByIndex.set(slot.index, local.x * 1000 + cabinet.width / 2);
+    }
   }
-  return { shelves: uniqueSortedMm(shelves), panels: uniqueSortedMm(panels) };
+
+  const shelves: number[] = [];
+  for (const heights of shelfRows.values()) {
+    const lowest = Math.min(...heights);
+    const highest = Math.max(...heights);
+    // Every bay in a row shares one centreline. A bay moved off that line has
+    // no parametric representation, so the cabinet stops being regenerable.
+    if (highest - lowest > INTERIOR_TOLERANCE_MM) return null;
+    shelves.push((lowest + highest) / 2);
+  }
+  return {
+    shelves: uniqueSortedMm(shelves),
+    panels: uniqueSortedMm([...panelsByIndex.values()]),
+  };
 }
 
-function cabinetWithLiveInterior(group: Group, cabinet: CabinetConfig): CabinetConfig {
-  const live = liveInteriorCentrelines(group, cabinet);
+function cabinetWithLiveInterior(
+  group: Group,
+  cabinet: CabinetConfig,
+  transforms: Transforms = doc().transforms,
+): CabinetConfig {
+  const live = liveInteriorCentrelines(group, cabinet, transforms);
+  // Nothing readable: keep the stored config rather than guessing a new one.
+  if (!live) return cabinet;
   const shelves = live.shelves.length ? live.shelves : shelfPositions(cabinet);
   const panels = live.panels.length ? live.panels : dividerPositions(cabinet);
+  const evenShelves = shelfPositions({ height: cabinet.height, shelfCount: shelves.length });
   return {
     ...cabinet,
     shelfCount: shelves.length,
-    shelfPositionsMm: shelves.length ? shelves : undefined,
+    shelfPositionsMm: shelves.length && !sameMm(shelves, evenShelves) ? shelves : undefined,
     dividerPositionsMm: panels.length ? panels : undefined,
   };
+}
+
+/**
+ * Writes gizmo / typed-position moves back onto `cabinet` so Properties and
+ * the next Add Shelf / Add Panel keep the placed centrelines. Only runs when
+ * an interior member actually moved — dragging a side must not rewrite
+ * interiors from a shifted origin.
+ */
+function groupsWithSyncedInteriors(
+  groups: readonly Group[],
+  transforms: Transforms,
+  changedIds: readonly string[],
+): Group[] {
+  const changed = new Set(changedIds);
+  return groups.map((group) => {
+    const cabinet = group.cabinet;
+    if (!cabinet) return group;
+    const interiorMoved = group.partIds.some((id) => {
+      if (!changed.has(id)) return false;
+      return Boolean(interiorMemberPlacement(cabinet, group.partIds, id));
+    });
+    if (!interiorMoved) return group;
+    // One bay's shelf moved off its row: the parametric config cannot express
+    // that, so the group demotes to a plain group instead of gaining a phantom
+    // shelf row (BUG-029). Restore cabinet can rebuild the config later.
+    if (!liveInteriorCentrelines(group, cabinet, transforms)) {
+      return { ...group, cabinet: undefined };
+    }
+    const next = cabinetWithLiveInterior(group, cabinet, transforms);
+    if (!layoutMatchesMembers(group, next)) return { ...group, cabinet: undefined };
+    const sameShelves = sameMm(shelfPositions(next), shelfPositions(cabinet));
+    const samePanels = sameMm(dividerPositions(next), dividerPositions(cabinet));
+    return sameShelves && samePanels ? group : { ...group, cabinet: next };
+  });
 }
 
 /** Keeps the gizmo's shared member-centroid fixed while a cabinet is rebuilt. */
@@ -1100,8 +1350,9 @@ export function setCabinetDim(
   const group = state.groups.find((candidate) => candidate.id === groupId);
   if (!group?.cabinet) return;
   const limits = CABINET_DIM_LIMITS[key];
+  const live = cabinetWithLiveInterior(group, group.cabinet);
   const nextConfig: CabinetConfig = {
-    ...group.cabinet,
+    ...live,
     [key]: Math.min(limits.max, Math.max(limits.min, value)),
   };
   const placement = cabinetPlacement(group, group.cabinet);
@@ -1346,9 +1597,13 @@ export function setPositionAxis(id: string, axis: 'x' | 'y' | 'z', millimetres: 
   const position = [...current.position] as [number, number, number];
   position[POSITION_AXIS_INDEX[axis]] = Math.min(10, Math.max(-10, millimetres / 1000));
   commit(() => {
-    useDocumentStore.setState((s) => ({
-      transforms: { ...s.transforms, [id]: { ...current, position } },
-    }));
+    useDocumentStore.setState((s) => {
+      const transforms = { ...s.transforms, [id]: { ...current, position } };
+      return {
+        transforms,
+        groups: groupsWithSyncedInteriors(s.groups, transforms, [id]),
+      };
+    });
   });
 }
 
@@ -1459,6 +1714,58 @@ export function setSelectionSizeAxis(
   const next = api.computeGroupResize(ids, axis, target);
   if (!next) return;
   commitTransforms(next);
+}
+
+/**
+ * Types an overall W/H/D witness while the scale gizmo is on. Targets the
+ * same parts the gizmo drives: a cabinet group resizes parametrically, a
+ * single part writes its catalog size, a rigid group scales around the pivot.
+ */
+export function setSelectedOverallDim(axis: 'x' | 'y' | 'z', millimetres: number): void {
+  if (!Number.isFinite(millimetres) || millimetres <= 0) return;
+  const state = doc();
+  const ids = gizmoPartIds(state.groups, ui().selectedPartIds);
+  if (!ids.length) return;
+
+  const selected = new Set(ids);
+  const cabinet = cabinetContainingSelection(state.groups, ids);
+  if (
+    cabinet?.cabinet &&
+    cabinet.partIds.length === ids.length &&
+    cabinet.partIds.every((id) => selected.has(id))
+  ) {
+    const key = axis === 'x' ? 'width' : axis === 'y' ? 'height' : 'depth';
+    setCabinetDim(cabinet.id, key, millimetres);
+    return;
+  }
+
+  if (ids.length === 1) {
+    const id = ids[0];
+    if (!id) return;
+    const part = state.customParts.find((candidate) => candidate.id === id);
+    if (!part) return;
+    // The witness measures the world AABB, so the world axis must be mapped
+    // back onto the part's own axis before writing a catalog dimension.
+    // Assuming x→w unconditionally meant typing the W label on a door rotated
+    // 90° about Y resized its depth instead (BUG-037).
+    const key = localDimensionForWorldAxis(transformOf(id).quaternion, axis);
+    if (part.category === 'hardware') {
+      if (isLegHardwareShape(part.shape)) {
+        if (key === 'h') setCustomPartDim(id, 'h', millimetres);
+        else setHardwareDiameter(id, millimetres);
+        return;
+      }
+      if (isRoundHardwareShape(part.shape)) {
+        if (key === 'd') setCustomPartDim(id, 'd', millimetres);
+        else setHardwareDiameter(id, millimetres);
+        return;
+      }
+    }
+    setCustomPartDim(id, key, millimetres);
+    return;
+  }
+
+  setSelectionSizeAxis(ids, axis, millimetres);
 }
 
 /** Sets one exact overall dimension of a regular group as one rigid resize. */
@@ -1737,19 +2044,18 @@ function serializeCurrentDocument(): string {
 
 /** Reads a .forma.json file and replaces the current document with it, as one undo step. */
 export async function openFile(file: File): Promise<void> {
-  let parsed: unknown;
-  try {
-    parsed = JSON.parse(await file.text());
-  } catch {
-    ui().showToast('Could not read that file');
+  const result = loadFormaText(await file.text());
+  if (!result.ok) {
+    if (result.reason === 'empty') {
+      ui().showToast('That file is empty. It may not have finished saving.');
+    } else if (result.reason === 'invalid-json') {
+      ui().showToast('Could not read that file');
+    } else {
+      ui().showToast('Not a Forma file, or an unsupported version');
+    }
     return;
   }
-
-  const next: FormaDocument | null = migrate(parsed);
-  if (!next) {
-    ui().showToast('Not a Forma file, or an unsupported version');
-    return;
-  }
+  const next = result.doc;
 
   // The on-disk name is the source of truth for the header once a file is opened.
   const title = titleFromFilename(file.name);

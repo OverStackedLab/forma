@@ -121,6 +121,23 @@ export function Viewport() {
       return gizmoPartIds(useDocumentStore.getState().groups, ui.selectedPartIds);
     };
 
+    // The witness pass needs the visible-id list and the world bounds of every
+    // neighbour. Both only change when the document changes or a gizmo drag is
+    // moving meshes, so they are derived here and stamped with a revision the
+    // per-frame pass can compare against, instead of being rebuilt 60×/second
+    // over the whole document (IMP-016).
+    let visibleIds: string[] = [];
+    let sceneRevision = 0;
+
+    const refreshVisibleIds = () => {
+      const doc = useDocumentStore.getState();
+      const hidden = new Set(doc.hiddenIds);
+      visibleIds = doc.customParts
+        .map((part) => part.id)
+        .filter((id) => !hidden.has(id));
+      sceneRevision += 1;
+    };
+
     const syncScene = () => {
       const doc = useDocumentStore.getState();
       const ui = useUiStore.getState();
@@ -135,6 +152,7 @@ export function Viewport() {
       });
       overlay.apply(decorated());
       gizmo.sync(ui.gizmoMode, gizmoSelection());
+      refreshVisibleIds();
     };
 
     syncScene();
@@ -200,13 +218,15 @@ export function Viewport() {
       measure.updateLabel();
       const ui = useUiStore.getState();
       const doc = useDocumentStore.getState();
+      // A drag moves meshes without touching the document, so the cached
+      // bounds have to be treated as stale for the length of the gesture.
+      if (gizmo.isDragging) sceneRevision += 1;
       dimensions.sync(
         builder,
         ui.viewMode === 'render' ? [] : ui.selectedPartIds,
         doc.groups,
-        doc.customParts
-          .map((part) => part.id)
-          .filter((id) => !doc.hiddenIds.includes(id)),
+        visibleIds,
+        sceneRevision,
       );
       dimensions.updateLabels();
     });
