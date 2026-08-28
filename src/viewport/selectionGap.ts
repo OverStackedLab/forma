@@ -7,8 +7,8 @@ export type GapDimension = {
   gapMm: number;
   /** True when the part that should move sits on the high side of the gap. */
   movableIsHigh: boolean;
-  /** Overall size of one box; gaps are clearances between two. */
-  kind: 'gap' | 'overall';
+  /** Overall size of one box; gaps are clearances; align is a flush face. */
+  kind: 'gap' | 'overall' | 'align';
   line: [Vec3, Vec3];
   witnessA: [Vec3, Vec3];
   witnessB: [Vec3, Vec3];
@@ -24,6 +24,8 @@ const OVERALL_OFFSET_M = 0.12;
 const TICK_M = 0.014;
 /** Ignore hairline separations from float error. */
 const MIN_GAP_M = 0.0005;
+/** Treat a tiny overlap as flush so a settled snap does not go quiet. */
+const ALIGN_TOLERANCE_M = 0.002;
 
 function setAxis(base: Vec3, axis: Axis, value: number): Vec3 {
   return { ...base, [axis]: value };
@@ -37,22 +39,44 @@ export function sharedOnAxis(a: Aabb, b: Aabb, axis: Axis): number {
   return ((a.min[axis] + a.max[axis]) / 2 + (b.min[axis] + b.max[axis]) / 2) / 2;
 }
 
+export type AxisRelation = {
+  low: number;
+  high: number;
+  gapM: number;
+  kind: 'gap' | 'align';
+};
+
+/**
+ * Facing separation on one axis. A real clearance is a gap; faces within a
+ * hairline (including a millimetre or two of float overlap) are flush
+ * alignment. A deeper intersection is not a dimension.
+ */
+export function axisRelation(a: Aabb, b: Aabb, axis: Axis): AxisRelation | null {
+  const sepAB = b.min[axis] - a.max[axis];
+  const sepBA = a.min[axis] - b.max[axis];
+  const aThenB = sepAB >= sepBA;
+  const facingSep = aThenB ? sepAB : sepBA;
+  const lowFace = aThenB ? a.max[axis] : b.max[axis];
+  const highFace = aThenB ? b.min[axis] : a.min[axis];
+  const low = Math.min(lowFace, highFace);
+  const high = Math.max(lowFace, highFace);
+  if (facingSep >= MIN_GAP_M) return { low, high, gapM: facingSep, kind: 'gap' };
+  if (facingSep >= -ALIGN_TOLERANCE_M) return { low, high, gapM: 0, kind: 'align' };
+  return null;
+}
+
 /**
  * Positive clearance between two AABBs on one axis, and the facing bounds.
- * Overlap returns null — those faces are not a gap.
+ * Flush or overlapping faces return null — those are not a gap.
  */
 export function axisGap(
   a: Aabb,
   b: Aabb,
   axis: Axis,
 ): { low: number; high: number; gapM: number } | null {
-  if (a.max[axis] + MIN_GAP_M <= b.min[axis]) {
-    return { low: a.max[axis], high: b.min[axis], gapM: b.min[axis] - a.max[axis] };
-  }
-  if (b.max[axis] + MIN_GAP_M <= a.min[axis]) {
-    return { low: b.max[axis], high: a.min[axis], gapM: a.min[axis] - b.max[axis] };
-  }
-  return null;
+  const relation = axisRelation(a, b, axis);
+  if (!relation || relation.kind !== 'gap') return null;
+  return { low: relation.low, high: relation.high, gapM: relation.gapM };
 }
 
 /** Offset X and Y gaps toward +Z (front); Z gaps toward +X (right). */
@@ -74,8 +98,21 @@ export function facesOnAxis(a: Aabb, b: Aabb, gapAxis: Axis): boolean {
 }
 
 function dimensionOnAxis(a: Aabb, b: Aabb, axis: Axis, movable: 'a' | 'b'): GapDimension | null {
-  const gap = axisGap(a, b, axis);
-  if (!gap) return null;
+  const relation = axisRelation(a, b, axis);
+  if (!relation) return null;
+  if (relation.kind === 'align') {
+    return alignmentFromPlane(a, b, axis, (relation.low + relation.high) / 2, movable);
+  }
+  return dimensionFromRelation(a, b, axis, relation, movable);
+}
+
+function dimensionFromRelation(
+  a: Aabb,
+  b: Aabb,
+  axis: Axis,
+  relation: AxisRelation,
+  movable: 'a' | 'b',
+): GapDimension {
   const along = offsetAxis(axis);
   const tick = tickAxis(axis, along);
   const mid: Vec3 = { x: 0, y: 0, z: 0 };
@@ -86,22 +123,78 @@ function dimensionOnAxis(a: Aabb, b: Aabb, axis: Axis, movable: 'a' | 'b'): GapD
   const outer = Math.max(a.max[along], b.max[along]) + OFFSET_M;
   const face: Vec3 = setAxis(mid, along, mid[along]);
   const dim: Vec3 = setAxis(mid, along, outer);
-  const start = setAxis(dim, axis, gap.low);
-  const end = setAxis(dim, axis, gap.high);
-  const faceA = setAxis(face, axis, gap.low);
-  const faceB = setAxis(face, axis, gap.high);
+  const start = setAxis(dim, axis, relation.low);
+  const end = setAxis(dim, axis, relation.high);
+  const faceA = setAxis(face, axis, relation.low);
+  const faceB = setAxis(face, axis, relation.high);
   const movableBox = movable === 'a' ? a : b;
   const fixedBox = movable === 'a' ? b : a;
+  const movableMid = (movableBox.min[axis] + movableBox.max[axis]) / 2;
+  const fixedMid = (fixedBox.min[axis] + fixedBox.max[axis]) / 2;
   return {
     axis,
-    gapMm: gap.gapM * 1000,
-    movableIsHigh: movableBox.min[axis] > fixedBox.max[axis],
-    kind: 'gap',
+    gapMm: relation.gapM * 1000,
+    movableIsHigh: movableMid > fixedMid,
+    kind: relation.kind,
     line: [start, end],
     witnessA: [faceA, start],
     witnessB: [faceB, end],
     tickA: [setAxis(start, tick, start[tick] - TICK_M / 2), setAxis(start, tick, start[tick] + TICK_M / 2)],
     tickB: [setAxis(end, tick, end[tick] - TICK_M / 2), setAxis(end, tick, end[tick] + TICK_M / 2)],
+  };
+}
+
+/**
+ * Brass alignment line at a shared plane. Spans the gap between the boxes, or
+ * the overlapping seam when they touch, so the mark stays visible instead of
+ * collapsing to a point the moment faces meet.
+ */
+function alignmentFromPlane(
+  a: Aabb,
+  b: Aabb,
+  axis: Axis,
+  plane: number,
+  movable: 'a' | 'b',
+): GapDimension {
+  const along = offsetAxis(axis);
+  let span = tickAxis(axis, along);
+  let spanLo = Math.max(a.min[span], b.min[span]);
+  let spanHi = Math.min(a.max[span], b.max[span]);
+  for (const candidate of AXES) {
+    if (candidate === axis) continue;
+    const relation = axisRelation(a, b, candidate);
+    if (relation?.kind !== 'gap') continue;
+    span = candidate;
+    spanLo = relation.low;
+    spanHi = relation.high;
+    break;
+  }
+  if (spanHi - spanLo < TICK_M) {
+    const mid = (spanLo + spanHi) / 2;
+    spanLo = mid - TICK_M / 2;
+    spanHi = mid + TICK_M / 2;
+  }
+  const outer = Math.max(a.max[along], b.max[along]) + OFFSET_M;
+  const inner = sharedOnAxis(a, b, along);
+  const origin = setAxis(setAxis({ x: 0, y: 0, z: 0 }, axis, plane), along, outer);
+  const start = setAxis(origin, span, spanLo);
+  const end = setAxis(origin, span, spanHi);
+  const faceA = setAxis(start, along, inner);
+  const faceB = setAxis(end, along, inner);
+  const movableBox = movable === 'a' ? a : b;
+  const fixedBox = movable === 'a' ? b : a;
+  const movableMid = (movableBox.min[axis] + movableBox.max[axis]) / 2;
+  const fixedMid = (fixedBox.min[axis] + fixedBox.max[axis]) / 2;
+  return {
+    axis,
+    gapMm: 0,
+    movableIsHigh: movableMid > fixedMid,
+    kind: 'align',
+    line: [start, end],
+    witnessA: [faceA, start],
+    witnessB: [faceB, end],
+    tickA: [setAxis(start, axis, start[axis] - TICK_M / 2), setAxis(start, axis, start[axis] + TICK_M / 2)],
+    tickB: [setAxis(end, axis, end[axis] - TICK_M / 2), setAxis(end, axis, end[axis] + TICK_M / 2)],
   };
 }
 
@@ -152,7 +245,7 @@ function overallOnAxis(box: Aabb, axis: Axis): GapDimension {
   };
 }
 
-/** SketchUp-style witnesses for every axis where the two boxes are separated. */
+/** SketchUp-style witnesses for every axis where the two boxes face or flush. */
 export function gapsBetweenBoxes(a: Aabb, b: Aabb): GapDimension[] {
   const out: GapDimension[] = [];
   for (const axis of AXES) {
@@ -163,9 +256,10 @@ export function gapsBetweenBoxes(a: Aabb, b: Aabb): GapDimension[] {
 }
 
 /**
- * Nearest clearance from `selected` in each direction. Neighbours that share
- * a facing span on the other two axes win; if none face, the closest on that
- * axis is used so a lifted panel still reads the one beside it.
+ * Nearest clearance or flush alignment from `selected` in each direction.
+ * Neighbours that share a facing span on the other two axes win; if none
+ * face, the closest on that axis is used so a lifted panel still reads the
+ * one beside it.
  */
 export function nearestFacingGaps(selected: Aabb, others: readonly Aabb[]): GapDimension[] {
   const out: GapDimension[] = [];
@@ -195,18 +289,86 @@ function nearestOnSide(
   let closest: Aabb | null = null;
   let closestGap = Infinity;
   for (const other of others) {
-    const gap = axisGap(selected, other, axis);
-    if (!gap) continue;
-    const isBelow = other.max[axis] <= selected.min[axis];
+    const relation = axisRelation(selected, other, axis);
+    if (!relation) continue;
+    const isBelow = other.max[axis] <= selected.min[axis] + ALIGN_TOLERANCE_M;
     if (side === 'below' ? !isBelow : isBelow) continue;
-    if (gap.gapM < closestGap) {
+    if (relation.gapM < closestGap) {
       closest = other;
-      closestGap = gap.gapM;
+      closestGap = relation.gapM;
     }
-    if (facesOnAxis(selected, other, axis) && gap.gapM < facingGap) {
+    if (facesOnAxis(selected, other, axis) && relation.gapM < facingGap) {
       facing = other;
-      facingGap = gap.gapM;
+      facingGap = relation.gapM;
     }
   }
   return facing ?? closest;
+}
+
+function sharesFootprint(a: Aabb, b: Aabb, alignAxis: Axis): boolean {
+  return AXES.some((axis) => axis !== alignAxis && overlapsOnAxis(a, b, axis));
+}
+
+function centreDistanceSq(a: Aabb, b: Aabb): number {
+  let sum = 0;
+  for (const axis of AXES) {
+    const delta = (a.min[axis] + a.max[axis] - (b.min[axis] + b.max[axis])) / 2;
+    sum += delta * delta;
+  }
+  return sum;
+}
+
+function coplanarOnBound(
+  a: Aabb,
+  b: Aabb,
+  axis: Axis,
+  bound: 'min' | 'max',
+  movable: 'a' | 'b',
+): GapDimension | null {
+  if (axisRelation(a, b, axis)) return null;
+  if (!sharesFootprint(a, b, axis)) return null;
+  if (Math.abs(a[bound][axis] - b[bound][axis]) > ALIGN_TOLERANCE_M) return null;
+  const plane = (a[bound][axis] + b[bound][axis]) / 2;
+  return alignmentFromPlane(a, b, axis, plane, movable);
+}
+
+/**
+ * Matching min or max on an axis while the boxes still share a footprint —
+ * Align Left / Tops style, not a facing clearance.
+ */
+export function coplanarAlignments(a: Aabb, b: Aabb, movable: 'a' | 'b' = 'b'): GapDimension[] {
+  const out: GapDimension[] = [];
+  for (const axis of AXES) {
+    const lo = coplanarOnBound(a, b, axis, 'min', movable);
+    const hi = coplanarOnBound(a, b, axis, 'max', movable);
+    if (lo) out.push(lo);
+    if (hi) out.push(hi);
+  }
+  return out;
+}
+
+/**
+ * Nearest coplanar neighbour per axis and bound, so a moving group reads the
+ * cabinet it is lining up with rather than every matching group in the scene.
+ */
+export function nearestCoplanarAlignments(selected: Aabb, others: readonly Aabb[]): GapDimension[] {
+  const out: GapDimension[] = [];
+  for (const axis of AXES) {
+    for (const bound of ['min', 'max'] as const) {
+      let best: Aabb | null = null;
+      let bestDist = Infinity;
+      for (const other of others) {
+        if (!coplanarOnBound(selected, other, axis, bound, 'a')) continue;
+        const dist = centreDistanceSq(selected, other);
+        if (dist < bestDist) {
+          best = other;
+          bestDist = dist;
+        }
+      }
+      if (!best) continue;
+      const dimension = coplanarOnBound(selected, best, axis, bound, 'a');
+      if (dimension) out.push(dimension);
+    }
+  }
+  return out;
 }

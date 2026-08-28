@@ -208,6 +208,37 @@ Leave blank until fixed. Record the change and how it was verified.
 Full write-ups kept after the summary row is added, so later agents can see
 what failed and how it was verified.
 
+### BUG-028 — Add Shelf / Add Panel still snapped a gizmo-moved panel home
+
+- **Status:** Resolved
+- **Severity:** Medium
+- **Found:** 2026-08-28
+- **Area:** Panels
+- **App version or commit:** main @ PR 21
+- **Frequency:** Always (move a shelf or interior panel, then Add Shelf / Add Panel or edit the millimetre field)
+
+#### Steps to reproduce
+
+1. Insert a Base 600.
+2. Add Panel at 300 mm. Select that panel and move it (gizmo, nudge, or X Position).
+3. Click Add Shelf, or look at Panel 1's millimetre field.
+
+#### Expected behavior
+
+The panel stays at the placed centreline. Properties shows that millimetre value.
+
+#### Actual behavior
+
+BUG-025 read live transforms at add time, but did not write them back onto `cabinet`. Properties still showed 300 mm. Editing that field, or some rebuilds, snapped the panel home.
+
+#### Notes and evidence
+
+`commitTransforms` and `setPositionAxis` now sync interior centrelines when a shelf or panel moves. `setCabinetDim` rebuilds from those live positions.
+
+#### Resolution
+
+Moving an interior member updates `shelfPositionsMm` / `dividerPositionsMm` in the same undo step. Covered by actions unit tests and a Chromium Open File-style Add Shelf check. Verified 2026-08-28.
+
 ### BUG-021 — Add Panel at the same position replaced the previous panel
 
 - **Status:** Resolved
@@ -480,3 +511,4 @@ Verified 2026-08-27.
 | BUG-025 | Add Shelf / Add Panel reset existing panel positions | See Resolved records. Rebuilds reuse ids by role and keep live centrelines. | 2026-08-27 |
 | BUG-026 | Save to File did nothing when the native picker aborted immediately | See Resolved records. Save always downloads `{title}.forma.json`; Open File accepts `.forma.json`. | 2026-08-27 |
 | BUG-027 | Open File rejected older Forma files that were still valid JSON | See Resolved records. `loadFormaText` strips a BOM, accepts string versions / `document` / a bare doc, and explains empty truncated saves. | 2026-08-27 |
+| BUG-028 | Add Shelf / Add Panel still snapped a gizmo-moved panel home | See Resolved records. Gizmo and typed moves write interior centrelines back onto `cabinet`. | 2026-08-28 |

@@ -21,6 +21,7 @@ import {
   findFinish,
   isHardwareFinishId,
   isLegHardwareShape,
+  isRoundHardwareShape,
   PANEL_PRESETS,
 } from '@/domain/catalog';
 import {
@@ -28,6 +29,8 @@ import {
   gizmoPartIds,
   groupMatching,
   livePartIds,
+  partsInGroupOrder,
+  reorderById,
   selectionPositionMetres,
   selectionTogglingGroup,
   selectionUnits,
@@ -51,6 +54,7 @@ import type {
   Group,
   SavedVersion,
   Transform,
+  Transforms,
 } from '@/domain/types';
 import { downloadBlob } from '@/ui/download';
 import { viewportApi, type AlignEdge } from '@/viewport/viewportApi';
@@ -744,6 +748,22 @@ export function toggleGroupSelection(groupId: string): void {
   ui().setSelection(selectionTogglingGroup(ui().selectedPartIds, group.partIds));
 }
 
+/** Moves a group before or after another in Assembly. Loose parts stay after. */
+export function reorderGroups(
+  sourceId: string,
+  targetId: string,
+  place: 'before' | 'after',
+): void {
+  if (sourceId === targetId) return;
+  commit(() => {
+    useDocumentStore.setState((s) => {
+      const groups = reorderById(s.groups, sourceId, targetId, place);
+      if (groups.every((group, index) => group.id === s.groups[index]?.id)) return s;
+      return { groups, customParts: partsInGroupOrder(s.customParts, groups) };
+    });
+  });
+}
+
 /** Hides the whole group if any member is visible; otherwise shows every member. */
 export function toggleGroupVisibility(groupId: string): void {
   const s = doc();
@@ -799,9 +819,13 @@ export function commitTransforms(next: Record<string, Transform>): void {
     }),
   );
   commit(() => {
-    useDocumentStore.setState((s) => ({
-      transforms: { ...s.transforms, ...sanitized },
-    }));
+    useDocumentStore.setState((s) => {
+      const transforms = { ...s.transforms, ...sanitized };
+      return {
+        transforms,
+        groups: groupsWithSyncedInteriors(s.groups, transforms, Object.keys(sanitized)),
+      };
+    });
   });
 }
 
@@ -844,12 +868,17 @@ function cabinetPreset(group: Group, config: CabinetConfig) {
 }
 
 /** Finds the cabinet's bottom-centre origin and shared assembly orientation. */
-function cabinetPlacement(group: Group, config: CabinetConfig): {
+function cabinetPlacement(
+  group: Group,
+  config: CabinetConfig,
+  transforms: Transforms = doc().transforms,
+): {
   origin: [number, number, number];
   quaternion: Transform['quaternion'];
 } {
   const layout = buildCabinetLayout(cabinetPreset(group, config));
-  const anchor = doc().transforms[group.partIds[0]!] ?? IDENTITY_TRANSFORM;
+  const anchorId = group.partIds[0];
+  const anchor = (anchorId ? transforms[anchorId] : undefined) ?? IDENTITY_TRANSFORM;
   const local = layout[0]?.positionMm ?? [0, 0, 0];
   const offset = rotateVectorByQuaternion(
     {
@@ -873,22 +902,30 @@ function uniqueSortedMm(values: readonly number[]): number[] {
   return [...new Set(values.map((value) => Math.round(value)))].sort((a, b) => a - b);
 }
 
+function sameMm(left: readonly number[], right: readonly number[]): boolean {
+  return left.length === right.length && left.every((value, index) => value === right[index]);
+}
+
 /**
  * Shelf and panel centrelines from live transforms, so a gizmo / typed-gap
  * move is not discarded the next time Add Shelf or Add Panel rebuilds.
  */
-function liveInteriorCentrelines(group: Group, cabinet: CabinetConfig): {
+function liveInteriorCentrelines(
+  group: Group,
+  cabinet: CabinetConfig,
+  transforms: Transforms = doc().transforms,
+): {
   shelves: number[];
   panels: number[];
 } {
-  const placement = cabinetPlacement(group, cabinet);
+  const placement = cabinetPlacement(group, cabinet, transforms);
   const inverse = invertQuaternion(placement.quaternion);
   const shelves: number[] = [];
   const panels: number[] = [];
   for (const partId of group.partIds) {
     const role = interiorMemberPlacement(cabinet, group.partIds, partId);
     if (!role) continue;
-    const world = doc().transforms[partId]?.position;
+    const world = transforms[partId]?.position;
     if (!world) continue;
     const local = rotateVectorByQuaternion(
       {
@@ -904,16 +941,48 @@ function liveInteriorCentrelines(group: Group, cabinet: CabinetConfig): {
   return { shelves: uniqueSortedMm(shelves), panels: uniqueSortedMm(panels) };
 }
 
-function cabinetWithLiveInterior(group: Group, cabinet: CabinetConfig): CabinetConfig {
-  const live = liveInteriorCentrelines(group, cabinet);
+function cabinetWithLiveInterior(
+  group: Group,
+  cabinet: CabinetConfig,
+  transforms: Transforms = doc().transforms,
+): CabinetConfig {
+  const live = liveInteriorCentrelines(group, cabinet, transforms);
   const shelves = live.shelves.length ? live.shelves : shelfPositions(cabinet);
   const panels = live.panels.length ? live.panels : dividerPositions(cabinet);
+  const evenShelves = shelfPositions({ height: cabinet.height, shelfCount: shelves.length });
   return {
     ...cabinet,
     shelfCount: shelves.length,
-    shelfPositionsMm: shelves.length ? shelves : undefined,
+    shelfPositionsMm: shelves.length && !sameMm(shelves, evenShelves) ? shelves : undefined,
     dividerPositionsMm: panels.length ? panels : undefined,
   };
+}
+
+/**
+ * Writes gizmo / typed-position moves back onto `cabinet` so Properties and
+ * the next Add Shelf / Add Panel keep the placed centrelines. Only runs when
+ * an interior member actually moved — dragging a side must not rewrite
+ * interiors from a shifted origin.
+ */
+function groupsWithSyncedInteriors(
+  groups: readonly Group[],
+  transforms: Transforms,
+  changedIds: readonly string[],
+): Group[] {
+  const changed = new Set(changedIds);
+  return groups.map((group) => {
+    const cabinet = group.cabinet;
+    if (!cabinet) return group;
+    const interiorMoved = group.partIds.some((id) => {
+      if (!changed.has(id)) return false;
+      return Boolean(interiorMemberPlacement(cabinet, group.partIds, id));
+    });
+    if (!interiorMoved) return group;
+    const next = cabinetWithLiveInterior(group, cabinet, transforms);
+    const sameShelves = sameMm(shelfPositions(next), shelfPositions(cabinet));
+    const samePanels = sameMm(dividerPositions(next), dividerPositions(cabinet));
+    return sameShelves && samePanels ? group : { ...group, cabinet: next };
+  });
 }
 
 /** Keeps the gizmo's shared member-centroid fixed while a cabinet is rebuilt. */
@@ -1100,8 +1169,9 @@ export function setCabinetDim(
   const group = state.groups.find((candidate) => candidate.id === groupId);
   if (!group?.cabinet) return;
   const limits = CABINET_DIM_LIMITS[key];
+  const live = cabinetWithLiveInterior(group, group.cabinet);
   const nextConfig: CabinetConfig = {
-    ...group.cabinet,
+    ...live,
     [key]: Math.min(limits.max, Math.max(limits.min, value)),
   };
   const placement = cabinetPlacement(group, group.cabinet);
@@ -1346,9 +1416,13 @@ export function setPositionAxis(id: string, axis: 'x' | 'y' | 'z', millimetres: 
   const position = [...current.position] as [number, number, number];
   position[POSITION_AXIS_INDEX[axis]] = Math.min(10, Math.max(-10, millimetres / 1000));
   commit(() => {
-    useDocumentStore.setState((s) => ({
-      transforms: { ...s.transforms, [id]: { ...current, position } },
-    }));
+    useDocumentStore.setState((s) => {
+      const transforms = { ...s.transforms, [id]: { ...current, position } };
+      return {
+        transforms,
+        groups: groupsWithSyncedInteriors(s.groups, transforms, [id]),
+      };
+    });
   });
 }
 
@@ -1459,6 +1533,54 @@ export function setSelectionSizeAxis(
   const next = api.computeGroupResize(ids, axis, target);
   if (!next) return;
   commitTransforms(next);
+}
+
+/**
+ * Types an overall W/H/D witness while the scale gizmo is on. Targets the
+ * same parts the gizmo drives: a cabinet group resizes parametrically, a
+ * single part writes its catalog size, a rigid group scales around the pivot.
+ */
+export function setSelectedOverallDim(axis: 'x' | 'y' | 'z', millimetres: number): void {
+  if (!Number.isFinite(millimetres) || millimetres <= 0) return;
+  const state = doc();
+  const ids = gizmoPartIds(state.groups, ui().selectedPartIds);
+  if (!ids.length) return;
+
+  const selected = new Set(ids);
+  const cabinet = cabinetContainingSelection(state.groups, ids);
+  if (
+    cabinet?.cabinet &&
+    cabinet.partIds.length === ids.length &&
+    cabinet.partIds.every((id) => selected.has(id))
+  ) {
+    const key = axis === 'x' ? 'width' : axis === 'y' ? 'height' : 'depth';
+    setCabinetDim(cabinet.id, key, millimetres);
+    return;
+  }
+
+  if (ids.length === 1) {
+    const id = ids[0];
+    if (!id) return;
+    const part = state.customParts.find((candidate) => candidate.id === id);
+    if (!part) return;
+    if (part.category === 'hardware') {
+      if (isLegHardwareShape(part.shape)) {
+        if (axis === 'y') setCustomPartDim(id, 'h', millimetres);
+        else setHardwareDiameter(id, millimetres);
+        return;
+      }
+      if (isRoundHardwareShape(part.shape)) {
+        if (axis === 'z') setCustomPartDim(id, 'd', millimetres);
+        else setHardwareDiameter(id, millimetres);
+        return;
+      }
+    }
+    const key = axis === 'x' ? 'w' : axis === 'y' ? 'h' : 'd';
+    setCustomPartDim(id, key, millimetres);
+    return;
+  }
+
+  setSelectionSizeAxis(ids, axis, millimetres);
 }
 
 /** Sets one exact overall dimension of a regular group as one rigid resize. */

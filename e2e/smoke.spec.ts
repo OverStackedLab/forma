@@ -23,6 +23,10 @@ async function useMm(page: Page): Promise<void> {
   await page.getByRole('tab', { name: 'mm' }).click();
 }
 
+function groupRow(page: Page, label: string) {
+  return page.getByRole('treeitem', { name: new RegExp(`${label} \\d+ Hide ${label}`) });
+}
+
 async function gotoMm(page: Page): Promise<void> {
   await page.goto('/');
   await useMm(page);
@@ -503,7 +507,7 @@ test('viewport clicks select one grouped piece while the Assembly group row sele
 
   await page.getByRole('tab', { name: 'Assembly' }).click();
   await expect(page.getByText('1 selected')).toBeVisible();
-  await page.getByRole('treeitem', { name: /Select Base 600 .*Base 600 6 Hide Base 600/ }).click();
+  await groupRow(page, 'Base 600').click();
   await expect(page.getByText('Editing: Base 600')).toBeVisible();
   await expect(page.getByText('Configurable cabinet · 6 pieces')).toBeVisible();
   await expect(page.getByRole('button', { name: 'Add Shelf' })).toBeVisible();
@@ -581,9 +585,7 @@ test('Snap Together moves a whole group without breaking its cabinet configurati
   await page.getByRole('button', { name: /Base 600/ }).click();
   await page.getByRole('tab', { name: 'Assembly' }).click();
 
-  const cabinets = page.getByRole('treeitem', {
-    name: /Select Base 600 .*Base 600 6 Hide Base 600/,
-  });
+  const cabinets = groupRow(page, 'Base 600');
   await expect(cabinets).toHaveCount(2);
   await cabinets.nth(0).click();
   await cabinets.nth(1).click({ modifiers: ['Shift'] });
@@ -604,12 +606,8 @@ test('Align Left lines a wall cabinet up with a floor cabinet without dropping i
   await page.getByRole('button', { name: /Wall 600/ }).click();
   await page.getByRole('tab', { name: 'Assembly' }).click();
 
-  const base = page.getByRole('treeitem', {
-    name: /Select Base 600 .*Base 600 6 Hide Base 600/,
-  });
-  const wall = page.getByRole('treeitem', {
-    name: /Select Wall 600 .*Wall 600 6 Hide Wall 600/,
-  });
+  const base = groupRow(page, 'Base 600');
+  const wall = groupRow(page, 'Wall 600');
   await wall.click();
   const wallY = page.getByLabel('Group Y Position in millimetres');
   const hangHeight = await wallY.inputValue();
@@ -814,9 +812,7 @@ test('selecting two groups shows shared position and rotation sliders', async ({
   await page.getByRole('button', { name: /Base 600/ }).click();
   await page.getByRole('tab', { name: 'Assembly' }).click();
 
-  const cabinets = page.getByRole('treeitem', {
-    name: /Select Base 600 .*Base 600 6 Hide Base 600/,
-  });
+  const cabinets = groupRow(page, 'Base 600');
   await cabinets.nth(0).click();
   await cabinets.nth(1).click({ modifiers: ['Shift'] });
   await expect(page.getByText('12 selected')).toBeVisible();
@@ -832,7 +828,7 @@ test('selecting two groups shows shared position and rotation sliders', async ({
   await expect(page.getByLabel('Y Angle in degrees')).toHaveValue('0');
 });
 
-test('Assembly group checkboxes add a second group without replacing the first', async ({
+test('Shift-clicking an Assembly group row adds it without replacing the first', async ({
   page,
 }) => {
   await gotoMm(page);
@@ -841,17 +837,52 @@ test('Assembly group checkboxes add a second group without replacing the first',
   await page.getByRole('button', { name: /Base 600/ }).click();
   await page.getByRole('tab', { name: 'Assembly' }).click();
 
-  const boxes = page.getByRole('checkbox', { name: 'Select Base 600' });
-  await expect(boxes).toHaveCount(2);
-  // The last insert is already selected. Checking the other group adds it.
+  const cabinets = groupRow(page, 'Base 600');
+  await expect(cabinets).toHaveCount(2);
   await expect(page.getByText('6 selected')).toBeVisible();
-  await expect(boxes.nth(1)).toBeChecked();
-  await boxes.nth(0).click();
+  await cabinets.nth(0).click({ modifiers: ['Shift'] });
   await expect(page.getByText('12 selected')).toBeVisible();
   await expect(page.getByLabel('X Position in millimetres')).toBeVisible();
-  await boxes.nth(0).click();
+  await cabinets.nth(0).click({ modifiers: ['Shift'] });
   await expect(page.getByText('6 selected')).toBeVisible();
   await expect(page.getByText('Editing: Base 600')).toBeVisible();
+});
+
+test('dragging an Assembly group row reorders cabinets', async ({ page }) => {
+  await gotoMm(page);
+  await page.getByRole('tab', { name: 'Library' }).click();
+  await page.getByRole('button', { name: /Base 600/ }).click();
+  await page.getByRole('button', { name: /Wall 600/ }).click();
+  await page.getByRole('tab', { name: 'Assembly' }).click();
+
+  const base = groupRow(page, 'Base 600');
+  const wall = groupRow(page, 'Wall 600');
+  await expect(base).toBeVisible();
+  await expect(wall).toBeVisible();
+  await page.getByRole('button', { name: 'Reorder Wall 600' }).dragTo(
+    page.getByRole('button', { name: 'Reorder Base 600' }),
+    { targetPosition: { x: 8, y: 4 } },
+  );
+  const handles = page.getByRole('button', { name: /Reorder (Base|Wall) 600/ });
+  await expect(handles.nth(0)).toHaveAttribute('aria-label', 'Reorder Wall 600');
+  await expect(handles.nth(1)).toHaveAttribute('aria-label', 'Reorder Base 600');
+});
+
+test('a moved interior panel stays put when Add Shelf rebuilds', async ({ page }) => {
+  await gotoMm(page);
+  await page.getByRole('tab', { name: 'Library' }).click();
+  await page.getByRole('button', { name: /Base 600/ }).click();
+  await page.getByRole('button', { name: 'Add Panel' }).click();
+  await expect(page.getByLabel('Panel 1 position in millimetres')).toHaveValue('300');
+
+  await page.getByRole('tab', { name: 'Assembly' }).click();
+  await page.getByRole('treeitem', { name: /Panel 1 Hide/ }).click();
+  await page.getByLabel('X Position in millimetres').fill('40');
+  await page.getByLabel('X Position in millimetres').blur();
+  await expect(page.getByLabel('Panel 1 position in millimetres')).toHaveValue('340');
+
+  await page.getByRole('button', { name: 'Add Shelf' }).click();
+  await expect(page.getByLabel('Panel 1 position in millimetres')).toHaveValue('340');
 });
 
 test('two selected panels show the clearance between them', async ({ page }) => {
@@ -898,6 +929,36 @@ test('clicking a clearance label sets the gap', async ({ page }) => {
   await expect(page.getByTestId('selection-dimension').filter({ hasText: '200 mm' })).toBeVisible();
 });
 
+test('flush faces draw an alignment witness', async ({ page }) => {
+  await gotoMm(page);
+  await insertShelf(page);
+  await insertShelf(page);
+  await expect(page.locator('canvas')).toBeVisible();
+  const yPosition = page.getByLabel('Y Position in millimetres');
+  await yPosition.fill('27');
+  await yPosition.blur();
+  await page.getByRole('button', { name: 'Move (G)' }).click();
+  await expect(page.getByTestId('selection-align-dimension').filter({ hasText: '0 mm' })).toBeVisible();
+  await page.getByRole('button', { name: 'Scale (S)' }).click();
+  await expect(page.getByTestId('selection-align-dimension')).toHaveCount(0);
+});
+
+test('a moving group shows alignment when it lines up with another group', async ({ page }) => {
+  await gotoMm(page);
+  await page.getByRole('tab', { name: 'Library' }).click();
+  await page.getByRole('button', { name: /Base 600/ }).click();
+  await page.getByRole('button', { name: /Wall 600/ }).click();
+  await page.getByRole('tab', { name: 'Assembly' }).click();
+  const base = groupRow(page, 'Base 600');
+  const wall = groupRow(page, 'Wall 600');
+  await base.click();
+  await wall.click({ modifiers: ['Shift'] });
+  await page.getByRole('button', { name: 'Align Left' }).click();
+  await expect(page.getByText('Wall 600 aligned left with Base 600')).toBeVisible();
+  await page.getByRole('button', { name: 'Move (G)' }).click();
+  await expect(page.getByTestId('selection-align-dimension').filter({ hasText: '0 mm' }).first()).toBeVisible();
+});
+
 test('a selected cabinet shows overall width, height, and depth', async ({ page }) => {
   await gotoMm(page);
   await page.getByRole('tab', { name: 'Library' }).click();
@@ -910,6 +971,22 @@ test('a selected cabinet shows overall width, height, and depth', async ({ page 
   await page.getByRole('tab', { name: 'Assembly' }).click();
   await page.getByRole('treeitem', { name: /Base 600 Top Hide/ }).click();
   await expect(page.getByTestId('selection-overall-dimension').filter({ hasText: 'H 800 mm' })).toBeVisible();
+});
+
+test('typing an overall witness with the scale gizmo resizes the selection', async ({ page }) => {
+  await gotoMm(page);
+  await insertShelf(page);
+  await expect(page.locator('canvas')).toBeVisible();
+  await page.getByRole('button', { name: 'Scale (S)' }).click();
+  const label = page.getByTestId('selection-overall-dimension').filter({ hasText: 'W 800 mm' });
+  await expect(label).toBeVisible();
+  await label.click();
+  const input = page.getByRole('textbox', { name: 'Width' });
+  await expect(input).toBeVisible();
+  await input.fill('900');
+  await input.press('Enter');
+  await expect(page.getByLabel('Width in millimetres')).toHaveValue('900');
+  await expect(page.getByTestId('selection-overall-dimension').filter({ hasText: 'W 900 mm' })).toBeVisible();
 });
 
 test('switching to mm converts the dimension fields and round-trips back to cm', async ({

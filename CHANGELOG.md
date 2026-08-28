@@ -13,7 +13,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - ENHET cabinet legs (IKEA 104.490.18, 125 mm) in the hardware library.
 - Oak wood-grain texture for the Oak color.
 - Walnut color with photographed grain, mapped like Oak.
-- Assembly group checkboxes add or remove a whole group from the selection.
+- Drag a group in Assembly to reorder cabinets. Shift-click (or ⌘-click) a group row adds it to the selection (IMP-013).
 - Selecting two pieces or groups draws the clearance between them in the viewport.
 - Selecting one piece or group draws clearance to the nearest facing neighbour in each direction, so a panel can be placed without picking a second object.
 - Click a clearance label to type the gap. The same parts the move gizmo drives (the selection, or the second of two units) move to match.
@@ -31,6 +31,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - Restore cabinet on a rigid group that still has a carcass, so a saved design that lost Add Shelf can get it back. Opening the file does not rewrite groups on its own (BUG-009).
 - Arrow keys nudge the selection while the move gizmo is active. Front and Side follow the view; 3D and Top stay on the floor. One display unit per tap, Shift for 100 mm.
 - Selecting a cabinet (or a fully selected group) draws overall width, height, and depth in the viewport so a lone carcass still shows its size (IMP-012).
+- Flush faces, and a moving group lining up with another group, draw alignment witnesses in the brass accent while the move gizmo is on (IMP-014).
+- With the scale gizmo on, overall W/H/D labels can be typed to resize the selection (IMP-015).
 
 ### Changed
 
@@ -45,6 +47,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - Save Version no longer shrinks in the toolbar.
 - Docs live under `docs/`.
 - Duplicate copies the current selection. A fully selected cabinet still clones with Add Shelf; a single shelf or carcass piece copies only that piece (BUG-022). Duplicating an interior panel adds the next free centreline like Add Panel (BUG-024).
+- Assembly group rows no longer have a checkbox. Shift-click or ⌘-click still adds or removes the whole group.
 
 ### Fixed
 
@@ -59,9 +62,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - Add shelf and Space evenly fields show defaults (300 mm, 3 every 200 mm) and are wide enough to read.
 - Add Panel and Add Shelf skip an occupied centreline and place the next free 100 mm slot, so a second click adds another instead of stacking on the first (BUG-021).
 - Duplicating an interior cabinet panel places the next free centreline like Add Panel, so clearance reads from the facing inner face rather than the carcass outside (BUG-024).
-- Add Shelf / Add Panel no longer remap existing panels onto new bay shelves or snap them back to stale centrelines (BUG-025).
+- Add Shelf / Add Panel no longer remap existing panels onto new bay shelves or snap them back to stale centrelines (BUG-025). A gizmo or typed move writes that centreline into the cabinet so Properties and the next add keep it (BUG-028).
 - Add Shelf and Add Panel stay at the top of Properties for a selected cabinet, including a single member or extra loose parts.
 - Reload, Open File, and Restore Version frame every object in the scene (BUG-023).
 - Save to File always downloads a `.forma.json` instead of using Chrome's save picker, which often failed after the dialog (BUG-026). Open File lists `.forma.json` files.
 - New File offers Cancel, Don't save, or Save and continue. Save downloads a `.forma.json` copy before clearing the design.
 - Open File loads older `.forma.json` files that used a UTF-8 BOM, a string schema version, a `document` key, or a bare document. Empty truncated saves say the write may not have finished instead of looking like garbage JSON (BUG-027).
+- Alignment witnesses stay after a snap: they span the shared face (or the gap between boxes) instead of collapsing to a point, and a millimetre of overlap still counts as flush.

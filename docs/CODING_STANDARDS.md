@@ -392,8 +392,9 @@ Read these before changing picking, history, cabinets, or materials:
 
 - New reproducible defects → next `BUG-###` in [`BUGS.md`](./BUGS.md) (full
   template while open; keep the write-up under Resolved records and a summary
-  row when resolved). Next unused id after BUG-027.
-- Non-bug follow-ups → next `IMP-###` in [`IMPROVEMENTS.md`](./IMPROVEMENTS.md)
+  row when resolved). Next unused id after BUG-028.
+- Non-bug follow-ups → next `IMP-###` in [`IMPROVEMENTS.md`](./IMPROVEMENTS.md).
+  Next unused id after IMP-015.
 - Do not invent tracker entries in PR descriptions only — write them in those
   files so the next agent can find them
 
