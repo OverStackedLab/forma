@@ -67,26 +67,6 @@ panel updates the config instead of demoting.
 drag; `commitTransforms` fires on pointer-up. One undo entry per gesture, and the
 store isn't churned at 60 fps.
 
-**Saving has one fallback chain, and a name is asked for exactly once.**
-`saveToFile` tries, in order: the retained `FileSystemFileHandle` (silent
-overwrite), the native `showSaveFilePicker` (folder + name in one dialog, handle
-kept for next time), then a plain download. Every step falls through on failure,
-because BUG-026 was a picker that opened and *then* failed to write, leaving the
-user with nothing saved — an unexplained abort now downloads rather than giving
-up. The handle lives in memory only and is dropped by New File, Open File, and
-any rename that makes it stop matching the title, so Save can never write a
-stale filename.
-
-Which mechanism collects the name follows from that chain: where the picker
-exists it names the file itself, so the in-app prompt stays out of the way;
-where it doesn't, the prompt is the only chance to avoid writing
-`Untitled Design.forma.json`. Asking in both places is the bug, not the feature.
-
-**No native dialogs elsewhere.** `window.confirm` / `window.prompt` can't be
-styled or driven by the e2e suite, so New File and the save-name prompt both use
-the `Dialog` primitive. The document title stays the filename: naming a save
-renames the document, and opening a file titles it from the filename.
-
 **`viewportApi` is a deliberate escape hatch.** Framing, PNG export, floor-snap,
 group-resize, snap-together and align need live meshes to compute bounds. Rather than threading refs
 through the React tree, the viewport registers a small imperative API as a module

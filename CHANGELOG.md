@@ -8,9 +8,6 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Added
 
-- Save to File picks a folder. On Chromium the first save opens the native dialog for folder and name, then remembers that file: later saves overwrite it in one click instead of piling up `Design (1).forma.json` copies in Downloads. Renaming the design re-asks, so Save never writes a stale filename.
-- Browsers without the File System Access API (Firefox, Safari) keep the download path and are asked for a name in-app on the first save, so nothing is written as `Untitled Design.forma.json`. Either way a name is collected once, never twice.
-- A save is never lost: if the native dialog cannot open, or its write fails afterwards, the download runs instead (BUG-026).
 - BORGHAMN square-bar handle in the hardware library (170 mm, 160 mm centres, IKEA 203.160.46) (IMP-018).
 
 ## 2026-08-28

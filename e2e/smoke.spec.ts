@@ -18,19 +18,6 @@ async function insertShelf(page: Page): Promise<void> {
   await expect(page.getByText('Shelf added to scene')).toBeVisible();
 }
 
-/**
- * First save of a never-named design: the name prompt appears once. Later saves
- * write straight through — see the "saves straight through" test.
- */
-async function saveNewDesign(page: Page, name?: string) {
-  await page.getByRole('button', { name: 'Save to File' }).click();
-  await expect(page.getByRole('dialog', { name: 'Name this design' })).toBeVisible();
-  if (name !== undefined) await page.getByLabel('File name').fill(name);
-  const downloadPromise = page.waitForEvent('download');
-  await page.getByRole('button', { name: 'Save', exact: true }).click();
-  return downloadPromise;
-}
-
 /** Fresh contexts start in cm. Tests that fill millimetre fields opt into mm. */
 async function useMm(page: Page): Promise<void> {
   await page.getByRole('tab', { name: 'mm' }).click();
@@ -46,12 +33,10 @@ async function gotoMm(page: Page): Promise<void> {
 }
 
 /**
- * Loads Forma as a browser with no File System Access picker — i.e. Firefox or
- * Safari. Chromium exposes `showSaveFilePicker`, but Playwright cannot drive
- * the native dialog, so removing it is the only way to exercise the download
- * path and the in-app name prompt that goes with it.
+ * Force the plain-download path in older builds that still called
+ * showSaveFilePicker. Chromium exposes that API; Playwright cannot drive it.
  */
-async function gotoWithoutFilePicker(page: Page): Promise<void> {
+async function gotoWithDownloadFallback(page: Page): Promise<void> {
   await page.addInitScript(() => {
     Reflect.deleteProperty(window, 'showSaveFilePicker');
   });
@@ -300,7 +285,7 @@ test('switching gizmo tools preserves the current selection', async ({ page }) =
     await expect(page.getByText('1 selected')).toBeVisible();
   }
 
-  await page.getByRole('button', { name: 'Frame', exact: true }).click();
+  await page.getByRole('button', { name: 'Frame' }).click();
   await expect(page.getByText('1 selected')).toBeVisible();
 });
 
@@ -455,7 +440,7 @@ test('model mode offers front, side and top views', async ({ page }) => {
   await page.getByRole('button', { name: 'Side', exact: true }).click();
   await page.getByRole('button', { name: 'Top', exact: true }).click();
   await page.getByRole('button', { name: '3D' }).click();
-  await expect(page.getByRole('button', { name: 'Frame', exact: true })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Frame' })).toBeVisible();
 });
 
 test('grouping two panels lets you reselect and ungroup them as one unit', async ({ page }) => {
@@ -1156,7 +1141,7 @@ test('resizing with the scale gizmo updates the Dimensions fields to match', asy
   // real headroom — deep in a long sequential suite the browser can be too
   // busy to hit 60fps, and a tight wait here reads as the drag missing the
   // gizmo entirely.
-  await page.getByRole('button', { name: 'Frame', exact: true }).click();
+  await page.getByRole('button', { name: 'Frame' }).click();
   await page.waitForTimeout(1500);
   await page.getByRole('button', { name: 'Scale (S)' }).click();
   await page.waitForTimeout(500);
@@ -1206,7 +1191,7 @@ test('resizing a cabinet with the scale gizmo updates its parametric dimensions'
   await page.getByRole('button', { name: /Base 600/ }).click();
   await expect(page.locator('canvas')).toBeVisible();
 
-  await page.getByRole('button', { name: 'Frame', exact: true }).click();
+  await page.getByRole('button', { name: 'Frame' }).click();
   await page.waitForTimeout(1500);
   await page.getByRole('button', { name: 'Scale (S)' }).click();
   await page.waitForTimeout(500);
@@ -1242,12 +1227,14 @@ test('resizing a cabinet with the scale gizmo updates its parametric dimensions'
 });
 
 test('saving to a file and opening it round-trips the document', async ({ page }) => {
-  await gotoWithoutFilePicker(page);
+  await gotoWithDownloadFallback(page);
   await insertShelf(page);
   await page.getByLabel('Part name').fill('Kitchen Shelf');
   await page.getByLabel('Part name').blur();
 
-  const download = await saveNewDesign(page);
+  const downloadPromise = page.waitForEvent('download');
+  await page.getByRole('button', { name: 'Save to File' }).click();
+  const download = await downloadPromise;
   expect(download.suggestedFilename()).toBe('Untitled Design.forma.json');
   const path = await download.path();
   if (!path) throw new Error('download did not save to disk');
@@ -1268,10 +1255,6 @@ test('saving to a file and opening it round-trips the document', async ({ page }
 });
 
 test('saving still downloads when the native picker aborts immediately', async ({ page }) => {
-  // BUG-026: headless Chromium exposes showSaveFilePicker but rejects it
-  // instantly without ever showing a dialog. That must fall through to a
-  // download rather than losing the save — and because the picker exists, the
-  // in-app name prompt stays out of the way.
   await page.goto('/');
   await insertShelf(page);
   const downloadPromise = page.waitForEvent('download');
@@ -1279,7 +1262,6 @@ test('saving still downloads when the native picker aborts immediately', async (
   const download = await downloadPromise;
   expect(download.suggestedFilename()).toBe('Untitled Design.forma.json');
   await expect(page.getByText('Saved Untitled Design')).toBeVisible();
-  await expect(page.getByRole('dialog', { name: 'Name this design' })).toHaveCount(0);
 });
 
 test('creating a new file can be cancelled and then starts a clean persisted design', async ({
@@ -1329,7 +1311,7 @@ test('new file can save a copy then start a clean design', async ({ page }) => {
 test('renaming the document drives the downloaded filename without extra dialogs', async ({
   page,
 }) => {
-  await gotoWithoutFilePicker(page);
+  await gotoWithDownloadFallback(page);
 
   const title = page.getByText('Untitled Design', { exact: true });
   await title.dblclick();
@@ -1338,8 +1320,7 @@ test('renaming the document drives the downloaded filename without extra dialogs
   await input.blur();
   await expect(page.getByText('Kitchen Remodel', { exact: true })).toBeVisible();
 
-  // Naming the design in the toolbar is the naming step. Save must not ask
-  // again — neither a native dialog nor the in-app name prompt.
+  // No prompt is expected here — any dialog would fail the test by hanging the click.
   page.on('dialog', () => {
     throw new Error('Save to File must not open a JS dialog');
   });
@@ -1347,7 +1328,6 @@ test('renaming the document drives the downloaded filename without extra dialogs
   await page.getByRole('button', { name: 'Save to File' }).click();
   const download = await downloadPromise;
   expect(download.suggestedFilename()).toBe('Kitchen Remodel.forma.json');
-  await expect(page.getByRole('dialog', { name: 'Name this design' })).toHaveCount(0);
 
   // Survives a reload like the rest of the document.
   await page.reload();
@@ -1504,62 +1484,4 @@ test('changing grid size keeps a hidden grid hidden and leaves parts alone', asy
   await expect(page.getByRole('button', { name: 'Undo' })).toBeEnabled();
 
   expect(errors).toEqual([]);
-});
-
-test('naming a design once makes every later save a single click', async ({ page }) => {
-  await gotoWithoutFilePicker(page);
-  await insertShelf(page);
-
-  // First save asks, because the alternative is "Untitled Design.forma.json".
-  const first = await saveNewDesign(page, 'Hallway Unit');
-  expect(first.suggestedFilename()).toBe('Hallway Unit.forma.json');
-
-  // Every save after that writes straight through, no second confirmation.
-  await insertShelf(page);
-  const secondPromise = page.waitForEvent('download');
-  await page.getByRole('button', { name: 'Save to File' }).click();
-  expect((await secondPromise).suggestedFilename()).toBe('Hallway Unit.forma.json');
-  await expect(page.getByRole('dialog', { name: 'Name this design' })).toHaveCount(0);
-});
-
-test('the first save names the download and the document', async ({ page }) => {
-  await gotoWithoutFilePicker(page);
-  await insertShelf(page);
-
-  const download = await saveNewDesign(page, 'Kitchen Remodel');
-  expect(download.suggestedFilename()).toBe('Kitchen Remodel.forma.json');
-  // The typed name becomes the title too, so a later Open File agrees with it.
-  await expect(page.getByText('Kitchen Remodel', { exact: true })).toBeVisible();
-  await expect(page.getByText('Saved Kitchen Remodel')).toBeVisible();
-});
-
-test('the name prompt previews the sanitized filename and can be cancelled', async ({ page }) => {
-  await gotoWithoutFilePicker(page);
-  await insertShelf(page);
-
-  await page.getByRole('button', { name: 'Save to File' }).click();
-  const name = page.getByLabel('File name');
-  await name.fill('Kitchen/v2');
-  await expect(page.getByText('Saves as Kitchen-v2.forma.json')).toBeVisible();
-
-  // An empty name has nothing to save under.
-  await name.fill('');
-  await expect(page.getByRole('button', { name: 'Save', exact: true })).toBeDisabled();
-
-  await page.keyboard.press('Escape');
-  await expect(page.getByRole('dialog', { name: 'Name this design' })).toHaveCount(0);
-  // Cancelling must not have renamed the document.
-  await expect(page.getByText('Untitled Design', { exact: true })).toBeVisible();
-});
-
-test('the name prompt commits on Enter', async ({ page }) => {
-  await gotoWithoutFilePicker(page);
-  await insertShelf(page);
-
-  await page.getByRole('button', { name: 'Save to File' }).click();
-  await page.getByLabel('File name').fill('Hallway Unit');
-  const downloadPromise = page.waitForEvent('download');
-  await page.getByLabel('File name').press('Enter');
-  const download = await downloadPromise;
-  expect(download.suggestedFilename()).toBe('Hallway Unit.forma.json');
 });

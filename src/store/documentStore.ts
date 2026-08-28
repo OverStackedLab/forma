@@ -18,13 +18,6 @@ export const DOC_KEYS = [
   'groups',
 ] as const satisfies readonly (keyof DocumentSnapshot)[];
 
-/**
- * The title a design carries until someone names it. Save uses it to tell a
- * never-named document from a named one: the first save asks for a name, every
- * save after that just writes.
- */
-export const DEFAULT_DOC_TITLE = 'Untitled Design';
-
 /** An empty scene — geometry enters through explicit library items and cabinets. */
 export function createDefaultDocument(): FormaDocument {
   return {
@@ -36,7 +29,7 @@ export function createDefaultDocument(): FormaDocument {
     hiddenIds: [],
     transforms: {},
     groups: [],
-    docTitle: DEFAULT_DOC_TITLE,
+    docTitle: 'Untitled Design',
     versions: [],
     currentVersionId: null,
   };

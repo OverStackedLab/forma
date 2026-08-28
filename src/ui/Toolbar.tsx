@@ -1,20 +1,10 @@
-import { useRef, useState, useSyncExternalStore } from 'react';
+import { useEffect, useRef, useState, useSyncExternalStore } from 'react';
 import { DISPLAY_UNITS, type DisplayUnit } from '@/domain/units';
-import {
-  needsFilename,
-  newDocument,
-  openFile,
-  renameDocument,
-  sanitizeFilename,
-  saveToFile,
-  saveVersion,
-  supportsFilePicker,
-} from '@/store/actions';
-import { DEFAULT_DOC_TITLE, useDocumentStore } from '@/store/documentStore';
+import { newDocument, openFile, renameDocument, saveToFile, saveVersion } from '@/store/actions';
+import { useDocumentStore } from '@/store/documentStore';
 import { canRedo, canUndo, historyStore, redo, undo } from '@/store/history';
 import { useUiStore, type ViewMode } from '@/store/uiStore';
 import { Button } from './primitives/Button';
-import { Dialog } from './primitives/Dialog';
 import { IconButton } from './primitives/IconButton';
 import { Icon } from './primitives/Icon';
 import { InlineRename } from './primitives/InlineRename';
@@ -39,11 +29,10 @@ export function Toolbar() {
   const rightSidebarOpen = useUiStore((s) => s.rightSidebarOpen);
   const toggleRightSidebar = useUiStore((s) => s.toggleRightSidebar);
   const hasDocumentContent = useDocumentStore(
-    (s) => s.customParts.length > 0 || s.versions.length > 0 || s.docTitle !== DEFAULT_DOC_TITLE,
+    (s) => s.customParts.length > 0 || s.versions.length > 0 || s.docTitle !== 'Untitled Design',
   );
 
   const [newFilePrompt, setNewFilePrompt] = useState(false);
-  const [saveAsPrompt, setSaveAsPrompt] = useState(false);
 
   const requestNewFile = () => {
     if (!hasDocumentContent) {
@@ -51,22 +40,6 @@ export function Toolbar() {
       return;
     }
     setNewFilePrompt(true);
-  };
-
-  // Save writes straight away: once a design is bound to a file, or already
-  // named in the toolbar title, asking again would be the same decision twice.
-  //
-  // A name is only ever collected once, and only by whichever of the two
-  // mechanisms is actually available. Where the native picker exists it takes
-  // the name and the folder together, so the in-app prompt must stay out of the
-  // way; where it does not, the in-app prompt is the only chance to avoid
-  // writing "Untitled Design.forma.json".
-  const requestSave = () => {
-    if (needsFilename() && !supportsFilePicker()) {
-      setSaveAsPrompt(true);
-      return;
-    }
-    void saveToFile();
   };
 
   const finishNewFile = async (saveFirst: boolean) => {
@@ -172,7 +145,7 @@ export function Toolbar() {
         />
         <div className="h-5 w-px flex-none bg-white/10" />
         <IconButton icon="new_file" label="New File" onClick={requestNewFile} />
-        <IconButton icon="save_file" label="Save to File" onClick={requestSave} />
+        <IconButton icon="save_file" label="Save to File" onClick={() => void saveToFile()} />
         <OpenFileButton />
         <div className="h-5 w-px flex-none bg-white/10" />
         <button
@@ -184,16 +157,6 @@ export function Toolbar() {
         </button>
       </div>
       </header>
-      {saveAsPrompt && (
-        <NameDesignPrompt
-          initialName={docTitle}
-          onCancel={() => setSaveAsPrompt(false)}
-          onSave={async (name) => {
-            await saveToFile(name);
-            setSaveAsPrompt(false);
-          }}
-        />
-      )}
       {newFilePrompt && (
         <NewFilePrompt
           onCancel={() => setNewFilePrompt(false)}
@@ -213,91 +176,44 @@ type NewFilePromptProps = {
 
 /** In-app stand-in for the old window.confirm — Save actually downloads a copy. */
 function NewFilePrompt({ onCancel, onDiscard, onSave }: NewFilePromptProps) {
+  useEffect(() => {
+    function onKey(event: KeyboardEvent) {
+      if (event.key === 'Escape') onCancel();
+    }
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [onCancel]);
+
   return (
-    <Dialog
-      title="Create a new design?"
-      description={
-        <>
+    <div
+      className="fixed inset-0 z-40 flex items-center justify-center bg-black/50"
+      onClick={onCancel}
+    >
+      <div
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="new-file-title"
+        aria-describedby="new-file-copy"
+        className="w-[min(26rem,calc(100vw-2rem))] rounded-lg border border-hairline bg-panel p-4 shadow-[0_16px_40px_rgba(0,0,0,.45)]"
+        onClick={(event) => event.stopPropagation()}
+      >
+        <h2 id="new-file-title" className="text-[14px] font-semibold text-ink">
+          Create a new design?
+        </h2>
+        <p id="new-file-copy" className="mt-2 text-[12.5px] leading-relaxed text-ink/60">
           The current design will be cleared from this browser. Save a{' '}
           <span className="font-mono text-ink/80">.forma.json</span> copy first if you want to
           open it again later.
-        </>
-      }
-      onCancel={onCancel}
-      actions={
-        <>
+        </p>
+        <div className="mt-4 flex flex-wrap justify-end gap-2">
           <Button onClick={onCancel}>Cancel</Button>
           <Button onClick={onDiscard}>Don&apos;t save</Button>
           <Button variant="primary" onClick={onSave}>
             Save and continue
           </Button>
-        </>
-      }
-    />
-  );
-}
-
-/**
- * Asked once, when a never-named design is saved for the first time. After that
- * the toolbar title is the rename affordance and Save is a single click — a
- * dialog on every save would only ask the user to re-confirm a name they had
- * already typed.
- *
- * A name is collected in-app rather than through the File System Access picker,
- * which is Chromium-only and whose post-dialog write failures caused BUG-026.
- */
-function NameDesignPrompt({
-  initialName,
-  onCancel,
-  onSave,
-}: {
-  initialName: string;
-  onCancel: () => void;
-  onSave: (name: string) => void;
-}) {
-  const [draft, setDraft] = useState(initialName);
-  const filename = `${sanitizeFilename(draft)}.forma.json`;
-  const canSave = draft.trim().length > 0;
-
-  const submit = () => {
-    if (canSave) onSave(draft);
-  };
-
-  return (
-    <Dialog
-      title="Name this design"
-      description="Saved as a .forma.json download you can open again later. The name becomes the document title, so later saves go straight to this file name."
-      onCancel={onCancel}
-      actions={
-        <>
-          <Button onClick={onCancel}>Cancel</Button>
-          <Button variant="primary" onClick={submit} disabled={!canSave}>
-            Save
-          </Button>
-        </>
-      }
-    >
-      <div className="mt-3 flex items-center gap-2">
-        <input
-          type="text"
-          aria-label="File name"
-          autoFocus
-          value={draft}
-          onChange={(event) => setDraft(event.target.value)}
-          onFocus={(event) => event.currentTarget.select()}
-          onKeyDown={(event) => {
-            if (event.key !== 'Enter') return;
-            event.preventDefault();
-            submit();
-          }}
-          className="h-8 min-w-0 flex-1 rounded-[7px] border border-hairline bg-input px-2.5 text-[12.5px] text-ink"
-        />
-        <span className="flex-none font-mono text-[11px] text-ink/45">.forma.json</span>
+        </div>
       </div>
-      {/* Sanitisation drops characters the filesystem rejects; show the real
-          result rather than letting the download quietly differ from the input. */}
-      <p className="mt-2 font-mono text-[10.5px] text-ink/35">Saves as {filename}</p>
-    </Dialog>
+    </div>
   );
 }
 
