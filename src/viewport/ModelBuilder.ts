@@ -89,7 +89,7 @@ export class ModelBuilder {
       );
 
       if (!node) {
-        node = createPartNode(THREE, this.geometries, spec, material);
+        node = createPartNode(THREE, this.geometries, this.materials, spec, material);
         this.partsGroup.add(node.root);
         this.nodes.set(spec.id, node);
       } else {

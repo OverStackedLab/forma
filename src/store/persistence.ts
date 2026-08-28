@@ -152,6 +152,8 @@ function inferredPreset(label: string) {
     return PANEL_PRESETS.find((preset) => preset.id === 'eneryda');
   if (normalized.includes('baggan')) return PANEL_PRESETS.find((preset) => preset.id === 'bagganas');
   if (normalized.includes('knob')) return PANEL_PRESETS.find((preset) => preset.id === 'knob');
+  if (normalized.includes('axstad') || normalized.includes('glass'))
+    return PANEL_PRESETS.find((preset) => preset.id === 'axstad-glass-400');
   if (normalized.includes('door')) return PANEL_PRESETS.find((preset) => preset.id === 'door');
   if (normalized.includes('back')) return PANEL_PRESETS.find((preset) => preset.id === 'back');
   if (normalized.includes('divider')) return PANEL_PRESETS.find((preset) => preset.id === 'divider');
@@ -169,6 +171,7 @@ function normalizePart(value: unknown): CustomPart | null {
     && part.shape !== 'bagganas'
     && part.shape !== 'eneryda'
     && part.shape !== 'enhet-leg'
+    && part.shape !== 'glass-door'
   )
     return null;
   const clampDimension = (axis: 'w' | 'h' | 'd') => {

@@ -35,6 +35,10 @@ export type PanelPresetId =
   | 'divider'
   | 'back'
   | 'door'
+  | 'axstad-glass-400'
+  | 'axstad-glass-600'
+  | 'axstad-glass-400-1000'
+  | 'axstad-glass-600-1000'
   | 'knob'
   | 'bagganas'
   | 'eneryda'
@@ -47,7 +51,7 @@ export type CabinetPresetId =
   | 'wall-800'
   | 'high-600';
 /** Every part renders as one of a few shared unit geometries, scaled per instance. */
-export type PanelShape = 'box' | 'cylinder' | 'bagganas' | 'eneryda' | 'enhet-leg';
+export type PanelShape = 'box' | 'cylinder' | 'bagganas' | 'eneryda' | 'enhet-leg' | 'glass-door';
 
 export type Material = {
   id: MaterialId;

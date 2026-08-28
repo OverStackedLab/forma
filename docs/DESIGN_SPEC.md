@@ -96,7 +96,7 @@ Tree body: `flex:1`, `overflow-y:auto`, `padding:10px 6px`. Five collapsible gro
 - **Leg Style** — 3-up grid: Tapered Wood, Straight Wood, Hairpin Metal
 - **Handle Style** — 3-up grid: Bar Pull, Knob, Recessed
 - **Base Style** — 3-up grid: Legs, Plinth Base
-- **Panels** — 2-up grid of insertable parts: Shelf, Side Panel, Back Panel, Door, Divider, Drawer Front
+- **Panels** — 2-up grid of insertable parts: Shelf, Side Panel, Back Panel, Divider. **Fronts** — solid Door plus AXSTAD-style glass doors (400/600 × 800/1000, 19 mm, 78 mm shaker frame).
 
 Option card: `border:1px solid rgba(255,255,255,.1)`, background `#211E1A`, `border-radius:8px`, `padding:10px 8px`, centered column, `gap:6px`, 18px icon, 11px label. Active card: border `#C68A46`, background `rgba(198,138,70,.14)`, label `#EEE9E2`.
 

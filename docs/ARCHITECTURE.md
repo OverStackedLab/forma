@@ -163,4 +163,5 @@ with it:
 
 New doors, drawers, legs, or hardware should continue to enter as explicit
 library items or generated assembly members rather than reviving the old
-always-present sideboard.
+always-present sideboard. Glass fronts are AXSTAD-style (`shape: 'glass-door'`):
+a 78 mm frame that keeps its width on resize, plus an inset pane.

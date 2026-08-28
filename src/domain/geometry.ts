@@ -1,6 +1,7 @@
 import { resolveAppearance } from './catalog';
 import { OAK_GRAIN_URL } from './oakGrain';
 import { WALNUT_GRAIN_URL } from './walnutGrain';
+import { axstadGlassPieces } from './glassDoor';
 import type { PanelShape, PartSpec } from './types';
 
 /**
@@ -290,6 +291,8 @@ export class MaterialCache {
   private readonly cache = new Map<string, TMaterial>();
   private oakMap: TTexture | null = null;
   private walnutMap: TTexture | null = null;
+  private glassMat: TMaterial | null = null;
+  private ghostMat: TMaterial | null = null;
 
   constructor(private readonly THREE: ThreeModule) {}
 
@@ -309,6 +312,37 @@ export class MaterialCache {
       this.cache.set(key, m);
     }
     return m;
+  }
+
+  /**
+   * Clear inset pane. Opacity instead of transmission so it reads without an
+   * environment map — transmission goes black in this studio lighting.
+   */
+  glass(): TMaterial {
+    if (!this.glassMat) {
+      this.glassMat = new this.THREE.MeshStandardMaterial({
+        color: '#c5dde8',
+        roughness: 0.08,
+        metalness: 0.18,
+        transparent: true,
+        opacity: 0.28,
+        depthWrite: false,
+      });
+    }
+    return this.glassMat;
+  }
+
+  /** Full-door pick/halo target that does not occlude the glass. */
+  ghost(): TMaterial {
+    if (!this.ghostMat) {
+      this.ghostMat = new this.THREE.MeshStandardMaterial({
+        transparent: true,
+        opacity: 0,
+        depthWrite: false,
+        colorWrite: false,
+      });
+    }
+    return this.ghostMat;
   }
 
   private naturalGrain(materialId: string | undefined, colorId: string | undefined): TTexture | null {
@@ -339,6 +373,10 @@ export class MaterialCache {
   dispose(): void {
     for (const m of this.cache.values()) m.dispose();
     this.cache.clear();
+    this.glassMat?.dispose();
+    this.ghostMat?.dispose();
+    this.glassMat = null;
+    this.ghostMat = null;
     this.oakMap?.dispose();
     this.walnutMap?.dispose();
     this.oakMap = null;
@@ -364,9 +402,13 @@ export type PartNode = {
 export function createPartNode(
   THREE: ThreeModule,
   geometries: GeometryCache,
+  materials: MaterialCache,
   spec: PartSpec,
   material: TMaterial,
 ): PartNode {
+  if (spec.shape === 'glass-door') {
+    return createGlassDoorNode(THREE, geometries, materials, spec, material);
+  }
   const root = new THREE.Group();
   const geometry = geometries.forShape(spec.shape);
   const mesh = new THREE.Mesh(geometry, material);
@@ -386,6 +428,60 @@ export function createPartNode(
     },
     setMaterial(m) {
       mesh.material = m;
+    },
+  };
+  node.update(spec);
+  return node;
+}
+
+function createGlassDoorNode(
+  THREE: ThreeModule,
+  geometries: GeometryCache,
+  materials: MaterialCache,
+  spec: PartSpec,
+  material: TMaterial,
+): PartNode {
+  const root = new THREE.Group();
+  const box = geometries.unitBox();
+  const highlight = new THREE.Mesh(box, materials.ghost());
+  highlight.castShadow = false;
+  highlight.receiveShadow = false;
+  highlight.userData.partId = spec.id;
+  const frames: TMesh[] = [];
+  for (let i = 0; i < 4; i++) {
+    const frame = new THREE.Mesh(box, material);
+    frame.castShadow = true;
+    frame.receiveShadow = true;
+    frame.userData.partId = spec.id;
+    root.add(frame);
+    frames.push(frame);
+  }
+  const glass = new THREE.Mesh(box, materials.glass());
+  glass.castShadow = false;
+  glass.receiveShadow = true;
+  glass.renderOrder = 2;
+  glass.userData.partId = spec.id;
+  root.add(glass);
+  root.add(highlight);
+  root.name = spec.id;
+  root.userData.partId = spec.id;
+
+  const node: PartNode = {
+    id: spec.id,
+    root,
+    highlightTarget: highlight,
+    update(next) {
+      highlight.scale.set(next.size.x * MM, next.size.y * MM, next.size.z * MM);
+      const pieces = axstadGlassPieces(next.size.x, next.size.y, next.size.z);
+      pieces.forEach((piece, index) => {
+        const mesh = piece.role === 'glass' ? glass : frames[index];
+        if (!mesh) return;
+        mesh.scale.set(piece.size.x * MM, piece.size.y * MM, piece.size.z * MM);
+        mesh.position.set(piece.position.x * MM, piece.position.y * MM, piece.position.z * MM);
+      });
+    },
+    setMaterial(m) {
+      for (const frame of frames) frame.material = m;
     },
   };
   node.update(spec);

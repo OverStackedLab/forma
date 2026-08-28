@@ -11,6 +11,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ### Added
 
 - Measure works alongside the move, rotate and scale gizmos, so a resize can be measured while it is happening (BUG-040).
+- AXSTAD-style glass doors in the Fronts library: 400/600 × 800/1000 mm, 19 mm thick, with a 78 mm shaker frame and an inset glass pane (IMP-017).
 - IKEA KNOXHULT / ASPUDDEN panel colors (Oak, Dark Gray, Dark Gray-Green, White) and hardware finishes (Brushed Brass, Matte Black, Brushed Steel, White).
 - BAGGANÄS knob and ENERYDA bow-pull geometry in the hardware library.
 - ENHET cabinet legs (IKEA 104.490.18, 125 mm) in the hardware library.
