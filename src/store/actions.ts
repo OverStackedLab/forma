@@ -61,6 +61,7 @@ import { downloadBlob } from '@/ui/download';
 import { viewportApi, type AlignEdge } from '@/viewport/viewportApi';
 import {
   createDefaultDocument,
+  DEFAULT_DOC_TITLE,
   IDENTITY_TRANSFORM,
   snapshotDocument,
   useDocumentStore,
@@ -1968,6 +1969,7 @@ export function renameDocument(title: string): void {
 /** Starts a clean local document while keeping workspace display preferences. */
 export function newDocument(): void {
   useDocumentStore.getState().hydrate(createDefaultDocument());
+  forgetSaveFile();
   // A new file is a fresh history boundary: Undo must never reach back into a
   // different design after the user confirmed that they wanted to replace it.
   clearHistory();
@@ -1985,9 +1987,14 @@ export function newDocument(): void {
   ui().showToast('New design created');
 }
 
-function sanitizeFilename(title: string): string {
+/**
+ * Strips characters no common filesystem accepts from a document title. The
+ * Save As dialog previews the result, so a name that loses characters here is
+ * visible before the download starts rather than surprising afterwards.
+ */
+export function sanitizeFilename(title: string): string {
   const trimmed = title.trim().replace(/[\\/:*?"<>|]+/g, '-');
-  return trimmed || 'Untitled Design';
+  return trimmed || DEFAULT_DOC_TITLE;
 }
 
 /**
@@ -2000,25 +2007,161 @@ export function titleFromFilename(filename: string): string {
   return sanitizeFilename(stem);
 }
 
+// ─── Saving to disk ──────────────────────────────────────────────────────────
+
+/**
+ * `showSaveFilePicker` is not in TypeScript's DOM lib. Only the two fields
+ * Forma uses are declared, rather than pulling in a whole ambient package.
+ */
+type SaveFilePicker = (options?: {
+  suggestedName?: string;
+  types?: { description: string; accept: Record<string, string[]> }[];
+}) => Promise<FileSystemFileHandle>;
+
+function filePicker(): SaveFilePicker | null {
+  const picker = (globalThis as { showSaveFilePicker?: SaveFilePicker }).showSaveFilePicker;
+  return typeof picker === 'function' ? picker : null;
+}
+
+/** Chromium-only. Firefox and Safari always take the download path. */
+export function supportsFilePicker(): boolean {
+  return filePicker() !== null;
+}
+
+/**
+ * The file a save writes back to, once the user has picked one. Kept in memory
+ * only: a handle cannot be serialized into the document, and persisting it to
+ * IndexedDB would need a permission re-prompt after every reload.
+ */
+let saveFileHandle: FileSystemFileHandle | null = null;
+
+/** A new or opened document targets a different file, so the handle is dropped. */
+function forgetSaveFile(): void {
+  saveFileHandle = null;
+}
+
+/**
+ * An `AbortError` this fast means the dialog never actually appeared —
+ * headless Chromium and some embedded webviews reject instantly. A real person
+ * dismissing a dialog cannot beat this.
+ *
+ * BUG-026 read every abort as a deliberate cancel, so in those environments
+ * Save silently did nothing. The check survives, but the failure now leans the
+ * safe way: an unexplained abort falls through to the download rather than
+ * dropping the user's save on the floor.
+ */
+const PICKER_CANCEL_FLOOR_MS = 250;
+
+type PickResult =
+  | { kind: 'handle'; handle: FileSystemFileHandle }
+  | { kind: 'cancelled' }
+  | { kind: 'unavailable' };
+
+async function pickSaveFile(picker: SaveFilePicker, suggestedName: string): Promise<PickResult> {
+  const startedAt = Date.now();
+  try {
+    const handle = await picker({
+      suggestedName,
+      types: [{ description: 'Forma design', accept: { 'application/json': ['.forma.json'] } }],
+    });
+    return { kind: 'handle', handle };
+  } catch (error) {
+    const aborted = error instanceof DOMException && error.name === 'AbortError';
+    const dismissable = Date.now() - startedAt >= PICKER_CANCEL_FLOOR_MS;
+    if (aborted && dismissable) return { kind: 'cancelled' };
+    return { kind: 'unavailable' };
+  }
+}
+
+/** Writes through a handle. False means the caller must fall back to a download. */
+async function writeSaveFile(handle: FileSystemFileHandle, payload: string): Promise<boolean> {
+  try {
+    const writable = await handle.createWritable();
+    await writable.write(payload);
+    await writable.close();
+    return true;
+  } catch (error) {
+    // A picker that showed but whose write then failed was the other half of
+    // BUG-026. Downloading is always available, so it is never a dead end.
+    console.warn('Writing through the file handle failed; falling back to a download', error);
+    return false;
+  }
+}
+
+/**
+ * The retained handle, but only while it still names the current document.
+ * Renaming in the toolbar has to re-target the save — otherwise Save would
+ * quietly keep writing the old filename while the header showed a new one, and
+ * "the title is the filename" would stop being true.
+ */
+function reusableHandle(filename: string): FileSystemFileHandle | null {
+  return saveFileHandle?.name === filename ? saveFileHandle : null;
+}
+
+/**
+ * True while the document still carries its placeholder title. Only then is a
+ * name worth asking for — otherwise the toolbar title has already answered the
+ * question and a Save As dialog would just make the user confirm their own
+ * earlier decision on every single save.
+ */
+export function needsFilename(): boolean {
+  return doc().docTitle.trim() === DEFAULT_DOC_TITLE;
+}
+
 /** Guards against a second Save while a write is in flight (e.g. a double-click). */
 let isSavingToFile = false;
 
 /**
  * Saves the whole document — geometry, materials, groups and version
- * history — as a downloaded `.forma.json` file, using the same schema-versioned
- * envelope as localStorage autosave. A native save picker is not used: Chrome's
- * File System Access write often fails after the dialog (BUG-026), which left
- * only a "Could not save the file" toast. Distinct from Save Version, which
- * stays inside this one document until downloaded from Version History.
+ * history — as a downloaded `.forma.json` file under `name`, defaulting to the
+ * current document title, using the same schema-versioned envelope as
+ * localStorage autosave.
+ *
+ * A native save picker is not used: Chrome's File System Access write often
+ * fails after the dialog (BUG-026), which left only a "Could not save the file"
+ * toast, and it does not exist at all in Firefox or Safari. The Save As dialog
+ * in the toolbar collects the name instead, so there stays exactly one write
+ * path. Distinct from Save Version, which stays inside this one document until
+ * downloaded from Version History.
  */
-export async function saveToFile(): Promise<boolean> {
+export async function saveToFile(name?: string): Promise<boolean> {
   if (isSavingToFile) return false;
   isSavingToFile = true;
   try {
-    const title = sanitizeFilename(doc().docTitle);
+    // A typed name becomes the document title, keeping the invariant the rest
+    // of the app relies on: the title *is* the filename, so the toolbar header,
+    // autosave and a later Open File all agree.
+    const title = sanitizeFilename(name ?? doc().docTitle);
     renameDocument(title);
+    const filename = `${title}.forma.json`;
     const payload = serializeCurrentDocument();
-    downloadBlob(new Blob([payload], { type: 'application/json' }), `${title}.forma.json`);
+
+    // Already bound to a file: overwrite it in place, no dialog. Without this
+    // every save left another "Design (1).forma.json" in the downloads folder.
+    const existing = reusableHandle(filename);
+    if (existing && (await writeSaveFile(existing, payload))) {
+      ui().showToast(`Saved ${title}`);
+      return true;
+    }
+
+    // First save of this file: one dialog picks both the folder and the name.
+    const picker = filePicker();
+    if (picker) {
+      const picked = await pickSaveFile(picker, filename);
+      if (picked.kind === 'cancelled') return false;
+      if (picked.kind === 'handle' && (await writeSaveFile(picked.handle, payload))) {
+        saveFileHandle = picked.handle;
+        // The name chosen on disk wins, so the header matches the real file.
+        const chosen = titleFromFilename(picked.handle.name);
+        renameDocument(chosen);
+        ui().showToast(`Saved ${chosen}`);
+        return true;
+      }
+    }
+
+    // Always reachable, in every browser, whatever the picker did.
+    forgetSaveFile();
+    downloadBlob(new Blob([payload], { type: 'application/json' }), filename);
     ui().showToast(`Saved ${title}`);
     return true;
   } catch (error) {
@@ -2057,6 +2200,8 @@ export async function openFile(file: File): Promise<void> {
   }
   const next = result.doc;
 
+  // Opening does not give a writable handle, so the next save re-picks.
+  forgetSaveFile();
   // The on-disk name is the source of truth for the header once a file is opened.
   const title = titleFromFilename(file.name);
   commit(() => {
