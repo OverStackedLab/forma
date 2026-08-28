@@ -143,7 +143,9 @@ with it:
   member without replacing the rest of the selection.
 - Saved documents are currently schema 5. Schema 4 applies the current appearance
   defaults. Schema-3 panel designs migrate to world-aligned dimensions and
-  explicit manufacturing metadata. A schema-1 save (sideboard dims, leg/handle/base
+  explicit manufacturing metadata. File text is parsed by `loadFormaText` so a
+  UTF-8 BOM, string `schemaVersion`, or a bare document still loads. A schema-1
+  save (sideboard dims, leg/handle/base
   style, deleted-fixed-ids) has no sensible mapping onto an empty-canvas design
   — what would you do with its generated doors and legs? — so `persistence.ts`
   treats it as unmigratable and falls back to a fresh empty document rather than

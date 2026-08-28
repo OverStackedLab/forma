@@ -64,3 +64,4 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - Reload, Open File, and Restore Version frame every object in the scene (BUG-023).
 - Save to File always downloads a `.forma.json` instead of using Chrome's save picker, which often failed after the dialog (BUG-026). Open File lists `.forma.json` files.
 - New File offers Cancel, Don't save, or Save and continue. Save downloads a `.forma.json` copy before clearing the design.
+- Open File loads older `.forma.json` files that used a UTF-8 BOM, a string schema version, a `document` key, or a bare document. Empty truncated saves say the write may not have finished instead of looking like garbage JSON (BUG-027).

@@ -1281,6 +1281,46 @@ test('opening a file that is not a Forma document shows an error instead of clea
   await expect(page.getByRole('button', { name: 'Shelf' }).first()).toBeVisible();
 });
 
+test('opening an empty file explains that the save may not have finished', async ({ page }) => {
+  await page.goto('/');
+  await insertShelf(page);
+
+  const path = test.info().outputPath('empty-save.forma.json');
+  await writeFile(path, '');
+
+  await page.locator('input[type="file"]').setInputFiles(path);
+  await expect(page.getByText('That file is empty. It may not have finished saving.')).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Shelf' }).first()).toBeVisible();
+});
+
+test('opening a schema-4 file with a UTF-8 BOM still loads', async ({ page }) => {
+  await page.goto('/');
+
+  const path = test.info().outputPath('Bom File.forma.json');
+  await writeFile(
+    path,
+    `\uFEFF${JSON.stringify({
+      schemaVersion: '4',
+      doc: {
+        defaultMaterialId: 'ash',
+        defaultColorId: 'white',
+        defaultHardwareFinishId: 'matte-black',
+        overrides: {},
+        customParts: [],
+        hiddenIds: [],
+        transforms: {},
+        groups: [],
+        docTitle: 'Inside JSON',
+        versions: [],
+        currentVersionId: null,
+      },
+    })}`,
+  );
+
+  await page.locator('input[type="file"]').setInputFiles(path);
+  await expect(page.getByText('Bom File', { exact: true })).toBeVisible();
+});
+
 test('the grid size preference survives a reload', async ({ page }) => {
   // The console-error assertion is the load-bearing half: resizing the grid
   // rebuilds GL resources, and touching a disposed one surfaces here as an

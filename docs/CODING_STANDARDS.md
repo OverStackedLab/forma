@@ -297,8 +297,9 @@ Mesh identity: `root.name` and `userData.partId` equal the part id.
 
 Autosave, Save to File, Open File, and Version History downloads share one
 envelope: `{ schemaVersion, doc }` (`localStorage` key `forma:doc`, files
-`.forma.json`). `migrate()` in `src/store/persistence.ts` is the only load
-door. Preferences (`forma:displayUnit`, `forma:gridSize`) are separate keys
+`.forma.json`). `loadFormaText()` in `src/store/persistence.ts` is the load
+door for file and autosave text; it calls `migrate()` on the parsed payload.
+Preferences (`forma:displayUnit`, `forma:gridSize`) are separate keys
 and are **not** schema-versioned.
 
 - **Current schema: 5** (KNOXHULT/ASPUDDEN appearance defaults: white panels,
@@ -308,6 +309,10 @@ and are **not** schema-versioned.
   then the schema-4 appearance step
 - Schema &lt; 3 and unknown versions are unmigratable → `null` → empty document
   / Open File error. Do not guess a mapping from the old parametric sideboard.
+- File text may include a UTF-8 BOM, `schemaVersion` as a string, `document`
+  instead of `doc`, or a bare document (`customParts` / `groups`). `loadFormaText`
+  accepts those. An empty body is reported as empty (truncated save), not as
+  invalid JSON.
 - Autosave is debounced (600ms) with a `beforeunload` flush; failures set save
   status to `error`
 - Save Version keeps a checkpoint in this browser. Version History can download
@@ -337,6 +342,7 @@ schema bump plus a migrator, not a silent rewrite.
 
 - Round-trip current schema: mutate a document, `migrate({ schemaVersion: SCHEMA_VERSION, doc })`, assert parts/groups/millimetres (see grain and demotion tests in `persistence.test.ts`)
 - Keep a `migrate` case for every supported schema (3, 4, 5) and assert `schemaVersion: 999` stays `null`
+- Cover `loadFormaText` for BOM, empty truncated saves, and string `schemaVersion`
 - E2E Open File already loads a schema-4 fixture; add a fixture per schema you still support when the document shape changes
 
 ---
@@ -378,7 +384,7 @@ Read these before changing picking, history, cabinets, or materials:
 9. **Unlayered base CSS breaks buttons** — keep resets in `@layer base`
 10. **Empty canvas is intentional** — do not restore the parametric sideboard
 11. **Magnet is object-face snap** — the 100 mm grid is Shift-held translation only; do not wire `setTranslationSnap(0.1)` to the magnet toggle
-12. **Saved files** — load only through `migrate()`; bump `SCHEMA_VERSION` when stored meaning changes; never rewrite current-schema millimetres from the catalog (see §9)
+12. **Saved files** — load text through `loadFormaText()` (which calls `migrate()`); bump `SCHEMA_VERSION` when stored meaning changes; never rewrite current-schema millimetres from the catalog (see §9)
 
 ---
 
@@ -386,7 +392,7 @@ Read these before changing picking, history, cabinets, or materials:
 
 - New reproducible defects → next `BUG-###` in [`BUGS.md`](./BUGS.md) (full
   template while open; keep the write-up under Resolved records and a summary
-  row when resolved). Next unused id after BUG-026.
+  row when resolved). Next unused id after BUG-027.
 - Non-bug follow-ups → next `IMP-###` in [`IMPROVEMENTS.md`](./IMPROVEMENTS.md)
 - Do not invent tracker entries in PR descriptions only — write them in those
   files so the next agent can find them

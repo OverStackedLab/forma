@@ -847,4 +847,22 @@ describe('save and open title', () => {
 
     expect(useDocumentStore.getState().docTitle).toBe('From Disk');
   });
+
+  it('toasts a specific message when the opened file is empty', async () => {
+    const file = new File([''], 'Broken Save.forma.json', { type: 'application/json' });
+    await openFile(file);
+    expect(useUiStore.getState().toast?.message).toBe(
+      'That file is empty. It may not have finished saving.',
+    );
+  });
+
+  it('still refuses a file that is not a Forma document', async () => {
+    const file = new File([JSON.stringify({ hello: 'world' })], 'notes.json', {
+      type: 'application/json',
+    });
+    await openFile(file);
+    expect(useUiStore.getState().toast?.message).toBe(
+      'Not a Forma file, or an unsupported version',
+    );
+  });
 });

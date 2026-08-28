@@ -423,6 +423,37 @@ always downloads `{title}.forma.json`. Open File accepts `.json` and
 `.forma.json`. Covered by save unit tests and Chromium download checks.
 Verified 2026-08-27.
 
+### BUG-027 — Open File rejected older Forma files that were still valid JSON
+
+- **Status:** Resolved
+- **Severity:** High
+- **Found:** 2026-08-27
+- **Area:** Persistence
+- **App version or commit:** main @ f383ce1
+- **Frequency:** Always for empty truncated saves; also BOM, string `schemaVersion`, `document` alias, or a bare document
+
+#### Steps to reproduce
+
+1. Open File on a `.forma.json` saved before the current envelope, or on a file that looks empty in a text editor.
+2. Or open a schema-3 / schema-4 file whose first character is a UTF-8 BOM.
+
+#### Expected behavior
+
+Schema 3–5 designs load. An empty truncated save says so and leaves the current scene alone.
+
+#### Actual behavior
+
+`JSON.parse` threw on a BOM. `migrate` required a numeric `schemaVersion` and a `doc` key, so string versions, `document`, and bare documents toasted "Not a Forma file, or an unsupported version". Empty files from the failed File System Access save (BUG-026) toasted "Could not read that file".
+
+#### Notes and evidence
+
+`src/store/persistence.ts` → `loadFormaText`. Schema 1 parametric sideboard files remain unsupported by design.
+
+#### Resolution
+
+Open File and autosave load through `loadFormaText`: strip BOM, treat empty as empty, accept string versions, `document`, and a bare document with `customParts` / `groups`. Empty files toast that the save may not have finished. Covered by persistence unit tests and Chromium Open File checks.
+Verified 2026-08-27.
+
 ## Resolved bugs
 
 | ID | Summary | Resolution | Verified |
@@ -448,3 +479,4 @@ Verified 2026-08-27.
 | BUG-024 | Duplicating a panel measured from the wrong face | See Resolved records. Duplicate of an interior panel is Add Panel at the next free centreline; a single selected piece measures to individual neighbours. | 2026-08-27 |
 | BUG-025 | Add Shelf / Add Panel reset existing panel positions | See Resolved records. Rebuilds reuse ids by role and keep live centrelines. | 2026-08-27 |
 | BUG-026 | Save to File did nothing when the native picker aborted immediately | See Resolved records. Save always downloads `{title}.forma.json`; Open File accepts `.forma.json`. | 2026-08-27 |
+| BUG-027 | Open File rejected older Forma files that were still valid JSON | See Resolved records. `loadFormaText` strips a BOM, accepts string versions / `document` / a bare doc, and explains empty truncated saves. | 2026-08-27 |

@@ -61,7 +61,7 @@ import {
   useDocumentStore,
 } from './documentStore';
 import { clearHistory, commit, syncHistoryDocumentMeta } from './history';
-import { migrate, SCHEMA_VERSION } from './persistence';
+import { loadFormaText, SCHEMA_VERSION } from './persistence';
 import { useUiStore } from './uiStore';
 
 export type { AlignEdge };
@@ -1737,19 +1737,18 @@ function serializeCurrentDocument(): string {
 
 /** Reads a .forma.json file and replaces the current document with it, as one undo step. */
 export async function openFile(file: File): Promise<void> {
-  let parsed: unknown;
-  try {
-    parsed = JSON.parse(await file.text());
-  } catch {
-    ui().showToast('Could not read that file');
+  const result = loadFormaText(await file.text());
+  if (!result.ok) {
+    if (result.reason === 'empty') {
+      ui().showToast('That file is empty. It may not have finished saving.');
+    } else if (result.reason === 'invalid-json') {
+      ui().showToast('Could not read that file');
+    } else {
+      ui().showToast('Not a Forma file, or an unsupported version');
+    }
     return;
   }
-
-  const next: FormaDocument | null = migrate(parsed);
-  if (!next) {
-    ui().showToast('Not a Forma file, or an unsupported version');
-    return;
-  }
+  const next = result.doc;
 
   // The on-disk name is the source of truth for the header once a file is opened.
   const title = titleFromFilename(file.name);
