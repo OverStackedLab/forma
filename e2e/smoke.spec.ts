@@ -72,6 +72,7 @@ test('boots to an empty scene with no starting model', async ({ page }) => {
   await expect(page.getByRole('button', { name: 'Door' })).toBeVisible();
   await expect(page.getByRole('button', { name: /AXSTAD Glass 400 400×800/ })).toBeVisible();
   await expect(page.getByRole('button', { name: /ENHET/ })).toBeVisible();
+  await expect(page.getByRole('button', { name: /BORGHAMN/ })).toBeVisible();
 
   expect(errors).toEqual([]);
 });
@@ -368,6 +369,15 @@ test('an AXSTAD glass door inserts as a front with an inset pane', async ({ page
   await expect(page.getByText('AXSTAD Glass 400 added to scene')).toBeVisible();
   await page.getByRole('tab', { name: 'Assembly' }).click();
   await expect(page.getByRole('treeitem', { name: /AXSTAD Glass 400/ })).toBeVisible();
+});
+
+test('a BORGHAMN handle inserts as square-bar hardware', async ({ page }) => {
+  await page.goto('/');
+  await page.getByRole('tab', { name: 'Library' }).click();
+  await page.getByRole('button', { name: /BORGHAMN 170 mm/ }).click();
+  await expect(page.getByText('BORGHAMN added to scene')).toBeVisible();
+  await page.getByRole('tab', { name: 'Assembly' }).click();
+  await expect(page.getByRole('treeitem', { name: /BORGHAMN/ })).toBeVisible();
 });
 
 test('the Properties tab has its own finish picker, in sync with Finish', async ({ page }) => {

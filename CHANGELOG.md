@@ -6,6 +6,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## Unreleased
 
+### Added
+
+- BORGHAMN square-bar handle in the hardware library (170 mm, 160 mm centres, IKEA 203.160.46) (IMP-018).
+
 ## 2026-08-28
 
 ### Added

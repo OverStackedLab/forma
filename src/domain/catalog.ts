@@ -122,6 +122,11 @@ export const PANEL_PRESETS: readonly PanelPreset[] = [
     grainAxis: null, edgeBanding: [], defaultQuaternion: [0, 0, 0, 1],
   },
   {
+    id: 'borghamn', label: 'BORGHAMN', w: 170, h: 10, d: 36, icon: 'panel_handle', shape: 'borghamn',
+    category: 'hardware', description: '170 mm · 160 mm centres · IKEA 203.160.46', thicknessAxis: null,
+    grainAxis: null, edgeBanding: [], defaultQuaternion: [0, 0, 0, 1],
+  },
+  {
     id: 'enhet-leg', label: 'ENHET', w: 50, h: 125, d: 50, icon: 'panel_leg', shape: 'enhet-leg',
     category: 'hardware', description: 'Leg · 125 mm · IKEA 104.490.18', thicknessAxis: null,
     grainAxis: null, edgeBanding: [], defaultQuaternion: [0, 0, 0, 1],

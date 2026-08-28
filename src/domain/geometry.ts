@@ -1,6 +1,14 @@
 import { resolveAppearance } from './catalog';
 import { OAK_GRAIN_URL } from './oakGrain';
 import { WALNUT_GRAIN_URL } from './walnutGrain';
+import {
+  BORGHAMN_BAR_MM,
+  BORGHAMN_CENTRES_MM,
+  BORGHAMN_FOOT_MM,
+  BORGHAMN_LENGTH_MM,
+  BORGHAMN_PROJECTION_MM,
+  borghamnCenterline,
+} from './borghamn';
 import { axstadGlassPieces } from './glassDoor';
 import type { PanelShape, PartSpec } from './types';
 
@@ -28,6 +36,7 @@ export class GeometryCache {
   private cylinder: TBufferGeometry | null = null;
   private bagganas: TBufferGeometry | null = null;
   private eneryda: TBufferGeometry | null = null;
+  private borghamn: TBufferGeometry | null = null;
   private enhetLeg: TBufferGeometry | null = null;
 
   constructor(private readonly THREE: ThreeModule) {}
@@ -127,6 +136,71 @@ export class GeometryCache {
   }
 
   /**
+   * IKEA BORGHAMN (203.160.46): 10×10 mm square bar bent into a U, 170 mm
+   * overall, 160 mm centres, 36 mm projection. Built in mm, then packed into
+   * the unit box like ENERYDA.
+   */
+  unitBorghamn(): TBufferGeometry {
+    if (!this.borghamn) {
+      const half = BORGHAMN_BAR_MM / 2;
+      const points = borghamnCenterline();
+      const a = points[0];
+      const b = points[1];
+      const c = points[2];
+      const d = points[3];
+      const e = points[4];
+      const f = points[5];
+      if (!a || !b || !c || !d || !e || !f) return this.unitBox();
+      const vec = (point: { x: number; y: number; z: number }) =>
+        new this.THREE.Vector3(point.x, point.y, point.z);
+
+      const path = new this.THREE.CurvePath<import('three').Vector3>();
+      path.add(new this.THREE.LineCurve3(vec(a), vec(b)));
+      path.add(new this.THREE.QuadraticBezierCurve3(
+        vec(b),
+        new this.THREE.Vector3(a.x, 0, c.z),
+        vec(c),
+      ));
+      path.add(new this.THREE.LineCurve3(vec(c), vec(d)));
+      path.add(new this.THREE.QuadraticBezierCurve3(
+        vec(d),
+        new this.THREE.Vector3(e.x, 0, d.z),
+        vec(e),
+      ));
+      path.add(new this.THREE.LineCurve3(vec(e), vec(f)));
+
+      const shape = new this.THREE.Shape();
+      shape.moveTo(-half, -half);
+      shape.lineTo(half, -half);
+      shape.lineTo(half, half);
+      shape.lineTo(-half, half);
+      shape.closePath();
+
+      const bar = new this.THREE.ExtrudeGeometry(shape, {
+        steps: 72,
+        bevelEnabled: false,
+        extrudePath: path,
+      });
+
+      const foot = new this.THREE.BoxGeometry(BORGHAMN_BAR_MM, BORGHAMN_BAR_MM, BORGHAMN_FOOT_MM);
+      const leftFoot = foot.clone();
+      leftFoot.translate(-BORGHAMN_CENTRES_MM / 2, 0, BORGHAMN_FOOT_MM / 2);
+      const rightFoot = foot.clone();
+      rightFoot.translate(BORGHAMN_CENTRES_MM / 2, 0, BORGHAMN_FOOT_MM / 2);
+      foot.dispose();
+
+      const merged = this.mergeGeometries([bar, leftFoot, rightFoot]);
+      bar.dispose();
+      leftFoot.dispose();
+      rightFoot.dispose();
+
+      this.normalizeToUnitBox(merged, BORGHAMN_LENGTH_MM, BORGHAMN_BAR_MM, BORGHAMN_PROJECTION_MM);
+      this.borghamn = merged;
+    }
+    return this.borghamn;
+  }
+
+  /**
    * IKEA ENHET cabinet leg (104.490.18): Ø50 mm mounting plate, steel tube,
    * threaded adjuster and plastic foot. Nominal height 125 mm (adjustable
    * 110–135). Built in mm with Y up, then packed into the unit box.
@@ -180,6 +254,7 @@ export class GeometryCache {
   forShape(shape: PanelShape): TBufferGeometry {
     if (shape === 'bagganas') return this.unitBagganas();
     if (shape === 'eneryda') return this.unitEneryda();
+    if (shape === 'borghamn') return this.unitBorghamn();
     if (shape === 'enhet-leg') return this.unitEnhetLeg();
     if (shape === 'cylinder') return this.unitCylinder();
     return this.unitBox();
@@ -277,6 +352,8 @@ export class GeometryCache {
     this.bagganas = null;
     this.eneryda?.dispose();
     this.eneryda = null;
+    this.borghamn?.dispose();
+    this.borghamn = null;
     this.enhetLeg?.dispose();
     this.enhetLeg = null;
   }
