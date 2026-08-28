@@ -89,7 +89,12 @@ export const useUiStore = create<UiStore>()(
         rightTab: 'properties',
       })),
     clearSelection: () => set({ selectedPartIds: [] }),
-    setGizmoMode: (gizmoMode) => set({ gizmoMode, measureActive: false }),
+    // Measure and the gizmos are independent tools. Forcing one off when the
+    // other is picked meant a resize could never be measured while it was
+    // happening, which is exactly when the number is wanted (BUG-040).
+    // TransformControls consumes its own handle drags, so measure clicks that
+    // miss a handle still land.
+    setGizmoMode: (gizmoMode) => set({ gizmoMode }),
     setViewMode: (viewMode) => set({ viewMode }),
     setLeftTab: (leftTab) => set({ leftTab }),
     setRightTab: (rightTab) => set({ rightTab }),
@@ -99,7 +104,6 @@ export const useUiStore = create<UiStore>()(
       set((s) => ({
         measureActive: !s.measureActive,
         measurePoints: [],
-        gizmoMode: 'select',
       })),
     // A third click starts a fresh measurement.
     addMeasurePoint: (point) =>

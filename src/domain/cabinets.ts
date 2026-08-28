@@ -63,6 +63,33 @@ export function nextFreeInteriorPosition(
   return null;
 }
 
+/**
+ * Explicit centrelines, clamped into `range`, sorted, and thinned so no two
+ * boards occupy the same space. Two centrelines closer than one panel
+ * thickness cannot both hold an 18 mm board, and typing the same position into
+ * several position fields used to generate stacked, z-fighting shelves that
+ * each got their own cut-list row (BUG-034). Add Shelf / Add Panel already
+ * refuse an occupied centreline via `nextFreeInteriorPosition`; this applies
+ * the same rule to typed and loaded positions.
+ */
+function distinctInteriorPositions(
+  positionsMm: readonly number[],
+  range: { min: number; max: number },
+  limit: number,
+): number[] {
+  const sorted = [...positionsMm]
+    .map((value) => Math.min(range.max, Math.max(range.min, Math.round(value))))
+    .sort((a, b) => a - b);
+  const distinct: number[] = [];
+  for (const value of sorted) {
+    const previous = distinct[distinct.length - 1];
+    if (previous !== undefined && value - previous < PANEL_THICKNESS) continue;
+    distinct.push(value);
+    if (distinct.length === limit) break;
+  }
+  return distinct;
+}
+
 export type InteriorMember = { kind: 'shelf' | 'divider'; positionMm: number };
 
 /**
@@ -220,10 +247,7 @@ type ShelfSpec = {
 export function shelfPositions(config: ShelfSpec): number[] {
   const range = shelfPositionRange(config.height);
   if (config.shelfPositionsMm?.length) {
-    return [...config.shelfPositionsMm]
-      .map((y) => Math.min(range.max, Math.max(range.min, Math.round(y))))
-      .sort((a, b) => a - b)
-      .slice(0, MAX_SHELF_COUNT);
+    return distinctInteriorPositions(config.shelfPositionsMm, range, MAX_SHELF_COUNT);
   }
   const innerHeight = config.height - PANEL_THICKNESS * 2;
   return Array.from(
@@ -269,11 +293,11 @@ type DividerSpec = {
  */
 export function dividerPositions(config: DividerSpec): number[] {
   if (!config.dividerPositionsMm?.length) return [];
-  const range = dividerPositionRange(config.width);
-  return [...config.dividerPositionsMm]
-    .map((x) => Math.min(range.max, Math.max(range.min, Math.round(x))))
-    .sort((a, b) => a - b)
-    .slice(0, MAX_DIVIDER_COUNT);
+  return distinctInteriorPositions(
+    config.dividerPositionsMm,
+    dividerPositionRange(config.width),
+    MAX_DIVIDER_COUNT,
+  );
 }
 
 /**

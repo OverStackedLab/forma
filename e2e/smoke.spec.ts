@@ -365,15 +365,18 @@ test('the Properties tab has its own finish picker, in sync with Finish', async 
   await insertShelf(page);
   await expect(page.getByRole('tab', { name: 'Properties' })).toHaveAttribute('aria-selected', 'true');
 
-  // Apply a finish without ever visiting the Finish tab.
-  await page.getByRole('button', { name: 'Dark Gray' }).click();
-  await expect(page.getByRole('button', { name: 'Dark Gray' })).toHaveAttribute('aria-pressed', 'true');
+  // Apply a finish without ever visiting the Finish tab. The name must be
+  // exact: 'Dark Gray' is also a prefix of the 'Dark Gray-Green' swatch.
+  await page.getByRole('button', { name: 'Dark Gray', exact: true }).click();
+  await expect(page.getByRole('button', { name: 'Dark Gray', exact: true }))
+    .toHaveAttribute('aria-pressed', 'true');
 
   // Finish reflects the same override for the same part — one shared
   // FinishPicker, not two copies that could drift apart.
   await page.getByRole('tab', { name: 'Color' }).click();
   await expect(page.getByText('Editing: Shelf')).toBeVisible();
-  await expect(page.getByRole('button', { name: 'Dark Gray' })).toHaveAttribute('aria-pressed', 'true');
+  await expect(page.getByRole('button', { name: 'Dark Gray', exact: true }))
+    .toHaveAttribute('aria-pressed', 'true');
   await expect(page.getByText('Use design color')).toBeVisible();
 });
 
@@ -382,7 +385,7 @@ test('a mixed-finish selection is clear and can be unified in one click', async 
   await insertShelf(page);
   await page.getByRole('button', { name: 'Oak', exact: true }).click();
   await insertShelf(page);
-  await page.getByRole('button', { name: 'Dark Gray' }).click();
+  await page.getByRole('button', { name: 'Dark Gray', exact: true }).click();
   await page.getByRole('tab', { name: 'Assembly' }).click();
 
   const shelves = page.getByRole('treeitem', { name: 'Shelf Hide Shelf' });
@@ -680,8 +683,10 @@ test('snap to floor preserves a fully selected cabinet structure', async ({ page
   await page.getByRole('button', { name: 'Snap to Floor' }).click();
   await expect(page.getByText('Already on the floor')).toBeVisible();
 
+  // Y Position is the part centre: an 800-high carcass with an 18 mm top
+  // puts that panel's centreline at 800 - 18 / 2.
   await page.getByRole('treeitem', { name: /Base 600 Top Hide/ }).click();
-  await expect(page.getByLabel('Y Position in millimetres')).toHaveValue('711');
+  await expect(page.getByLabel('Y Position in millimetres')).toHaveValue('791');
 });
 
 test('changing a panel height keeps its grounded face anchored', async ({
@@ -959,18 +964,23 @@ test('a moving group shows alignment when it lines up with another group', async
   await expect(page.getByTestId('selection-align-dimension').filter({ hasText: '0 mm' }).first()).toBeVisible();
 });
 
-test('a selected cabinet shows overall width, height, and depth', async ({ page }) => {
+test('overall width, height, and depth belong to the scale gizmo', async ({ page }) => {
   await gotoMm(page);
   await page.getByRole('tab', { name: 'Library' }).click();
   await page.getByRole('button', { name: /Base 600/ }).click();
   await expect(page.getByText('Base 600 cabinet added')).toBeVisible();
+
+  // BUG-038: size witnesses are part of the resize gesture, so the move gizmo
+  // an insert leaves selected must not carry them.
+  await expect(page.getByTestId('selection-overall-dimension')).toHaveCount(0);
+
+  await page.getByRole('button', { name: 'Scale (S)' }).click();
   await expect(page.getByTestId('selection-overall-dimension').filter({ hasText: 'W 600 mm' })).toBeVisible();
   await expect(page.getByTestId('selection-overall-dimension').filter({ hasText: 'H 800 mm' })).toBeVisible();
   await expect(page.getByTestId('selection-overall-dimension').filter({ hasText: 'D 600 mm' })).toBeVisible();
 
-  await page.getByRole('tab', { name: 'Assembly' }).click();
-  await page.getByRole('treeitem', { name: /Base 600 Top Hide/ }).click();
-  await expect(page.getByTestId('selection-overall-dimension').filter({ hasText: 'H 800 mm' })).toBeVisible();
+  await page.getByRole('button', { name: 'Move (G)' }).click();
+  await expect(page.getByTestId('selection-overall-dimension')).toHaveCount(0);
 });
 
 test('typing an overall witness with the scale gizmo resizes the selection', async ({ page }) => {

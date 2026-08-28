@@ -5,18 +5,6 @@ feature, show up in profiling, or sit next to related work.
 
 ## Open improvements
 
-### IMP-001 — History clones and serializes the full version list on every commit
-
-- **Area:** Store / History
-- **Why it matters:** Each `commit()` deep-clones `versions` twice and
-  `JSON.stringify`s the whole document (including every saved version) for the
-  no-op check and `reconcileCurrentVersion`. With many checkpoints of a large
-  design, a single gizmo release does unnecessary work, and the undo stack
-  retains independent clones of the version list.
-- **Direction:** Share immutable version entries by reference in snapshots, or
-  keep versions out of the geometry undo slice and track them as an append-only
-  log with hashed reconcile keys.
-
 ### IMP-002 — Marquee selection tests part centres only
 
 - **Area:** Viewport / Picking
@@ -48,30 +36,6 @@ feature, show up in profiling, or sit next to related work.
 - **Direction:** Add an optional `scale` argument for symmetry, or document the
   unit-scale constraint at the call site.
 
-### IMP-005 — Cut-list CSV export hardening
-
-- **Area:** Cut List / CSV
-- **Why it matters:**
-  1. Labels beginning with `=`, `+`, `-`, or `@` become live spreadsheet formulas
-     when the file is opened in Excel or Google Sheets (formula injection).
-  2. Hardware rows use an em dash (`—`) for grain with no UTF-8 BOM, so Excel on
-     Windows often shows `â€"` on double-click open.
-- **Direction:** Prefix formula-like fields (e.g. with `'` or a space) in
-  `escapeField`, and write `\uFEFF` at the export boundary (or use an ASCII
-  placeholder in CSV output).
-
-### IMP-006 — `CUSTOM_PANEL_LIMITS.w` fights real presets
-
-- **Area:** Catalog / Properties
-- **Why it matters:** Width limits are `{ min: 10, max: 3000, step: 5 }` while
-  side/divider presets store 18 mm thickness on `w` and knobs use 32 mm diameter.
-  Neither value sits on the 5 mm grid, so the W/Diameter slider cannot return a
-  part to its factory size, and persistence clamps rewrite odd thicknesses on
-  load. The comment above the constant still claims the limits are unused.
-- **Direction:** Align `w` limits with thickness-capable axes (`min: 3`,
-  `step: 1`), or use per-axis limits that depend on `thicknessAxis` / shape, and
-  fix the stale comment.
-
 ### IMP-007 — Test coverage for recently fixed seams
 
 - **Area:** Tests
@@ -102,3 +66,7 @@ feature, show up in profiling, or sit next to related work.
 | IMP-013 | Reorder cabinets in Assembly | Group checkboxes removed. Drag a group handle to reorder; Shift/⌘-click still adds a group to the selection. Covered by `reorderById` / `reorderGroups` unit tests and a Base 600 + Wall 600 browser check. | 2026-08-28 |
 | IMP-014 | See when two objects line up | Flush facing faces, and a moving group whose min/max matches another group, draw SketchUp-style witnesses in the brass accent (`#C68A46`) at 0 mm, only while the move gizmo is on. Alignment lines span the shared face or the gap between boxes so they stay after a snap. Overlapping interiors stay quiet. Covered by `axisRelation` / `coplanarAlignments` unit tests and two-shelf plus Base 600 + Wall 600 browser checks. | 2026-08-28 |
 | IMP-015 | Type overall size from the viewport | With the scale gizmo on, overall W/H/D labels are editable. A cabinet resizes parametrically; a single part writes catalog size; a rigid group scales around the shared pivot. Covered by `setSelectedOverallDim` unit tests and a typed-shelf browser check. | 2026-08-28 |
+| IMP-005 | Cut-list CSV export hardening | `escapeField` apostrophe-prefixes text fields opening with `=`, `+`, `-`, `@`, tab or CR (numbers exempt), and the export blob carries a UTF-8 BOM so Excel decodes the em dash. Covered by `csv.test.ts` (BUG-011, BUG-013). | 2026-08-28 |
+| IMP-006 | `CUSTOM_PANEL_LIMITS.w` fights real presets | All three axes are `{ min: 3, max: 3000, step: 1 }`, so 8 mm backs, 18 mm sides and 32 mm knobs are reachable and survive a reload. The stale "not enforced" comment is corrected (BUG-012). | 2026-08-28 |
+| IMP-016 | Per-frame and per-commit work that scales with the whole document | The visible-id list is derived on document change instead of per frame; `SelectionDimensions.sync` short-circuits on an unchanged scene revision, selection and gizmo mode, so idle frames do no bounds work; `commit` compares store slices by reference before serializing, and version reconciliation caches each checkpoint's serialized form. | 2026-08-28 |
+| IMP-001 | History clones and serializes the full version list on every commit | `fullSnapshot` shares immutable `SavedVersion` entries by reference instead of deep-cloning them per commit; `commit` compares store slices by reference and only serializes the ones that changed identity; `reconcileCurrentVersion` caches each checkpoint's serialized form in a `WeakMap`. Resolved with IMP-016. | 2026-08-28 |

@@ -8,6 +8,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Added
 
+- Measure works alongside the move, rotate and scale gizmos, so a resize can be measured while it is happening (BUG-040).
 - IKEA KNOXHULT / ASPUDDEN panel colors (Oak, Dark Gray, Dark Gray-Green, White) and hardware finishes (Brushed Brass, Matte Black, Brushed Steel, White).
 - BAGGANÄS knob and ENERYDA bow-pull geometry in the hardware library.
 - ENHET cabinet legs (IKEA 104.490.18, 125 mm) in the hardware library.
@@ -36,6 +37,11 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Changed
 
+- Panel W/H/D all span 3–3000 mm on a 1 mm step, so 8 mm backs, 18 mm sides and 32 mm knob diameters are reachable and survive a reload (BUG-012).
+- Losing cabinet controls is explained: an edit that leaves a carcass the cabinet can't regenerate now says so and points at Restore cabinet, and Properties warns before a per-part resize does it (BUG-020).
+- Overall width/height/depth witnesses draw only while the scale gizmo is on, matching alignment witnesses, which draw only while the move gizmo is on (BUG-038, reversing IMP-012's always-on preview).
+- Inserting a piece from the Library frames it, so it can't land off-screen on a wide design. Dragging one in keeps the current camera (BUG-036).
+- Keyboard hints follow the platform: `Ctrl+D` / `Ctrl+A` off macOS, `⌘D` / `⌘A` on it (BUG-041).
 - The 3D view button sits to the left of Front.
 - With two pieces or groups selected, the gizmo moves only the second so the first stays put and the clearance updates (same order as Align).
 - Default display unit is centimetres. Domain values stay millimetres.
@@ -51,6 +57,18 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Fixed
 
+- Duplicating two or more cabinets copies each as a configurable cabinet instead of a pile of loose panels (BUG-019).
+- Cut-list labels beginning with `=`, `+`, `-` or `@` no longer become live formulas when the CSV is opened in Excel or Google Sheets (BUG-011).
+- The exported CSV carries a UTF-8 BOM, so Excel on Windows shows the hardware grain em dash instead of `â€"` (BUG-013).
+- Typing a width, height or depth on a viewport witness now resizes the axis the label is drawn along. On a rotated part it used to resize a different axis — typing W on a door turned 90° changed its depth (BUG-037).
+- Selection dimension labels no longer stack on top of each other; overlapping measurements are pushed apart, or hidden when there is no room (BUG-039).
+- Moving one bay's shelf in a cabinet with an interior panel no longer invents a second shelf row (a later Add Shelf produced six shelves instead of three). The cabinet demotes to a plain group when a row can no longer be described parametrically; Restore cabinet brings the controls back (BUG-029).
+- Deleting one shelf of a multi-bay row no longer deletes the facing bay's shelf with it (BUG-030).
+- Dragging or nudging a selection past the ±10 m limit moves it as one rigid structure instead of flattening every panel onto the boundary plane (BUG-031).
+- Cabinets whose shelves fall on fractional even spacing (High 600) keep their catalog preset through a size change and still redistribute shelves when the height changes (BUG-032).
+- Scaling one cabinet panel with the gizmo demotes the cabinet like a typed dimension edit, instead of silently discarding the change on the next rebuild (BUG-033).
+- Typing the same position into several shelf or panel fields no longer stacks boards on one centreline and double-counts them in the cut list (BUG-034).
+- Dragging a scale handle through a part's pivot leaves the part at its size instead of collapsing it to 1/1000 (BUG-035).
 - Wall cabinets no longer sit on the floor when inserted; they hang so their top lines up with High 2200.
 - Moving, rotating, or renaming a cabinet panel no longer strips shelf controls. Add Shelf stays available when any piece of that cabinet is selected.
 - Deleting a generated shelf or interior panel keeps the cabinet configurable (BUG-014); only removing a carcass piece (side, top, bottom, or back) demotes it.
@@ -69,3 +87,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - New File offers Cancel, Don't save, or Save and continue. Save downloads a `.forma.json` copy before clearing the design.
 - Open File loads older `.forma.json` files that used a UTF-8 BOM, a string schema version, a `document` key, or a bare document. Empty truncated saves say the write may not have finished instead of looking like garbage JSON (BUG-027).
 - Alignment witnesses stay after a snap: they span the shared face (or the gap between boxes) instead of collapsing to a point, and a millimetre of overlap still counts as flush.
+
+### Performance
+
+- Selection witnesses recompute only when the document changes or a gizmo is dragging, instead of rebuilding every neighbour's world bounds on every frame (IMP-016).
+- `commit()` compares document slices by reference and serializes only the ones that changed, and version reconciliation caches each checkpoint's serialized form. A gizmo release in a design with ten checkpoints no longer serializes eleven whole documents (IMP-001, IMP-016).

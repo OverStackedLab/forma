@@ -724,6 +724,13 @@ function PropertiesTab() {
       {selection.kind === 'single' && (
         <>
           <SectionHeader>Dimensions</SectionHeader>
+          {cabinetGroup?.cabinet && !matchedGroup && (
+            <p className="mb-3 text-[10.5px] leading-relaxed text-ink/40">
+              This piece belongs to {cabinetGroup.label}. Resizing it on its own leaves a carcass
+              the cabinet can no longer regenerate, so shelf controls are replaced by Restore
+              cabinet. Use Cabinet Width / Height / Depth above to resize the whole unit.
+            </p>
+          )}
           {selection.spec.category === 'hardware' ? (
             isLegHardwareShape(selection.spec.shape) ? (
               <>

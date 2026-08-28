@@ -135,13 +135,18 @@ export const DEFAULT_COLOR_ID: ColorId = 'white';
 export const DEFAULT_HARDWARE_FINISH_ID: HardwareFinishId = 'matte-black';
 
 /**
- * Slider range for a panel's own W/H/D. Unlike a hard domain rule, this isn't
- * enforced anywhere else — setCustomPartDim only rejects non-positive values.
- * `h` and `d` each span thin-to-large, since which one carries a panel's
- * thickness vs. its depth/height depends on the preset (see PANEL_PRESETS).
+ * Slider range for a panel's own W/H/D. `setCustomPartDim`, `setHardwareDiameter`
+ * and `persistence.normalizePart` all clamp to these, so they are a real domain
+ * rule and not only a slider hint.
+ *
+ * All three axes span thin-to-large on a 1 mm step: which axis carries a
+ * panel's thickness rather than its height or depth depends on the preset (see
+ * PANEL_PRESETS), and the catalog itself needs 8 mm backs, 18 mm sides and
+ * 32 mm knobs. A 10 mm floor on a 5 mm grid put none of those on a reachable
+ * value and had persistence rewriting them on load (BUG-012).
  */
 export const CUSTOM_PANEL_LIMITS = {
-  w: { min: 10, max: 3000, step: 5 },
+  w: { min: 3, max: 3000, step: 1 },
   h: { min: 3, max: 3000, step: 1 },
   d: { min: 3, max: 3000, step: 1 },
 } as const;

@@ -1,4 +1,4 @@
-import type { Transform } from './types';
+import type { DimensionAxis, Transform } from './types';
 
 export type Size3 = { w: number; h: number; d: number };
 export type Vector3 = { x: number; y: number; z: number };
@@ -51,4 +51,37 @@ export function halfExtentAlongNormalMm(
     Math.abs(dot(normal, yAxis)) * size.h / 2 +
     Math.abs(dot(normal, zAxis)) * size.d / 2
   );
+}
+
+/**
+ * The part-local dimension (`w`/`h`/`d`) that points along a world axis for a
+ * given orientation — the nearest local axis, so a 90° turn maps cleanly and a
+ * small tilt still resolves to the dimension the user sees.
+ *
+ * Selection witnesses measure the world AABB, so an edit typed on one has to be
+ * written back to whichever local dimension actually runs that way. Assuming
+ * x→w unconditionally resized a rotated door's depth from its width label
+ * (BUG-037). Quaternions reaching the document are normalized by
+ * `commitTransforms` and `persistence.normalizeTransform`, so the conjugate is
+ * the inverse.
+ */
+export function localDimensionForWorldAxis(
+  quaternion: Transform['quaternion'],
+  axis: 'x' | 'y' | 'z',
+): DimensionAxis {
+  const inverse: Transform['quaternion'] = [
+    -quaternion[0],
+    -quaternion[1],
+    -quaternion[2],
+    quaternion[3],
+  ];
+  const local = rotateVectorByQuaternion(
+    { x: axis === 'x' ? 1 : 0, y: axis === 'y' ? 1 : 0, z: axis === 'z' ? 1 : 0 },
+    inverse,
+  );
+  const x = Math.abs(local.x);
+  const y = Math.abs(local.y);
+  const z = Math.abs(local.z);
+  if (x >= y && x >= z) return 'w';
+  return y >= z ? 'h' : 'd';
 }
