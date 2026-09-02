@@ -9,6 +9,7 @@ import {
   BORGHAMN_PROJECTION_MM,
   borghamnCenterline,
 } from './borghamn';
+import { bodbynGlassPieces, bodbynPieces } from './bodbyn';
 import { axstadGlassPieces } from './glassDoor';
 import type { PanelShape, PartSpec } from './types';
 
@@ -483,8 +484,11 @@ export function createPartNode(
   spec: PartSpec,
   material: TMaterial,
 ): PartNode {
-  if (spec.shape === 'glass-door') {
+  if (spec.shape === 'glass-door' || spec.shape === 'bodbyn-glass' || spec.shape === 'bodbyn-muntin-glass') {
     return createGlassDoorNode(THREE, geometries, materials, spec, material);
+  }
+  if (spec.shape === 'bodbyn-door') {
+    return createBodbynDoorNode(THREE, geometries, materials, spec, material);
   }
   const root = new THREE.Group();
   const geometry = geometries.forShape(spec.shape);
@@ -533,6 +537,16 @@ function createGlassDoorNode(
     root.add(frame);
     frames.push(frame);
   }
+  const muntins: TMesh[] = [];
+  for (let i = 0; i < 2; i++) {
+    const muntin = new THREE.Mesh(box, material);
+    muntin.castShadow = true;
+    muntin.receiveShadow = true;
+    muntin.userData.partId = spec.id;
+    muntin.visible = false;
+    root.add(muntin);
+    muntins.push(muntin);
+  }
   const glass = new THREE.Mesh(box, materials.glass());
   glass.castShadow = false;
   glass.receiveShadow = true;
@@ -549,16 +563,105 @@ function createGlassDoorNode(
     highlightTarget: highlight,
     update(next) {
       highlight.scale.set(next.size.x * MM, next.size.y * MM, next.size.z * MM);
-      const pieces = axstadGlassPieces(next.size.x, next.size.y, next.size.z);
-      pieces.forEach((piece, index) => {
-        const mesh = piece.role === 'glass' ? glass : frames[index];
-        if (!mesh) return;
+      const pieces =
+        next.shape === 'bodbyn-muntin-glass'
+          ? bodbynGlassPieces(next.size.x, next.size.y, next.size.z, true)
+          : next.shape === 'bodbyn-glass'
+            ? bodbynGlassPieces(next.size.x, next.size.y, next.size.z)
+            : axstadGlassPieces(next.size.x, next.size.y, next.size.z);
+      let frameIndex = 0;
+      let muntinIndex = 0;
+      for (const muntin of muntins) muntin.visible = false;
+      for (const piece of pieces) {
+        const mesh =
+          piece.role === 'glass'
+            ? glass
+            : piece.role === 'muntin'
+              ? muntins[muntinIndex++]
+              : frames[frameIndex++];
+        if (!mesh) continue;
+        mesh.visible = true;
         mesh.scale.set(piece.size.x * MM, piece.size.y * MM, piece.size.z * MM);
         mesh.position.set(piece.position.x * MM, piece.position.y * MM, piece.position.z * MM);
-      });
+      }
     },
     setMaterial(m) {
       for (const frame of frames) frame.material = m;
+      for (const muntin of muntins) muntin.material = m;
+    },
+  };
+  node.update(spec);
+  return node;
+}
+
+function createBodbynDoorNode(
+  THREE: ThreeModule,
+  geometries: GeometryCache,
+  materials: MaterialCache,
+  spec: PartSpec,
+  material: TMaterial,
+): PartNode {
+  const root = new THREE.Group();
+  const box = geometries.unitBox();
+  const highlight = new THREE.Mesh(box, materials.ghost());
+  highlight.castShadow = false;
+  highlight.receiveShadow = false;
+  highlight.userData.partId = spec.id;
+  const frames: TMesh[] = [];
+  for (let i = 0; i < 4; i++) {
+    const frame = new THREE.Mesh(box, material);
+    frame.castShadow = true;
+    frame.receiveShadow = true;
+    frame.userData.partId = spec.id;
+    root.add(frame);
+    frames.push(frame);
+  }
+  const bevels: TMesh[] = [];
+  for (let i = 0; i < 4; i++) {
+    const bevel = new THREE.Mesh(box, material);
+    bevel.castShadow = true;
+    bevel.receiveShadow = true;
+    bevel.userData.partId = spec.id;
+    root.add(bevel);
+    bevels.push(bevel);
+  }
+  const panel = new THREE.Mesh(box, material);
+  panel.castShadow = true;
+  panel.receiveShadow = true;
+  panel.userData.partId = spec.id;
+  root.add(panel);
+  root.add(highlight);
+  root.name = spec.id;
+  root.userData.partId = spec.id;
+
+  const node: PartNode = {
+    id: spec.id,
+    root,
+    highlightTarget: highlight,
+    update(next) {
+      highlight.scale.set(next.size.x * MM, next.size.y * MM, next.size.z * MM);
+      const pieces = bodbynPieces(next.size.x, next.size.y, next.size.z);
+      let frameIndex = 0;
+      let bevelIndex = 0;
+      for (const piece of pieces) {
+        const mesh =
+          piece.role === 'panel'
+            ? panel
+            : piece.role === 'bevel'
+              ? bevels[bevelIndex++]
+              : frames[frameIndex++];
+        if (!mesh) continue;
+        const vanished = piece.size.x < 1 || piece.size.y < 1 || piece.size.z < 1;
+        mesh.visible = !vanished;
+        if (vanished) continue;
+        mesh.scale.set(piece.size.x * MM, piece.size.y * MM, piece.size.z * MM);
+        mesh.position.set(piece.position.x * MM, piece.position.y * MM, piece.position.z * MM);
+      }
+    },
+    setMaterial(m) {
+      for (const frame of frames) frame.material = m;
+      for (const bevel of bevels) bevel.material = m;
+      panel.material = m;
     },
   };
   node.update(spec);

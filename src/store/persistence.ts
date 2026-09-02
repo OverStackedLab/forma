@@ -154,7 +154,15 @@ function inferredPreset(label: string) {
     return PANEL_PRESETS.find((preset) => preset.id === 'eneryda');
   if (normalized.includes('baggan')) return PANEL_PRESETS.find((preset) => preset.id === 'bagganas');
   if (normalized.includes('knob')) return PANEL_PRESETS.find((preset) => preset.id === 'knob');
-  if (normalized.includes('axstad') || normalized.includes('glass'))
+  if (normalized.includes('axstad'))
+    return PANEL_PRESETS.find((preset) => preset.id === 'axstad-glass-400');
+  if (normalized.includes('bodbyn') && normalized.includes('glass'))
+    return PANEL_PRESETS.find((preset) => preset.id === 'bodbyn-glass-400-400');
+  if (normalized.includes('bodbyn') && normalized.includes('drawer'))
+    return PANEL_PRESETS.find((preset) => preset.id === 'bodbyn-drawer-600-200');
+  if (normalized.includes('bodbyn'))
+    return PANEL_PRESETS.find((preset) => preset.id === 'bodbyn-450');
+  if (normalized.includes('glass'))
     return PANEL_PRESETS.find((preset) => preset.id === 'axstad-glass-400');
   if (normalized.includes('door')) return PANEL_PRESETS.find((preset) => preset.id === 'door');
   if (normalized.includes('back')) return PANEL_PRESETS.find((preset) => preset.id === 'back');
@@ -175,6 +183,9 @@ function normalizePart(value: unknown): CustomPart | null {
     && part.shape !== 'borghamn'
     && part.shape !== 'enhet-leg'
     && part.shape !== 'glass-door'
+    && part.shape !== 'bodbyn-door'
+    && part.shape !== 'bodbyn-glass'
+    && part.shape !== 'bodbyn-muntin-glass'
   )
     return null;
   const clampDimension = (axis: 'w' | 'h' | 'd') => {

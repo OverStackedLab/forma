@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { findColor, findMaterial, finishForAppearance, resolveAppearance, resolveCabinetPresetId } from './catalog';
+import { findColor, findMaterial, finishForAppearance, PANEL_PRESETS, resolveAppearance, resolveCabinetPresetId } from './catalog';
 
 describe('resolveAppearance', () => {
   it("uses the material's own color and finish when the color is natural", () => {
@@ -59,5 +59,19 @@ describe('resolveCabinetPresetId', () => {
     expect(resolveCabinetPresetId('tall-600')).toBe('high-600');
     expect(resolveCabinetPresetId('base-600')).toBe('base-600');
     expect(resolveCabinetPresetId('nope')).toBeUndefined();
+  });
+});
+
+describe('BODBYN catalog', () => {
+  it('covers the off-white door, drawer and glass sizes', () => {
+    const byId = new Map(PANEL_PRESETS.map((preset) => [preset.id, preset]));
+    expect(byId.get('bodbyn-300')).toMatchObject({ w: 300, h: 800, shape: 'bodbyn-door' });
+    expect(byId.get('bodbyn-drawer-600-200')).toMatchObject({ w: 600, h: 200, shape: 'bodbyn-door' });
+    expect(byId.get('bodbyn-glass-400-400')).toMatchObject({
+      w: 400, h: 400, shape: 'bodbyn-muntin-glass',
+    });
+    expect([...byId.keys()].filter((id) => id.startsWith('bodbyn-glass-'))).toEqual([
+      'bodbyn-glass-400-400',
+    ]);
   });
 });

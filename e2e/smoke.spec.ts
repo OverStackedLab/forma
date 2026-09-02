@@ -67,10 +67,14 @@ test('boots to an empty scene with no starting model', async ({ page }) => {
   await expect(page.getByText('Base Style')).toHaveCount(0);
   await expect(page.getByRole('heading', { name: 'Panels' })).toBeVisible();
   await expect(page.getByRole('heading', { name: 'Fronts' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'BODBYN' })).toBeVisible();
   await expect(page.getByRole('heading', { name: 'Hardware' }).first()).toBeVisible();
   await expect(page.getByRole('button', { name: 'Shelf' })).toBeVisible();
   await expect(page.getByRole('button', { name: 'Door' })).toBeVisible();
   await expect(page.getByRole('button', { name: /AXSTAD Glass 400 400×800/ })).toBeVisible();
+  await expect(page.getByRole('button', { name: /BODBYN 45×80 450×800/ })).toBeVisible();
+  await expect(page.getByRole('button', { name: /BODBYN Glass 40×40 400×400/ })).toBeVisible();
+  await expect(page.getByRole('button', { name: /BODBYN Drawer 60×20 600×200/ })).toBeVisible();
   await expect(page.getByRole('button', { name: /ENHET/ })).toBeVisible();
   await expect(page.getByRole('button', { name: /BORGHAMN/ })).toBeVisible();
 
@@ -369,6 +373,24 @@ test('an AXSTAD glass door inserts as a front with an inset pane', async ({ page
   await expect(page.getByText('AXSTAD Glass 400 added to scene')).toBeVisible();
   await page.getByRole('tab', { name: 'Assembly' }).click();
   await expect(page.getByRole('treeitem', { name: /AXSTAD Glass 400/ })).toBeVisible();
+});
+
+test('a BODBYN door inserts as a framed front with a recessed panel', async ({ page }) => {
+  await page.goto('/');
+  await page.getByRole('tab', { name: 'Library' }).click();
+  await page.getByRole('button', { name: /BODBYN 45×80 450×800/ }).click();
+  await expect(page.getByText('BODBYN 45×80 added to scene')).toBeVisible();
+  await page.getByRole('tab', { name: 'Assembly' }).click();
+  await expect(page.getByRole('treeitem', { name: /BODBYN 45×80/ })).toBeVisible();
+});
+
+test('a BODBYN glass door inserts as a framed front with a cross-rail', async ({ page }) => {
+  await page.goto('/');
+  await page.getByRole('tab', { name: 'Library' }).click();
+  await page.getByRole('button', { name: /BODBYN Glass 40×40 400×400/ }).click();
+  await expect(page.getByText('BODBYN Glass 40×40 added to scene')).toBeVisible();
+  await page.getByRole('tab', { name: 'Assembly' }).click();
+  await expect(page.getByRole('treeitem', { name: /BODBYN Glass 40×40/ })).toBeVisible();
 });
 
 test('a BORGHAMN handle inserts as square-bar hardware', async ({ page }) => {

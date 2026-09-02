@@ -389,7 +389,10 @@ function LibrarySection({
 /** Library entry point for cabinet assemblies, panels, fronts and hardware. */
 function LibraryPanel() {
   const panels = PANEL_PRESETS.filter((preset) => preset.category === 'panel');
-  const fronts = PANEL_PRESETS.filter((preset) => preset.category === 'front');
+  const fronts = PANEL_PRESETS.filter(
+    (preset) => preset.category === 'front' && !preset.id.startsWith('bodbyn'),
+  );
+  const bodbyn = PANEL_PRESETS.filter((preset) => preset.id.startsWith('bodbyn'));
   const hardware = PANEL_PRESETS.filter((preset) => preset.category === 'hardware');
 
   return (
@@ -417,6 +420,7 @@ function LibraryPanel() {
 
       <LibrarySection title="Panels" presets={panels} />
       <LibrarySection title="Fronts" presets={fronts} />
+      <LibrarySection title="BODBYN" presets={bodbyn} />
       <LibrarySection title="Hardware" presets={hardware} />
 
       <p className="text-[11px] leading-relaxed text-ink/35">

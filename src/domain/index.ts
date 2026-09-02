@@ -6,6 +6,7 @@ export * from './bom';
 export * from './csv';
 export * from './geometry';
 export * from './glassDoor';
+export * from './bodbyn';
 export * from './rotation';
 export * from './units';
 export * from './workspace';
