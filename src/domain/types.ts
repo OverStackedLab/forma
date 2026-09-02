@@ -39,6 +39,22 @@ export type PanelPresetId =
   | 'axstad-glass-600'
   | 'axstad-glass-400-1000'
   | 'axstad-glass-600-1000'
+  | 'bodbyn-250'
+  | 'bodbyn-300'
+  | 'bodbyn-400'
+  | 'bodbyn-400-1000'
+  | 'bodbyn-450'
+  | 'bodbyn-600-400'
+  | 'bodbyn-600-600'
+  | 'bodbyn-600'
+  | 'bodbyn-600-1400'
+  | 'bodbyn-drawer-400-200'
+  | 'bodbyn-drawer-400-400'
+  | 'bodbyn-drawer-600-100'
+  | 'bodbyn-drawer-600-200'
+  | 'bodbyn-drawer-800-200'
+  | 'bodbyn-drawer-800-400'
+  | 'bodbyn-glass-400-400'
   | 'knob'
   | 'bagganas'
   | 'eneryda'
@@ -52,7 +68,17 @@ export type CabinetPresetId =
   | 'wall-800'
   | 'high-600';
 /** Every part renders as one of a few shared unit geometries, scaled per instance. */
-export type PanelShape = 'box' | 'cylinder' | 'bagganas' | 'eneryda' | 'borghamn' | 'enhet-leg' | 'glass-door';
+export type PanelShape =
+  | 'box'
+  | 'cylinder'
+  | 'bagganas'
+  | 'eneryda'
+  | 'borghamn'
+  | 'enhet-leg'
+  | 'glass-door'
+  | 'bodbyn-door'
+  | 'bodbyn-glass'
+  | 'bodbyn-muntin-glass';
 
 export type Material = {
   id: MaterialId;

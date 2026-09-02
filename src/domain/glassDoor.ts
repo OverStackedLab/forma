@@ -10,7 +10,7 @@ export const AXSTAD_GLASS_MM = 4;
 export const AXSTAD_GLASS_INSET_MM = 5;
 const MIN_OPENING_MM = 40;
 
-export type DoorPieceRole = 'frame' | 'glass';
+export type DoorPieceRole = 'frame' | 'glass' | 'muntin';
 
 export type DoorPiece = {
   role: DoorPieceRole;
@@ -18,17 +18,22 @@ export type DoorPiece = {
   position: { x: number; y: number; z: number };
 };
 
-function frameWidth(w: number, h: number): number {
+function frameWidth(w: number, h: number, frameMm: number): number {
   const budget = (Math.min(w, h) - MIN_OPENING_MM) / 2;
-  return Math.max(12, Math.min(AXSTAD_FRAME_MM, budget));
+  return Math.max(12, Math.min(frameMm, budget));
 }
 
 /**
- * Stiles, rails and inset glass for an AXSTAD-style door centred on the origin.
+ * Stiles, rails and inset glass for a framed glass door centred on the origin.
  * Rails sit between the stiles so the corners are a single thickness.
  */
-export function axstadGlassPieces(w: number, h: number, d: number): DoorPiece[] {
-  const frame = frameWidth(w, h);
+export function framedGlassPieces(
+  w: number,
+  h: number,
+  d: number,
+  frameMm: number,
+): DoorPiece[] {
+  const frame = frameWidth(w, h, frameMm);
   const innerW = Math.max(MIN_OPENING_MM, w - 2 * frame);
   const innerH = Math.max(MIN_OPENING_MM, h - 2 * frame);
   const front = d / 2;
@@ -60,4 +65,11 @@ export function axstadGlassPieces(w: number, h: number, d: number): DoorPiece[] 
       position: { x: 0, y: 0, z: glassZ },
     },
   ];
+}
+
+/**
+ * Stiles, rails and inset glass for an AXSTAD-style door centred on the origin.
+ */
+export function axstadGlassPieces(w: number, h: number, d: number): DoorPiece[] {
+  return framedGlassPieces(w, h, d, AXSTAD_FRAME_MM);
 }

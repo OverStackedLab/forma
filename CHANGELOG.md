@@ -9,6 +9,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ### Added
 
 - BORGHAMN square-bar handle in the hardware library (170 mm, 160 mm centres, IKEA 203.160.46) (IMP-018).
+- BODBYN off-white fronts from the IKEA range (IMP-019): solid doors (25/30/40/45/60 cm widths), drawer fronts, and the 40×40 glass door with a cross-rail. 19 mm thick, 70 mm frame; the 45×80 dishwasher front is IKEA 802.915.52.
 
 ## 2026-08-28
 

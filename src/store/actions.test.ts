@@ -108,6 +108,44 @@ describe('library construction actions', () => {
     });
   });
 
+  it('adds BODBYN as a framed front with a recessed panel', () => {
+    addCustomPanel('bodbyn-450');
+    expect(useDocumentStore.getState().customParts[0]).toMatchObject({
+      label: 'BODBYN 45×80',
+      category: 'front',
+      shape: 'bodbyn-door',
+      w: 450,
+      h: 800,
+      d: 19,
+      thicknessAxis: 'd',
+      grainAxis: 'h',
+    });
+  });
+
+  it('adds a BODBYN glass door with the framed pane and cross-rail', () => {
+    addCustomPanel('bodbyn-glass-400-400');
+    expect(useDocumentStore.getState().customParts[0]).toMatchObject({
+      label: 'BODBYN Glass 40×40',
+      category: 'front',
+      shape: 'bodbyn-muntin-glass',
+      w: 400,
+      h: 400,
+      d: 19,
+    });
+  });
+
+  it('adds a BODBYN drawer front at the catalog size', () => {
+    addCustomPanel('bodbyn-drawer-600-200');
+    expect(useDocumentStore.getState().customParts[0]).toMatchObject({
+      label: 'BODBYN Drawer 60×20',
+      category: 'front',
+      shape: 'bodbyn-door',
+      w: 600,
+      h: 200,
+      d: 19,
+    });
+  });
+
   it('adds BAGGANÄS with its disc-knob profile', () => {
     addCustomPanel('bagganas');
     expect(useDocumentStore.getState().customParts[0]).toMatchObject({

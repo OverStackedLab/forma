@@ -164,5 +164,8 @@ with it:
 New doors, drawers, legs, or hardware should continue to enter as explicit
 library items or generated assembly members rather than reviving the old
 always-present sideboard. Glass fronts are AXSTAD-style (`shape: 'glass-door'`):
-a 78 mm frame that keeps its width on resize, plus an inset pane. Bar handles
-are ENERYDA (round bow) and BORGHAMN (10×10 mm square profile, 170 mm).
+a 78 mm frame that keeps its width on resize, plus an inset pane. Traditional
+framed fronts are BODBYN-style (`shape: 'bodbyn-door'`): a 70 mm frame, bevelled
+rebate and recessed panel. BODBYN glass (`bodbyn-muntin-glass`, and `bodbyn-glass` on older files)
+uses the same 70 mm frame with an inset pane; the library SKU is the 40×40 with a + cross-rail.
+Bar handles are ENERYDA (round bow) and BORGHAMN (10×10 mm square profile, 170 mm).

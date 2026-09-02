@@ -9,6 +9,8 @@ import type {
   Material,
   MaterialId,
   PanelPreset,
+  PanelPresetId,
+  PanelShape,
 } from './types';
 
 /** The wood species a part is milled from. Its own color/roughness shows through when the color is 'natural'. */
@@ -56,6 +58,24 @@ export const ALL_FINISHES: readonly Finish[] = [...FINISHES, ...HARDWARE_FINISHE
  * Properties labels literal: changing Depth always changes front-to-back
  * depth, even for side panels and hardware.
  */
+const FRONT_EDGE: PanelPreset['edgeBanding'] = ['w-min', 'w-max', 'h-min', 'h-max'];
+
+function bodbynFront(
+  id: PanelPresetId,
+  label: string,
+  w: number,
+  h: number,
+  shape: Extract<PanelShape, 'bodbyn-door' | 'bodbyn-muntin-glass'>,
+  description: string,
+  icon: string,
+): PanelPreset {
+  return {
+    id, label, w, h, d: 19, icon, shape, category: 'front', description,
+    thicknessAxis: 'd', grainAxis: 'h', edgeBanding: FRONT_EDGE,
+    defaultQuaternion: [0, 0, 0, 1],
+  };
+}
+
 export const PANEL_PRESETS: readonly PanelPreset[] = [
   {
     id: 'shelf', label: 'Shelf', w: 800, h: 18, d: 300, icon: 'panel_shelf', shape: 'box',
@@ -106,6 +126,70 @@ export const PANEL_PRESETS: readonly PanelPreset[] = [
     thicknessAxis: 'd', grainAxis: 'h', edgeBanding: ['w-min', 'w-max', 'h-min', 'h-max'],
     defaultQuaternion: [0, 0, 0, 1],
   },
+  bodbynFront(
+    'bodbyn-250', 'BODBYN 25×80', 250, 800, 'bodbyn-door',
+    '250×800×19 mm · 70 mm frame · bevelled panel', 'panel_framed_door',
+  ),
+  bodbynFront(
+    'bodbyn-300', 'BODBYN 30×80', 300, 800, 'bodbyn-door',
+    '300×800×19 mm · 70 mm frame · bevelled panel', 'panel_framed_door',
+  ),
+  bodbynFront(
+    'bodbyn-400', 'BODBYN 40×80', 400, 800, 'bodbyn-door',
+    '400×800×19 mm · 70 mm frame · bevelled panel', 'panel_framed_door',
+  ),
+  bodbynFront(
+    'bodbyn-400-1000', 'BODBYN 40×100', 400, 1000, 'bodbyn-door',
+    '400×1000×19 mm · 70 mm frame · bevelled panel', 'panel_framed_door',
+  ),
+  bodbynFront(
+    'bodbyn-450', 'BODBYN 45×80', 450, 800, 'bodbyn-door',
+    '450×800×19 mm · 70 mm frame · bevelled panel · IKEA 802.915.52', 'panel_framed_door',
+  ),
+  bodbynFront(
+    'bodbyn-600-400', 'BODBYN 60×40', 600, 400, 'bodbyn-door',
+    '600×400×19 mm · 70 mm frame · bevelled panel', 'panel_framed_door',
+  ),
+  bodbynFront(
+    'bodbyn-600-600', 'BODBYN 60×60', 600, 600, 'bodbyn-door',
+    '600×600×19 mm · 70 mm frame · bevelled panel', 'panel_framed_door',
+  ),
+  bodbynFront(
+    'bodbyn-600', 'BODBYN 60×80', 600, 800, 'bodbyn-door',
+    '600×800×19 mm · 70 mm frame · bevelled panel', 'panel_framed_door',
+  ),
+  bodbynFront(
+    'bodbyn-600-1400', 'BODBYN 60×140', 600, 1400, 'bodbyn-door',
+    '600×1400×19 mm · 70 mm frame · bevelled panel', 'panel_framed_door',
+  ),
+  bodbynFront(
+    'bodbyn-drawer-400-200', 'BODBYN Drawer 40×20', 400, 200, 'bodbyn-door',
+    '400×200×19 mm · 70 mm frame · bevelled panel', 'panel_framed_door',
+  ),
+  bodbynFront(
+    'bodbyn-drawer-400-400', 'BODBYN Drawer 40×40', 400, 400, 'bodbyn-door',
+    '400×400×19 mm · 70 mm frame · bevelled panel', 'panel_framed_door',
+  ),
+  bodbynFront(
+    'bodbyn-drawer-600-100', 'BODBYN Drawer 60×10', 600, 100, 'bodbyn-door',
+    '600×100×19 mm · 70 mm frame · bevelled panel', 'panel_framed_door',
+  ),
+  bodbynFront(
+    'bodbyn-drawer-600-200', 'BODBYN Drawer 60×20', 600, 200, 'bodbyn-door',
+    '600×200×19 mm · 70 mm frame · bevelled panel', 'panel_framed_door',
+  ),
+  bodbynFront(
+    'bodbyn-drawer-800-200', 'BODBYN Drawer 80×20', 800, 200, 'bodbyn-door',
+    '800×200×19 mm · 70 mm frame · bevelled panel', 'panel_framed_door',
+  ),
+  bodbynFront(
+    'bodbyn-drawer-800-400', 'BODBYN Drawer 80×40', 800, 400, 'bodbyn-door',
+    '800×400×19 mm · 70 mm frame · bevelled panel', 'panel_framed_door',
+  ),
+  bodbynFront(
+    'bodbyn-glass-400-400', 'BODBYN Glass 40×40', 400, 400, 'bodbyn-muntin-glass',
+    '400×400×19 mm · 70 mm frame · glass · cross-rail', 'panel_glass_door',
+  ),
   {
     id: 'knob', label: 'Knob', w: 32, h: 32, d: 25, icon: 'panel_knob', shape: 'cylinder',
     category: 'hardware', description: 'Ø32 × 25 mm projection', thicknessAxis: null,
