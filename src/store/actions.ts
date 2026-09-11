@@ -1,3 +1,4 @@
+import type { CabinetLayoutPart } from '@/domain/cabinets';
 import {
   assignCabinetMemberIds,
   buildCabinetLayout,
@@ -12,8 +13,12 @@ import {
   nextFreeInteriorPosition,
   shelfPositionRange,
   shelfPositions,
-  type CabinetLayoutPart,
 } from '@/domain/cabinets';
+import {
+  buildDrawerLayout,
+  DRAWER_DIM_LIMITS,
+  DRAWER_PRESETS,
+} from '@/domain/drawers';
 import {
   CABINET_DIM_LIMITS,
   CABINET_PRESETS,
@@ -50,6 +55,7 @@ import type {
   CabinetPreset,
   CustomPart,
   DimensionAxis,
+  DrawerConfig,
   EdgeBandSide,
   FormaDocument,
   Group,
@@ -96,10 +102,9 @@ export function liveIds(): string[] {
 function invalidatePartiallyEditedCabinets(groups: readonly Group[], changedIds: readonly string[]): Group[] {
   const changed = new Set(changedIds);
   return groups.map((group) => {
-    if (!group.cabinet || !group.partIds.some((id) => changed.has(id))) return group;
-    return group.partIds.every((id) => changed.has(id))
-      ? group
-      : { ...group, cabinet: undefined };
+    if (!group.partIds.some((id) => changed.has(id))) return group;
+    if (group.partIds.every((id) => changed.has(id))) return group;
+    return { ...group, cabinet: undefined, drawer: undefined };
   });
 }
 
@@ -320,6 +325,88 @@ export function addCabinetPreset(presetId: string, placement?: DropPlacement): v
   stateUi.showToast(`${preset.label} cabinet added`);
 }
 
+/** Adds a four-piece drawer box as one named, selectable group. */
+export function addDrawerPreset(presetId: string, placement?: DropPlacement): void {
+  const preset = DRAWER_PRESETS.find((candidate) => candidate.id === presetId) ?? DRAWER_PRESETS[0]!;
+  const state = doc();
+  const layout = buildDrawerLayout(preset);
+  const supportMm = placement
+    ? Math.abs(placement.normal.x) * preset.width / 2 +
+      Math.abs(placement.normal.y) * preset.height / 2 +
+      Math.abs(placement.normal.z) * preset.depth / 2
+    : 0;
+  const centre: [number, number, number] = placement
+    ? [
+        placement.point.x + placement.normal.x * supportMm / 1000,
+        placement.point.y + placement.normal.y * supportMm / 1000,
+        placement.point.z + placement.normal.z * supportMm / 1000,
+      ]
+    : [nextInsertionX(state, preset.width / 2), preset.height / 2000, 0];
+  const origin: [number, number, number] = [
+    centre[0],
+    centre[1] - preset.height / 2000,
+    centre[2],
+  ];
+  const ids = layout.map(() => nextCustomId());
+  const newParts: CustomPart[] = layout.map((item, index) => ({
+    id: ids[index]!,
+    label: item.label,
+    w: item.w,
+    h: item.h,
+    d: item.d,
+    shape: item.shape,
+    category: item.category,
+    bomLabel: item.bomLabel,
+    thicknessAxis: item.thicknessAxis,
+    grainAxis: item.grainAxis,
+    edgeBanding: [...item.edgeBanding],
+  }));
+  const group: Group = {
+    id: nextGroupId(),
+    label: preset.label,
+    partIds: ids,
+    drawer: {
+      presetId: preset.id,
+      width: preset.width,
+      height: preset.height,
+      depth: preset.depth,
+    },
+  };
+
+  commit(() => {
+    useDocumentStore.setState((previous) => {
+      const transforms = { ...previous.transforms };
+      layout.forEach((item, index) => {
+        transforms[ids[index]!] = {
+          position: [
+            origin[0] + item.positionMm[0] / 1000,
+            origin[1] + item.positionMm[1] / 1000,
+            origin[2] + item.positionMm[2] / 1000,
+          ],
+          quaternion: [...item.quaternion],
+          scale: [1, 1, 1],
+        };
+      });
+      return {
+        customParts: [...previous.customParts, ...newParts],
+        transforms,
+        groups: [...previous.groups, group],
+      };
+    });
+  });
+
+  const stateUi = ui();
+  stateUi.setSelection(ids);
+  useUiStore.setState((previous) => ({
+    gizmoMode:
+      previous.gizmoMode === 'select' || previous.gizmoMode === 'pan'
+        ? 'translate'
+        : previous.gizmoMode,
+  }));
+  frameInsertedParts(ids, placement);
+  stateUi.showToast(`${preset.label} drawer added`);
+}
+
 /** Renames a part. Blank input is ignored, keeping the previous name rather than going empty. */
 export function renamePart(id: string, label: string): void {
   const trimmed = label.trim();
@@ -343,13 +430,21 @@ export function renamePart(id: string, label: string): void {
  * can leave their own, less important toast unsaid.
  */
 function announceDemotions(before: readonly Group[]): boolean {
-  const configurable = new Set(before.filter((group) => group.cabinet).map((group) => group.id));
-  if (!configurable.size) return false;
-  const demoted = doc().groups.filter((group) => configurable.has(group.id) && !group.cabinet);
-  if (!demoted.length) return false;
-  const subject = demoted.length === 1 ? demoted[0]!.label : `${demoted.length} cabinets`;
-  ui().showToast(`${subject} no longer matches a carcass — use Restore cabinet for shelf controls`);
-  return true;
+  const configurableCabinets = new Set(before.filter((group) => group.cabinet).map((group) => group.id));
+  const configurableDrawers = new Set(before.filter((group) => group.drawer).map((group) => group.id));
+  const demotedCabinets = doc().groups.filter((group) => configurableCabinets.has(group.id) && !group.cabinet);
+  const demotedDrawers = doc().groups.filter((group) => configurableDrawers.has(group.id) && !group.drawer);
+  if (demotedCabinets.length) {
+    const subject = demotedCabinets.length === 1 ? demotedCabinets[0]!.label : `${demotedCabinets.length} cabinets`;
+    ui().showToast(`${subject} no longer matches a carcass — use Restore cabinet for shelf controls`);
+    return true;
+  }
+  if (demotedDrawers.length) {
+    const subject = demotedDrawers.length === 1 ? demotedDrawers[0]!.label : `${demotedDrawers.length} drawers`;
+    ui().showToast(`${subject} is no longer a parametric drawer`);
+    return true;
+  }
+  return false;
 }
 
 const DIM_AXIS_INDEX = { w: 0, h: 1, d: 2 } as const;
@@ -554,6 +649,7 @@ export function duplicateSelected(): void {
               : undefined,
           }
         : undefined,
+      drawer: source.drawer ? { ...source.drawer } : undefined,
     });
   }
 
@@ -688,6 +784,7 @@ export function deleteParts(ids: readonly string[]): void {
             // regular editable group; parametric rebuilding would otherwise
             // reassign the surviving ids to the wrong generated roles.
             cabinet: partIds.length === g.partIds.length ? g.cabinet : undefined,
+            drawer: partIds.length === g.partIds.length ? g.drawer : undefined,
           };
         })
         .filter((g) => g.partIds.length > 1);
@@ -774,7 +871,9 @@ export function renameGroup(groupId: string, label: string): void {
   if (!current || current.label === trimmed) return;
   const cabinetLayout = current.cabinet
     ? buildCabinetLayout(cabinetPreset({ ...current, label: trimmed }, current.cabinet))
-    : null;
+    : current.drawer
+      ? buildDrawerLayout({ ...current.drawer, label: trimmed })
+      : null;
   const memberIndex = new Map(current.partIds.map((id, index) => [id, index]));
   commit(() => {
     useDocumentStore.setState((s) => ({
@@ -993,6 +1092,36 @@ function cabinetPlacement(
   quaternion: Transform['quaternion'];
 } {
   const layout = buildCabinetLayout(cabinetPreset(group, config));
+  const anchorId = group.partIds[0];
+  const anchor = (anchorId ? transforms[anchorId] : undefined) ?? IDENTITY_TRANSFORM;
+  const local = layout[0]?.positionMm ?? [0, 0, 0];
+  const offset = rotateVectorByQuaternion(
+    {
+      x: local[0] * anchor.scale[0] / 1000,
+      y: local[1] * anchor.scale[1] / 1000,
+      z: local[2] * anchor.scale[2] / 1000,
+    },
+    anchor.quaternion,
+  );
+  return {
+    origin: [
+      anchor.position[0] - offset.x,
+      anchor.position[1] - offset.y,
+      anchor.position[2] - offset.z,
+    ],
+    quaternion: [...anchor.quaternion],
+  };
+}
+
+function drawerPlacement(
+  group: Group,
+  config: DrawerConfig,
+  transforms: Transforms = doc().transforms,
+): {
+  origin: [number, number, number];
+  quaternion: Transform['quaternion'];
+} {
+  const layout = buildDrawerLayout({ ...config, label: group.label });
   const anchorId = group.partIds[0];
   const anchor = (anchorId ? transforms[anchorId] : undefined) ?? IDENTITY_TRANSFORM;
   const local = layout[0]?.positionMm ?? [0, 0, 0];
@@ -1359,6 +1488,149 @@ export function setCabinetDim(
   commitCabinetResize(group, nextConfig, placement);
 }
 
+function drawerResizeMetadata(group: Group, requested: DrawerConfig): {
+  config: DrawerConfig;
+  label: string;
+} {
+  const config = { ...requested };
+  const matching = DRAWER_PRESETS.find(
+    (preset) =>
+      preset.width === config.width &&
+      preset.height === config.height &&
+      preset.depth === config.depth,
+  );
+  config.presetId = matching?.id;
+  const generatedLabel =
+    DRAWER_PRESETS.some((preset) => preset.label === group.label) ||
+    /^Drawer \d+×\d+/.test(group.label);
+  return {
+    config,
+    label: generatedLabel ? matching?.label ?? `Drawer ${config.width}×${config.height}×${config.depth}` : group.label,
+  };
+}
+
+function commitDrawerResize(
+  group: Group,
+  requested: DrawerConfig,
+  placement: { origin: [number, number, number]; quaternion: Transform['quaternion'] },
+): void {
+  const { config, label } = drawerResizeMetadata(group, requested);
+  const layout = buildDrawerLayout({ ...config, label });
+  const nextIds = group.partIds.length === layout.length
+    ? [...group.partIds]
+    : layout.map((_, index) => group.partIds[index] ?? nextCustomId());
+  const indexById = new Map(nextIds.map((id, index) => [id, index]));
+  const nextIdSet = new Set(nextIds);
+  const removedIds = group.partIds.filter((id) => !nextIdSet.has(id));
+
+  const layoutTransform = (item: CabinetLayoutPart): Transform => {
+    const offset = rotateVectorByQuaternion(
+      {
+        x: item.positionMm[0] / 1000,
+        y: item.positionMm[1] / 1000,
+        z: item.positionMm[2] / 1000,
+      },
+      placement.quaternion,
+    );
+    return {
+      position: [
+        placement.origin[0] + offset.x,
+        placement.origin[1] + offset.y,
+        placement.origin[2] + offset.z,
+      ],
+      quaternion: [...placement.quaternion],
+      scale: [1, 1, 1],
+    };
+  };
+
+  commit(() => {
+    useDocumentStore.setState((previous) => {
+      const transforms = { ...previous.transforms };
+      const overrides = { ...previous.overrides };
+      for (const [index, id] of nextIds.entries()) transforms[id] = layoutTransform(layout[index]!);
+      for (const id of removedIds) {
+        delete transforms[id];
+        delete overrides[id];
+      }
+      const existing = new Set(group.partIds);
+      const addedParts: CustomPart[] = nextIds
+        .map((id, index) => ({ id, item: layout[index]! }))
+        .filter(({ id }) => !existing.has(id))
+        .map(({ id, item }) => ({
+          id,
+          label: item.label,
+          w: item.w,
+          h: item.h,
+          d: item.d,
+          shape: item.shape,
+          category: item.category,
+          bomLabel: item.bomLabel,
+          thicknessAxis: item.thicknessAxis,
+          grainAxis: item.grainAxis,
+          edgeBanding: [...item.edgeBanding],
+        }));
+
+      return {
+        customParts: [
+          ...previous.customParts
+            .filter((part) => !removedIds.includes(part.id))
+            .map((part) => {
+              const index = indexById.get(part.id);
+              const item = index === undefined ? undefined : layout[index];
+              if (!item) return part;
+              return {
+                ...part,
+                label: item.label,
+                bomLabel: item.bomLabel,
+                w: item.w,
+                h: item.h,
+                d: item.d,
+                category: item.category,
+                thicknessAxis: item.thicknessAxis,
+              };
+            }),
+          ...addedParts,
+        ],
+        hiddenIds: previous.hiddenIds.filter((id) => !removedIds.includes(id)),
+        transforms,
+        overrides,
+        groups: previous.groups.map((candidate) =>
+          candidate.id === group.id
+            ? { ...candidate, label, partIds: nextIds, drawer: config }
+            : candidate,
+        ),
+      };
+    });
+  });
+
+  const selected = ui().selectedPartIds;
+  if (!selected.some((id) => group.partIds.includes(id))) return;
+  const selectedWhole = group.partIds.every((id) => selected.includes(id));
+  if (selectedWhole) {
+    ui().setSelection(nextIds);
+    return;
+  }
+  const stillLive = selected.filter((id) => nextIdSet.has(id));
+  if (stillLive.length) ui().setSelection(stillLive);
+}
+
+/** Rebuilds a generated drawer box while keeping its bottom-centre placement. */
+export function setDrawerDim(
+  groupId: string,
+  key: 'width' | 'height' | 'depth',
+  value: number,
+): void {
+  if (!Number.isFinite(value)) return;
+  const group = doc().groups.find((candidate) => candidate.id === groupId);
+  if (!group?.drawer) return;
+  const limits = DRAWER_DIM_LIMITS[key];
+  const nextConfig: DrawerConfig = {
+    ...group.drawer,
+    [key]: Math.min(limits.max, Math.max(limits.min, value)),
+  };
+  commitDrawerResize(group, nextConfig, drawerPlacement(group, group.drawer));
+}
+
 /**
  * Replaces a cabinet's shelves with explicit centreline heights (mm from the
  * cabinet bottom). Positions are clamped into the interior, sorted, and
@@ -1525,21 +1797,40 @@ export function resizeCabinetFromGizmo(
   scale: Transform['scale'],
 ): boolean {
   const group = groupMatching(doc().groups, ids);
-  if (!group?.cabinet || scale.some((value) => !Number.isFinite(value) || value <= 0)) return false;
+  if (!group || scale.some((value) => !Number.isFinite(value) || value <= 0)) return false;
 
-  const dimensions = ['width', 'height', 'depth'] as const;
-  const nextConfig = { ...group.cabinet };
-  dimensions.forEach((key, index) => {
-    const limits = CABINET_DIM_LIMITS[key];
-    nextConfig[key] = Math.min(
-      limits.max,
-      Math.max(limits.min, Math.round(group.cabinet![key] * scale[index]!)),
-    );
-  });
-  const placement = cabinetPivotPlacement(group, nextConfig);
-  commitCabinetResize(group, nextConfig, placement);
-  ui().showToast('Cabinet dimensions updated');
-  return true;
+  if (group.cabinet) {
+    const dimensions = ['width', 'height', 'depth'] as const;
+    const nextConfig = { ...group.cabinet };
+    dimensions.forEach((key, index) => {
+      const limits = CABINET_DIM_LIMITS[key];
+      nextConfig[key] = Math.min(
+        limits.max,
+        Math.max(limits.min, Math.round(group.cabinet![key] * scale[index]!)),
+      );
+    });
+    const placement = cabinetPivotPlacement(group, nextConfig);
+    commitCabinetResize(group, nextConfig, placement);
+    ui().showToast('Cabinet dimensions updated');
+    return true;
+  }
+
+  if (group.drawer) {
+    const dimensions = ['width', 'height', 'depth'] as const;
+    const nextConfig = { ...group.drawer };
+    dimensions.forEach((key, index) => {
+      const limits = DRAWER_DIM_LIMITS[key];
+      nextConfig[key] = Math.min(
+        limits.max,
+        Math.max(limits.min, Math.round(group.drawer![key] * scale[index]!)),
+      );
+    });
+    commitDrawerResize(group, nextConfig, drawerPlacement(group, group.drawer));
+    ui().showToast('Drawer dimensions updated');
+    return true;
+  }
+
+  return false;
 }
 
 /** Placement is kept; only orientation and scale reset. */
@@ -1569,6 +1860,31 @@ export function resetTransforms(ids: readonly string[]): void {
       });
     });
     ui().showToast('Cabinet transform reset');
+    return;
+  }
+  if (cabinetGroup?.drawer) {
+    const placement = drawerPlacement(cabinetGroup, cabinetGroup.drawer);
+    const layout = buildDrawerLayout({ ...cabinetGroup.drawer, label: cabinetGroup.label });
+    commit(() => {
+      useDocumentStore.setState((previous) => {
+        const transforms = { ...previous.transforms };
+        cabinetGroup.partIds.forEach((id, index) => {
+          const item = layout[index];
+          if (!item) return;
+          transforms[id] = {
+            position: [
+              placement.origin[0] + item.positionMm[0] / 1000,
+              placement.origin[1] + item.positionMm[1] / 1000,
+              placement.origin[2] + item.positionMm[2] / 1000,
+            ],
+            quaternion: [0, 0, 0, 1],
+            scale: [1, 1, 1],
+          };
+        });
+        return { transforms };
+      });
+    });
+    ui().showToast('Drawer transform reset');
     return;
   }
   commit(() => {
@@ -1705,7 +2021,7 @@ export function setSelectionSizeAxis(
 ): void {
   if (!Number.isFinite(millimetres) || ids.length < 2) return;
   const selected = new Set(ids);
-  if (doc().groups.some((group) => group.cabinet && group.partIds.some((id) => selected.has(id)))) {
+  if (doc().groups.some((group) => (group.cabinet || group.drawer) && group.partIds.some((id) => selected.has(id)))) {
     return;
   }
   const api = viewportApi();
@@ -1736,6 +2052,12 @@ export function setSelectedOverallDim(axis: 'x' | 'y' | 'z', millimetres: number
   ) {
     const key = axis === 'x' ? 'width' : axis === 'y' ? 'height' : 'depth';
     setCabinetDim(cabinet.id, key, millimetres);
+    return;
+  }
+  const drawerGroup = groupMatching(state.groups, ids);
+  if (drawerGroup?.drawer) {
+    const key = axis === 'x' ? 'width' : axis === 'y' ? 'height' : 'depth';
+    setDrawerDim(drawerGroup.id, key, millimetres);
     return;
   }
 

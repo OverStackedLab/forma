@@ -1,10 +1,12 @@
 import { useMemo, useState } from 'react';
 import { CABINET_PRESETS, PANEL_PRESETS } from '@/domain/catalog';
+import { DRAWER_PRESETS } from '@/domain/drawers';
 import { groupInclusion } from '@/domain/parts';
 import type { Group, PanelPreset, PartSpec } from '@/domain/types';
 import {
   addCustomPanel,
   addCabinetPreset,
+  addDrawerPreset,
   renameGroup,
   renamePart,
   reorderGroups,
@@ -415,6 +417,27 @@ function LibraryPanel() {
         </div>
         <p className="mt-2 text-[10px] leading-relaxed text-ink/30">
           IKEA METOD frame sizes. Heights exclude legs and worktops.
+        </p>
+      </div>
+
+      <div>
+        <h3 className="mb-2 text-[11px] font-semibold tracking-[.04em] text-ink/45 uppercase">
+          Drawers
+        </h3>
+        <div className="grid grid-cols-2 gap-1.5">
+          {DRAWER_PRESETS.map((preset) => (
+            <OptionCard
+              key={preset.id}
+              label={preset.label}
+              description={preset.description}
+              icon={preset.icon}
+              dragPayload={`drawer:${preset.id}`}
+              onClick={() => addDrawerPreset(preset.id)}
+            />
+          ))}
+        </div>
+        <p className="mt-2 text-[10px] leading-relaxed text-ink/30">
+          Four-piece box: 18 mm sides, 8 mm bottom and back. Pair with a BODBYN drawer front.
         </p>
       </div>
 

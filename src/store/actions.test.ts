@@ -7,6 +7,7 @@ import {
   addCabinetPreset,
   addCabinetShelf,
   addCustomPanel,
+  addDrawerPreset,
   commitTransforms,
   distributeCabinetDividers,
   distributeCabinetShelves,
@@ -29,6 +30,7 @@ import {
   setCabinetDividerPositions,
   setCabinetShelfPositions,
   setCustomPartDim,
+  setDrawerDim,
   setGroupPositionAxis,
   setGroupRotationAxis,
   setHardwareDiameter,
@@ -200,6 +202,38 @@ describe('library construction actions', () => {
     expect(side.position[0]).toBeCloseTo(0.4 - 0.291, 8);
     expect(side.position[1]).toBeCloseTo(1.8, 8);
     expect(side.position[2]).toBeCloseTo(-0.2, 8);
+  });
+
+  it('adds a four-piece drawer box that rebuilds when resized', () => {
+    addDrawerPreset('drawer-600-200');
+    const state = useDocumentStore.getState();
+    const group = state.groups[0]!;
+    expect(group.label).toBe('Drawer 60×20');
+    expect(group.drawer).toMatchObject({ width: 562, height: 180, depth: 550 });
+    expect(group.partIds).toHaveLength(4);
+    expect(state.customParts.map((part) => part.bomLabel)).toEqual([
+      'Drawer 60×20 Side',
+      'Drawer 60×20 Side',
+      'Drawer 60×20 Bottom',
+      'Drawer 60×20 Back',
+    ]);
+    const underside = Math.min(
+      ...group.partIds.map((id) => {
+        const part = state.customParts.find((item) => item.id === id)!;
+        const transform = state.transforms[id]!;
+        return transform.position[1] * 1000 - part.h / 2;
+      }),
+    );
+    expect(underside).toBeCloseTo(0, 5);
+
+    setDrawerDim(group.id, 'width', 700);
+    const resized = useDocumentStore.getState();
+    expect(resized.groups[0]!.drawer).toMatchObject({ width: 700, height: 180, depth: 550 });
+    const sides = resized.customParts.filter((part) => part.thicknessAxis === 'w');
+    expect(sides).toHaveLength(2);
+    expect(sides.every((part) => part.w === 18)).toBe(true);
+    const bottom = resized.customParts.find((part) => part.thicknessAxis === 'h');
+    expect(bottom?.w).toBe(664);
   });
 
   it('resizes a cabinet parametrically without changing panel thicknesses', () => {

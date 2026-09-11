@@ -68,6 +68,7 @@ test('boots to an empty scene with no starting model', async ({ page }) => {
   await expect(page.getByRole('heading', { name: 'Panels' })).toBeVisible();
   await expect(page.getByRole('heading', { name: 'Fronts' })).toBeVisible();
   await expect(page.getByRole('heading', { name: 'BODBYN' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Drawers' })).toBeVisible();
   await expect(page.getByRole('heading', { name: 'Hardware' }).first()).toBeVisible();
   await expect(page.getByRole('button', { name: 'Shelf' })).toBeVisible();
   await expect(page.getByRole('button', { name: 'Door' })).toBeVisible();
@@ -75,6 +76,7 @@ test('boots to an empty scene with no starting model', async ({ page }) => {
   await expect(page.getByRole('button', { name: /BODBYN 45×80 450×800/ })).toBeVisible();
   await expect(page.getByRole('button', { name: /BODBYN Glass 40×40 400×400/ })).toBeVisible();
   await expect(page.getByRole('button', { name: /BODBYN Drawer 60×20 600×200/ })).toBeVisible();
+  await expect(page.getByRole('button', { name: /Drawer 60×20 562×180×550/ })).toBeVisible();
   await expect(page.getByRole('button', { name: /ENHET/ })).toBeVisible();
   await expect(page.getByRole('button', { name: /BORGHAMN/ })).toBeVisible();
 
@@ -373,6 +375,15 @@ test('an AXSTAD glass door inserts as a front with an inset pane', async ({ page
   await expect(page.getByText('AXSTAD Glass 400 added to scene')).toBeVisible();
   await page.getByRole('tab', { name: 'Assembly' }).click();
   await expect(page.getByRole('treeitem', { name: /AXSTAD Glass 400/ })).toBeVisible();
+});
+
+test('a drawer box inserts as a four-piece group without a front', async ({ page }) => {
+  await page.goto('/');
+  await page.getByRole('tab', { name: 'Library' }).click();
+  await page.getByRole('button', { name: /Drawer 60×20 562×180×550/ }).click();
+  await expect(page.getByText('Drawer 60×20 drawer added')).toBeVisible();
+  await page.getByRole('tab', { name: 'Assembly' }).click();
+  await expect(page.getByRole('treeitem', { name: /Drawer 60×20/ }).first()).toBeVisible();
 });
 
 test('a BODBYN door inserts as a framed front with a recessed panel', async ({ page }) => {
