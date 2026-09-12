@@ -322,7 +322,7 @@ export function addCabinetPreset(presetId: string, placement?: DropPlacement): v
         : previous.gizmoMode,
   }));
   frameInsertedParts(ids, placement);
-  stateUi.showToast(`${preset.label} cabinet added`);
+  stateUi.showToast(`${preset.label} added to scene`);
 }
 
 /** Adds a four-piece drawer box as one named, selectable group. */
@@ -404,7 +404,7 @@ export function addDrawerPreset(presetId: string, placement?: DropPlacement): vo
         : previous.gizmoMode,
   }));
   frameInsertedParts(ids, placement);
-  stateUi.showToast(`${preset.label} drawer added`);
+  stateUi.showToast(`${preset.label} added to scene`);
 }
 
 /** Renames a part. Blank input is ignored, keeping the previous name rather than going empty. */
@@ -1340,11 +1340,11 @@ function cabinetResizeMetadata(group: Group, requested: CabinetConfig): {
         );
   config.presetId = matchingPreset?.id;
   const generatedLabel =
-    currentPreset?.label === group.label || /^(Base|Wall|Tall|High) \d+×\d+×\d+$/.test(group.label);
+    currentPreset?.label === group.label || /^(Base|Wall|Tall|High)( cabinet)? \d+(?:\.\d+)?(?:×\d+(?:\.\d+)?){0,2}( cm)?$/.test(group.label);
   const family = currentPreset?.label.split(' ')[0] ?? group.label.split(' ')[0] ?? 'Cabinet';
   const label = generatedLabel
     ? matchingPreset?.label ??
-      `${family} ${config.width}×${config.height}×${config.depth}`
+      `${family === 'High' ? 'Tall' : family} cabinet ${config.width / 10}×${config.height / 10}×${config.depth / 10} cm`
     : group.label;
   return { config, label };
 }
@@ -1502,10 +1502,10 @@ function drawerResizeMetadata(group: Group, requested: DrawerConfig): {
   config.presetId = matching?.id;
   const generatedLabel =
     DRAWER_PRESETS.some((preset) => preset.label === group.label) ||
-    /^Drawer \d+×\d+/.test(group.label);
+    /^Drawer(?: box)? \d+(?:\.\d+)?×\d+(?:\.\d+)?(?:×\d+(?:\.\d+)?)?( cm)?$/.test(group.label);
   return {
     config,
-    label: generatedLabel ? matching?.label ?? `Drawer ${config.width}×${config.height}×${config.depth}` : group.label,
+    label: generatedLabel ? matching?.label ?? `Drawer box ${config.width / 10}×${config.height / 10}×${config.depth / 10} cm` : group.label,
   };
 }
 
@@ -2333,11 +2333,11 @@ let isSavingToFile = false;
  * only a "Could not save the file" toast. Distinct from Save Version, which
  * stays inside this one document until downloaded from Version History.
  */
-export async function saveToFile(): Promise<boolean> {
+export async function saveToFile(requestedTitle = doc().docTitle): Promise<boolean> {
   if (isSavingToFile) return false;
   isSavingToFile = true;
   try {
-    const title = sanitizeFilename(doc().docTitle);
+    const title = sanitizeFilename(requestedTitle.trim().replace(/\.(forma\.)?json$/i, ''));
     renameDocument(title);
     const payload = serializeCurrentDocument();
     downloadBlob(new Blob([payload], { type: 'application/json' }), `${title}.forma.json`);

@@ -103,91 +103,91 @@ export const PANEL_PRESETS: readonly PanelPreset[] = [
     edgeBanding: ['w-min', 'w-max', 'h-min', 'h-max'], defaultQuaternion: [0, 0, 0, 1],
   },
   {
-    id: 'axstad-glass-400', label: 'AXSTAD Glass 400', w: 400, h: 800, d: 19, icon: 'panel_glass_door',
+    id: 'axstad-glass-400', label: 'AXSTAD glass front 40×80 cm', w: 400, h: 800, d: 19, icon: 'panel_glass_door',
     shape: 'glass-door', category: 'front', description: '400×800×19 mm · 78 mm frame · inset glass',
     thicknessAxis: 'd', grainAxis: 'h', edgeBanding: ['w-min', 'w-max', 'h-min', 'h-max'],
     defaultQuaternion: [0, 0, 0, 1],
   },
   {
-    id: 'axstad-glass-600', label: 'AXSTAD Glass 600', w: 600, h: 800, d: 19, icon: 'panel_glass_door',
+    id: 'axstad-glass-600', label: 'AXSTAD glass front 60×80 cm', w: 600, h: 800, d: 19, icon: 'panel_glass_door',
     shape: 'glass-door', category: 'front', description: '600×800×19 mm · 78 mm frame · inset glass',
     thicknessAxis: 'd', grainAxis: 'h', edgeBanding: ['w-min', 'w-max', 'h-min', 'h-max'],
     defaultQuaternion: [0, 0, 0, 1],
   },
   {
-    id: 'axstad-glass-400-1000', label: 'AXSTAD Glass 400×1000', w: 400, h: 1000, d: 19, icon: 'panel_glass_door',
+    id: 'axstad-glass-400-1000', label: 'AXSTAD glass front 40×100 cm', w: 400, h: 1000, d: 19, icon: 'panel_glass_door',
     shape: 'glass-door', category: 'front', description: '400×1000×19 mm · 78 mm frame · inset glass',
     thicknessAxis: 'd', grainAxis: 'h', edgeBanding: ['w-min', 'w-max', 'h-min', 'h-max'],
     defaultQuaternion: [0, 0, 0, 1],
   },
   {
-    id: 'axstad-glass-600-1000', label: 'AXSTAD Glass 600×1000', w: 600, h: 1000, d: 19, icon: 'panel_glass_door',
+    id: 'axstad-glass-600-1000', label: 'AXSTAD glass front 60×100 cm', w: 600, h: 1000, d: 19, icon: 'panel_glass_door',
     shape: 'glass-door', category: 'front', description: '600×1000×19 mm · 78 mm frame · inset glass',
     thicknessAxis: 'd', grainAxis: 'h', edgeBanding: ['w-min', 'w-max', 'h-min', 'h-max'],
     defaultQuaternion: [0, 0, 0, 1],
   },
   bodbynFront(
-    'bodbyn-250', 'BODBYN 25×80', 250, 800, 'bodbyn-door',
+    'bodbyn-250', 'BODBYN panel front 25×80 cm', 250, 800, 'bodbyn-door',
     '250×800×19 mm · 70 mm frame · bevelled panel', 'panel_framed_door',
   ),
   bodbynFront(
-    'bodbyn-300', 'BODBYN 30×80', 300, 800, 'bodbyn-door',
+    'bodbyn-300', 'BODBYN panel front 30×80 cm', 300, 800, 'bodbyn-door',
     '300×800×19 mm · 70 mm frame · bevelled panel', 'panel_framed_door',
   ),
   bodbynFront(
-    'bodbyn-400', 'BODBYN 40×80', 400, 800, 'bodbyn-door',
+    'bodbyn-400', 'BODBYN panel front 40×80 cm', 400, 800, 'bodbyn-door',
     '400×800×19 mm · 70 mm frame · bevelled panel', 'panel_framed_door',
   ),
   bodbynFront(
-    'bodbyn-400-1000', 'BODBYN 40×100', 400, 1000, 'bodbyn-door',
+    'bodbyn-400-1000', 'BODBYN panel front 40×100 cm', 400, 1000, 'bodbyn-door',
     '400×1000×19 mm · 70 mm frame · bevelled panel', 'panel_framed_door',
   ),
   bodbynFront(
-    'bodbyn-450', 'BODBYN 45×80', 450, 800, 'bodbyn-door',
-    '450×800×19 mm · 70 mm frame · bevelled panel · IKEA 802.915.52', 'panel_framed_door',
+    'bodbyn-450', 'BODBYN panel front 45×80 cm', 450, 800, 'bodbyn-door',
+    '450×800×19 mm · 70 mm frame · bevelled panel', 'panel_framed_door',
   ),
   bodbynFront(
-    'bodbyn-600-400', 'BODBYN 60×40', 600, 400, 'bodbyn-door',
+    'bodbyn-600-400', 'BODBYN panel front 60×40 cm', 600, 400, 'bodbyn-door',
     '600×400×19 mm · 70 mm frame · bevelled panel', 'panel_framed_door',
   ),
   bodbynFront(
-    'bodbyn-600-600', 'BODBYN 60×60', 600, 600, 'bodbyn-door',
+    'bodbyn-600-600', 'BODBYN panel front 60×60 cm', 600, 600, 'bodbyn-door',
     '600×600×19 mm · 70 mm frame · bevelled panel', 'panel_framed_door',
   ),
   bodbynFront(
-    'bodbyn-600', 'BODBYN 60×80', 600, 800, 'bodbyn-door',
+    'bodbyn-600', 'BODBYN panel front 60×80 cm', 600, 800, 'bodbyn-door',
     '600×800×19 mm · 70 mm frame · bevelled panel', 'panel_framed_door',
   ),
   bodbynFront(
-    'bodbyn-600-1400', 'BODBYN 60×140', 600, 1400, 'bodbyn-door',
+    'bodbyn-600-1400', 'BODBYN panel front 60×140 cm', 600, 1400, 'bodbyn-door',
     '600×1400×19 mm · 70 mm frame · bevelled panel', 'panel_framed_door',
   ),
   bodbynFront(
-    'bodbyn-drawer-400-200', 'BODBYN Drawer 40×20', 400, 200, 'bodbyn-door',
+    'bodbyn-drawer-400-200', 'BODBYN drawer front 40×20 cm', 400, 200, 'bodbyn-door',
     '400×200×19 mm · 70 mm frame · bevelled panel', 'panel_framed_door',
   ),
   bodbynFront(
-    'bodbyn-drawer-400-400', 'BODBYN Drawer 40×40', 400, 400, 'bodbyn-door',
+    'bodbyn-drawer-400-400', 'BODBYN drawer front 40×40 cm', 400, 400, 'bodbyn-door',
     '400×400×19 mm · 70 mm frame · bevelled panel', 'panel_framed_door',
   ),
   bodbynFront(
-    'bodbyn-drawer-600-100', 'BODBYN Drawer 60×10', 600, 100, 'bodbyn-door',
+    'bodbyn-drawer-600-100', 'BODBYN drawer front 60×10 cm', 600, 100, 'bodbyn-door',
     '600×100×19 mm · 70 mm frame · bevelled panel', 'panel_framed_door',
   ),
   bodbynFront(
-    'bodbyn-drawer-600-200', 'BODBYN Drawer 60×20', 600, 200, 'bodbyn-door',
+    'bodbyn-drawer-600-200', 'BODBYN drawer front 60×20 cm', 600, 200, 'bodbyn-door',
     '600×200×19 mm · 70 mm frame · bevelled panel', 'panel_framed_door',
   ),
   bodbynFront(
-    'bodbyn-drawer-800-200', 'BODBYN Drawer 80×20', 800, 200, 'bodbyn-door',
+    'bodbyn-drawer-800-200', 'BODBYN drawer front 80×20 cm', 800, 200, 'bodbyn-door',
     '800×200×19 mm · 70 mm frame · bevelled panel', 'panel_framed_door',
   ),
   bodbynFront(
-    'bodbyn-drawer-800-400', 'BODBYN Drawer 80×40', 800, 400, 'bodbyn-door',
+    'bodbyn-drawer-800-400', 'BODBYN drawer front 80×40 cm', 800, 400, 'bodbyn-door',
     '800×400×19 mm · 70 mm frame · bevelled panel', 'panel_framed_door',
   ),
   bodbynFront(
-    'bodbyn-glass-400-400', 'BODBYN Glass 40×40', 400, 400, 'bodbyn-muntin-glass',
+    'bodbyn-glass-400-400', 'BODBYN glass front 40×40 cm', 400, 400, 'bodbyn-muntin-glass',
     '400×400×19 mm · 70 mm frame · glass · cross-rail', 'panel_glass_door',
   ),
   {
@@ -196,36 +196,36 @@ export const PANEL_PRESETS: readonly PanelPreset[] = [
     grainAxis: null, edgeBanding: [], defaultQuaternion: [0, 0, 0, 1],
   },
   {
-    id: 'bagganas', label: 'BAGGANÄS', w: 21, h: 21, d: 24, icon: 'panel_knob', shape: 'bagganas',
-    category: 'hardware', description: 'Ø21 × 24 mm · IKEA 903.384.17', thicknessAxis: null,
+    id: 'bagganas', label: 'BAGGANÄS knob', w: 21, h: 21, d: 24, icon: 'panel_knob', shape: 'bagganas',
+    category: 'hardware', description: 'Ø21 × 24 mm projection', thicknessAxis: null,
     grainAxis: null, edgeBanding: [], defaultQuaternion: [0, 0, 0, 1],
   },
   {
-    id: 'eneryda', label: 'ENERYDA', w: 112, h: 17, d: 30, icon: 'panel_handle', shape: 'eneryda',
-    category: 'hardware', description: '112 mm · 96 mm centres · IKEA 703.475.16', thicknessAxis: null,
+    id: 'eneryda', label: 'ENERYDA handle', w: 112, h: 17, d: 30, icon: 'panel_handle', shape: 'eneryda',
+    category: 'hardware', description: '112 mm · 96 mm centres', thicknessAxis: null,
     grainAxis: null, edgeBanding: [], defaultQuaternion: [0, 0, 0, 1],
   },
   {
-    id: 'borghamn', label: 'BORGHAMN', w: 170, h: 10, d: 36, icon: 'panel_handle', shape: 'borghamn',
-    category: 'hardware', description: '170 mm · 160 mm centres · IKEA 203.160.46', thicknessAxis: null,
+    id: 'borghamn', label: 'BORGHAMN handle', w: 170, h: 10, d: 36, icon: 'panel_handle', shape: 'borghamn',
+    category: 'hardware', description: '170 mm · 160 mm centres', thicknessAxis: null,
     grainAxis: null, edgeBanding: [], defaultQuaternion: [0, 0, 0, 1],
   },
   {
-    id: 'enhet-leg', label: 'ENHET', w: 50, h: 125, d: 50, icon: 'panel_leg', shape: 'enhet-leg',
-    category: 'hardware', description: 'Leg · 125 mm · IKEA 104.490.18', thicknessAxis: null,
+    id: 'enhet-leg', label: 'ENHET leg', w: 50, h: 125, d: 50, icon: 'panel_leg', shape: 'enhet-leg',
+    category: 'hardware', description: '125 mm high', thicknessAxis: null,
     grainAxis: null, edgeBanding: [], defaultQuaternion: [0, 0, 0, 1],
   },
 ];
 
 /** IKEA METOD frame sizes. Heights exclude legs, worktops and the 1 cm wall gap. */
 export const CABINET_PRESETS: readonly CabinetPreset[] = [
-  { id: 'base-400', label: 'Base 400', width: 400, height: 800, depth: 600, shelfCount: 1, icon: 'cabinet' },
-  { id: 'base-600', label: 'Base 600', width: 600, height: 800, depth: 600, shelfCount: 1, icon: 'cabinet' },
-  { id: 'base-800', label: 'Base 800', width: 800, height: 800, depth: 600, shelfCount: 1, icon: 'cabinet' },
+  { id: 'base-400', label: 'Base cabinet 40 cm', width: 400, height: 800, depth: 600, shelfCount: 1, icon: 'cabinet' },
+  { id: 'base-600', label: 'Base cabinet 60 cm', width: 600, height: 800, depth: 600, shelfCount: 1, icon: 'cabinet' },
+  { id: 'base-800', label: 'Base cabinet 80 cm', width: 800, height: 800, depth: 600, shelfCount: 1, icon: 'cabinet' },
   // 1400 mm underside so an 800 mm wall unit’s top lines up with High 2200.
-  { id: 'wall-600', label: 'Wall 600', width: 600, height: 800, depth: 370, shelfCount: 1, icon: 'cabinet', bottomMm: 1400 },
-  { id: 'wall-800', label: 'Wall 800', width: 800, height: 800, depth: 370, shelfCount: 1, icon: 'cabinet', bottomMm: 1400 },
-  { id: 'high-600', label: 'High 600', width: 600, height: 2200, depth: 600, shelfCount: 4, icon: 'cabinet' },
+  { id: 'wall-600', label: 'Wall cabinet 60 cm', width: 600, height: 800, depth: 370, shelfCount: 1, icon: 'cabinet', bottomMm: 1400 },
+  { id: 'wall-800', label: 'Wall cabinet 80 cm', width: 800, height: 800, depth: 370, shelfCount: 1, icon: 'cabinet', bottomMm: 1400 },
+  { id: 'high-600', label: 'Tall cabinet 60 cm', width: 600, height: 2200, depth: 600, shelfCount: 4, icon: 'cabinet' },
 ];
 
 /** Older library ids, kept so saved cabinets still resolve to a catalog preset. */

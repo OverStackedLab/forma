@@ -44,12 +44,12 @@ export const DRAWER_DIM_LIMITS = {
 } as const;
 
 export const DRAWER_PRESETS: readonly DrawerPreset[] = [
-  drawerPreset('drawer-400-200', 'Drawer 40×20', 400, 200),
-  drawerPreset('drawer-400-400', 'Drawer 40×40', 400, 400),
-  drawerPreset('drawer-600-100', 'Drawer 60×10', 600, 100),
-  drawerPreset('drawer-600-200', 'Drawer 60×20', 600, 200),
-  drawerPreset('drawer-800-200', 'Drawer 80×20', 800, 200),
-  drawerPreset('drawer-800-400', 'Drawer 80×40', 800, 400),
+  drawerPreset('drawer-400-200', 'Drawer box 40×20 cm', 400, 200),
+  drawerPreset('drawer-400-400', 'Drawer box 40×40 cm', 400, 400),
+  drawerPreset('drawer-600-100', 'Drawer box 60×10 cm', 600, 100),
+  drawerPreset('drawer-600-200', 'Drawer box 60×20 cm', 600, 200),
+  drawerPreset('drawer-800-200', 'Drawer box 80×20 cm', 800, 200),
+  drawerPreset('drawer-800-400', 'Drawer box 80×40 cm', 800, 400),
 ];
 
 function drawerPreset(

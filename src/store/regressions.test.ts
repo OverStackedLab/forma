@@ -211,7 +211,7 @@ describe('BUG-032 — cabinets with fractional even shelf spacing', () => {
 
     setCabinetDim(firstGroup().id, 'width', 600);
     expect(firstGroup().cabinet?.presetId).toBe('high-600');
-    expect(firstGroup().label).toBe('High 600');
+    expect(firstGroup().label).toBe('Tall cabinet 60 cm');
   });
 
   it('redistributes shelves when the cabinet gets taller', () => {
@@ -376,7 +376,10 @@ describe('BUG-019 — duplicating more than one cabinet', () => {
     expect(after).toHaveLength(4);
     // Previously both cabinets were cloned as loose parts with no config.
     expect(after.slice(2).every((group) => Boolean(group.cabinet))).toBe(true);
-    expect(after.slice(2).map((group) => group.label)).toEqual(['Base 600', 'Wall 600']);
+    expect(after.slice(2).map((group) => group.label)).toEqual([
+      'Base cabinet 60 cm',
+      'Wall cabinet 60 cm',
+    ]);
     expect(after[2]!.partIds).toHaveLength(before[0]!.partIds.length);
   });
 

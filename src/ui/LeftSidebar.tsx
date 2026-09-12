@@ -393,19 +393,15 @@ function LibrarySection({
 function LibraryPanel() {
   const panels = PANEL_PRESETS.filter((preset) => preset.category === 'panel');
   const fronts = PANEL_PRESETS.filter(
-    (preset) =>
-      preset.category === 'front' &&
-      preset.id !== 'door' &&
-      !preset.id.startsWith('bodbyn'),
+    (preset) => preset.category === 'front' && preset.id !== 'door',
   );
-  const bodbyn = PANEL_PRESETS.filter((preset) => preset.id.startsWith('bodbyn'));
   const hardware = PANEL_PRESETS.filter((preset) => preset.category === 'hardware');
 
   return (
     <div className="flex flex-col gap-[18px] overflow-y-auto px-3 py-3.5">
       <div>
         <h3 className="mb-2 text-[11px] font-semibold tracking-[.04em] text-ink/45 uppercase">
-          Prebuilt Cabinets
+          Cabinets
         </h3>
         <div className="grid grid-cols-2 gap-1.5">
           {CABINET_PRESETS.map((preset) => (
@@ -422,13 +418,13 @@ function LibraryPanel() {
           ))}
         </div>
         <p className="mt-2 text-[10px] leading-relaxed text-ink/30">
-          IKEA METOD frame sizes. Heights exclude legs and worktops.
+          Standard METOD cabinet sizes. Heights exclude legs and worktops.
         </p>
       </div>
 
       <div>
         <h3 className="mb-2 text-[11px] font-semibold tracking-[.04em] text-ink/45 uppercase">
-          Drawers
+          Drawer Boxes
         </h3>
         <div className="grid grid-cols-2 gap-1.5">
           {DRAWER_PRESETS.map((preset) => (
@@ -443,13 +439,13 @@ function LibraryPanel() {
           ))}
         </div>
         <p className="mt-2 text-[10px] leading-relaxed text-ink/30">
-          Four-piece box: 1.8 cm sides, 0.8 cm bottom and back. Pair with a BODBYN drawer front.
+          Names indicate matching front size; dimensions show the actual box (W×H×D).
+          Fronts are added separately. Sides: 1.8 cm; bottom and back: 0.8 cm.
         </p>
       </div>
 
       <LibrarySection title="Panels" presets={panels} />
       <LibrarySection title="Fronts" presets={fronts} />
-      <LibrarySection title="BODBYN" presets={bodbyn} />
       <LibrarySection title="Hardware" presets={hardware} />
 
       <p className="text-[11px] leading-relaxed text-ink/35">

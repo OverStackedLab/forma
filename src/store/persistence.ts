@@ -397,7 +397,13 @@ function normalizeSnapshot(value: unknown, legacyAxes = false): DocumentSnapshot
         .map((id) => customParts.find((part) => part.id === id)?.label ?? '')
         .join(' ');
       const inferredCabinet = CABINET_PRESETS.find(
-        (preset) => preset.label === label || memberLabels.includes(`${preset.label} Left Side`),
+        (preset) => {
+          const family = preset.id.split('-')[0]!;
+          const legacyLabel = `${family[0]!.toUpperCase()}${family.slice(1)} ${preset.width}`;
+          return [preset.label, legacyLabel].some(
+            (name) => name === label || memberLabels.includes(`${name} Left Side`),
+          );
+        },
       );
       if (inferredCabinet && partIds.length === 5 + inferredCabinet.shelfCount) {
         cabinet = {

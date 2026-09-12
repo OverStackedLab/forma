@@ -67,19 +67,19 @@ test('boots to an empty scene with no starting model', async ({ page }) => {
   await expect(page.getByText('Base Style')).toHaveCount(0);
   await expect(page.getByRole('heading', { name: 'Panels' })).toBeVisible();
   await expect(page.getByRole('heading', { name: 'Fronts' })).toBeVisible();
-  await expect(page.getByRole('heading', { name: 'BODBYN' })).toBeVisible();
-  await expect(page.getByRole('heading', { name: 'Drawers' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Cabinets' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Drawer Boxes' })).toBeVisible();
   await expect(page.getByRole('heading', { name: 'Hardware' }).first()).toBeVisible();
-  await expect(page.getByRole('button', { name: /Base 600 60×80×60 cm/ })).toBeVisible();
+  await expect(page.getByRole('button', { name: /Base cabinet 60 cm 60×80×60 cm/ })).toBeVisible();
   await expect(page.getByRole('button', { name: /Shelf 80×1.8×30 cm/ })).toBeVisible();
   await expect(page.getByRole('button', { name: 'Door' })).toHaveCount(0);
-  await expect(page.getByRole('button', { name: /AXSTAD Glass 400 40×80×1.9 cm/ })).toBeVisible();
-  await expect(page.getByRole('button', { name: /BODBYN 45×80 45×80×1.9 cm/ })).toBeVisible();
-  await expect(page.getByRole('button', { name: /BODBYN Glass 40×40 40×40×1.9 cm/ })).toBeVisible();
-  await expect(page.getByRole('button', { name: /BODBYN Drawer 60×20 60×20×1.9 cm/ })).toBeVisible();
-  await expect(page.getByRole('button', { name: /Drawer 60×20 56.2×18×55 cm/ })).toBeVisible();
-  await expect(page.getByRole('button', { name: /ENHET.*12.5 cm/ })).toBeVisible();
-  await expect(page.getByRole('button', { name: /BORGHAMN.*17 cm/ })).toBeVisible();
+  await expect(page.getByRole('button', { name: /AXSTAD glass front 40×80 cm 40×80×1.9 cm/ })).toBeVisible();
+  await expect(page.getByRole('button', { name: /BODBYN panel front 45×80 cm 45×80×1.9 cm/ })).toBeVisible();
+  await expect(page.getByRole('button', { name: /BODBYN glass front 40×40 cm 40×40×1.9 cm/ })).toBeVisible();
+  await expect(page.getByRole('button', { name: /BODBYN drawer front 60×20 cm 60×20×1.9 cm/ })).toBeVisible();
+  await expect(page.getByRole('button', { name: /Drawer box 60×20 cm 56.2×18×55 cm/ })).toBeVisible();
+  await expect(page.getByRole('button', { name: /ENHET leg.*12.5 cm/ })).toBeVisible();
+  await expect(page.getByRole('button', { name: /BORGHAMN handle.*17 cm/ })).toBeVisible();
 
   expect(errors).toEqual([]);
 });
@@ -105,24 +105,24 @@ test('inserting a prebuilt cabinet creates one grouped open carcass and six cut-
 }) => {
   await page.goto('/');
   await page.getByRole('tab', { name: 'Library' }).click();
-  await page.getByRole('button', { name: /Base 600/ }).click();
-  await expect(page.getByText('Base 600 cabinet added')).toBeVisible();
+  await page.getByRole('button', { name: /Base cabinet 60 cm/ }).click();
+  await expect(page.getByText('Base cabinet 60 cm added to scene')).toBeVisible();
 
   await page.getByRole('tab', { name: 'Assembly' }).click();
   await expect(page.getByText('6 selected')).toBeVisible();
-  await expect(page.getByRole('treeitem', { name: /Base 600/ }).first()).toBeVisible();
+  await expect(page.getByRole('treeitem', { name: /Base cabinet 60 cm/ }).first()).toBeVisible();
 
   await page.getByRole('tab', { name: 'Cut List' }).click();
   await expect(page.getByText('Sheet Goods', { exact: true })).toBeVisible();
-  await expect(page.getByText('Base 600 Side', { exact: true }).last()).toBeVisible();
-  await expect(page.getByText('Base 600 Shelf', { exact: true }).last()).toBeVisible();
-  await expect(page.getByText('Base 600 Door', { exact: true })).toHaveCount(0);
+  await expect(page.getByText('Base cabinet 60 cm Side', { exact: true }).last()).toBeVisible();
+  await expect(page.getByText('Base cabinet 60 cm Shelf', { exact: true }).last()).toBeVisible();
+  await expect(page.getByText('Base cabinet 60 cm Door', { exact: true })).toHaveCount(0);
 });
 
 test('cabinet shelves can be added at a position and distributed by spacing', async ({ page }) => {
   await gotoMm(page);
   await page.getByRole('tab', { name: 'Library' }).click();
-  await page.getByRole('button', { name: /Base 600/ }).click();
+  await page.getByRole('button', { name: /Base cabinet 60 cm/ }).click();
   await expect(page.getByText('6 parts').first()).toBeVisible();
 
   // The preset's single shelf sits at the interior centre.
@@ -156,7 +156,7 @@ test('cabinet shelves can be added at a position and distributed by spacing', as
 test('cabinet panels can be added at a position and distributed by spacing', async ({ page }) => {
   await gotoMm(page);
   await page.getByRole('tab', { name: 'Library' }).click();
-  await page.getByRole('button', { name: /Base 600/ }).click();
+  await page.getByRole('button', { name: /Base cabinet 60 cm/ }).click();
   await expect(page.getByText('6 parts').first()).toBeVisible();
 
   await page.getByLabel('New panel position in millimetres').fill('300');
@@ -189,7 +189,7 @@ test('duplicating an interior panel adds the next free centreline like Add Panel
 }) => {
   await gotoMm(page);
   await page.getByRole('tab', { name: 'Library' }).click();
-  await page.getByRole('button', { name: /Base 600/ }).click();
+  await page.getByRole('button', { name: /Base cabinet 60 cm/ }).click();
   await page.getByLabel('New panel position in millimetres').fill('300');
   await page.getByRole('button', { name: 'Add Panel' }).click();
   await expect(page.getByText('Panel added at 300 mm')).toBeVisible();
@@ -220,7 +220,7 @@ test('deleting a panel updates the tree, the count and the cut list together', a
 test('a prebuilt cabinet resizes from nominal dimensions without changing panel thickness', async ({ page }) => {
   await gotoMm(page);
   await page.getByRole('tab', { name: 'Library' }).click();
-  await page.getByRole('button', { name: /Base 600/ }).click();
+  await page.getByRole('button', { name: /Base cabinet 60 cm/ }).click();
 
   const width = page.getByLabel('Cabinet Width in millimetres');
   await expect(width).toHaveValue('600');
@@ -229,7 +229,7 @@ test('a prebuilt cabinet resizes from nominal dimensions without changing panel 
   await expect(width).toHaveValue('800');
 
   await page.getByRole('tab', { name: 'Cut List' }).click();
-  await expect(page.getByText('Base 800 Side', { exact: true }).last()).toBeVisible();
+  await expect(page.getByText('Base cabinet 80 cm Side', { exact: true }).last()).toBeVisible();
   await expect(page.getByText('764', { exact: true }).first()).toBeVisible();
   await expect(page.getByText('18', { exact: true }).first()).toBeVisible();
 });
@@ -237,7 +237,7 @@ test('a prebuilt cabinet resizes from nominal dimensions without changing panel 
 test('round hardware has purpose-built dimensions, finish and purchasing output', async ({ page }) => {
   await gotoMm(page);
   await page.getByRole('tab', { name: 'Library' }).click();
-  await page.getByRole('button', { name: 'Knob' }).click();
+  await page.getByRole('button', { name: /^Knob / }).click();
 
   await expect(page.getByLabel('Diameter in millimetres')).toHaveValue('32');
   await expect(page.getByLabel('Projection in millimetres')).toHaveValue('25');
@@ -254,14 +254,14 @@ test('ENHET legs insert as purchased hardware with diameter and height', async (
   await gotoMm(page);
   await page.getByRole('tab', { name: 'Library' }).click();
   await page.getByRole('button', { name: /ENHET/ }).click();
-  await expect(page.getByText('ENHET added to scene')).toBeVisible();
+  await expect(page.getByText('ENHET leg added to scene')).toBeVisible();
 
   await expect(page.getByLabel('Diameter in millimetres')).toHaveValue('50');
   await expect(page.getByLabel('Height in millimetres')).toHaveValue('125');
 
   await page.getByRole('tab', { name: 'Cut List' }).click();
   await expect(page.getByRole('heading', { name: 'Purchased Hardware' })).toBeVisible();
-  await expect(page.getByText('ENHET', { exact: true }).last()).toBeVisible();
+  await expect(page.getByText('ENHET leg', { exact: true }).last()).toBeVisible();
 });
 
 test('shift-click adds to the selection without triggering a marquee', async ({ page }) => {
@@ -400,44 +400,44 @@ test('inserting a library panel keeps the Library tab open', async ({ page }) =>
 test('an AXSTAD glass door inserts as a front with an inset pane', async ({ page }) => {
   await page.goto('/');
   await page.getByRole('tab', { name: 'Library' }).click();
-  await page.getByRole('button', { name: /AXSTAD Glass 400 40×80×1.9 cm/ }).click();
-  await expect(page.getByText('AXSTAD Glass 400 added to scene')).toBeVisible();
+  await page.getByRole('button', { name: /AXSTAD glass front 40×80 cm 40×80×1.9 cm/ }).click();
+  await expect(page.getByText('AXSTAD glass front 40×80 cm added to scene')).toBeVisible();
   await page.getByRole('tab', { name: 'Assembly' }).click();
-  await expect(page.getByRole('treeitem', { name: /AXSTAD Glass 400/ })).toBeVisible();
+  await expect(page.getByRole('treeitem', { name: /AXSTAD glass front 40×80 cm/ })).toBeVisible();
 });
 
 test('a drawer box inserts as a four-piece group without a front', async ({ page }) => {
   await page.goto('/');
   await page.getByRole('tab', { name: 'Library' }).click();
-  await page.getByRole('button', { name: /Drawer 60×20 56.2×18×55 cm/ }).click();
-  await expect(page.getByText('Drawer 60×20 drawer added')).toBeVisible();
+  await page.getByRole('button', { name: /Drawer box 60×20 cm 56.2×18×55 cm/ }).click();
+  await expect(page.getByText('Drawer box 60×20 cm added to scene')).toBeVisible();
   await page.getByRole('tab', { name: 'Assembly' }).click();
-  await expect(page.getByRole('treeitem', { name: /Drawer 60×20/ }).first()).toBeVisible();
+  await expect(page.getByRole('treeitem', { name: /Drawer box 60×20 cm/ }).first()).toBeVisible();
 });
 
 test('a BODBYN door inserts as a framed front with a recessed panel', async ({ page }) => {
   await page.goto('/');
   await page.getByRole('tab', { name: 'Library' }).click();
-  await page.getByRole('button', { name: /BODBYN 45×80 45×80×1.9 cm/ }).click();
-  await expect(page.getByText('BODBYN 45×80 added to scene')).toBeVisible();
+  await page.getByRole('button', { name: /BODBYN panel front 45×80 cm 45×80×1.9 cm/ }).click();
+  await expect(page.getByText('BODBYN panel front 45×80 cm added to scene')).toBeVisible();
   await page.getByRole('tab', { name: 'Assembly' }).click();
-  await expect(page.getByRole('treeitem', { name: /BODBYN 45×80/ })).toBeVisible();
+  await expect(page.getByRole('treeitem', { name: /BODBYN panel front 45×80 cm/ })).toBeVisible();
 });
 
 test('a BODBYN glass door inserts as a framed front with a cross-rail', async ({ page }) => {
   await page.goto('/');
   await page.getByRole('tab', { name: 'Library' }).click();
-  await page.getByRole('button', { name: /BODBYN Glass 40×40 40×40×1.9 cm/ }).click();
-  await expect(page.getByText('BODBYN Glass 40×40 added to scene')).toBeVisible();
+  await page.getByRole('button', { name: /BODBYN glass front 40×40 cm 40×40×1.9 cm/ }).click();
+  await expect(page.getByText('BODBYN glass front 40×40 cm added to scene')).toBeVisible();
   await page.getByRole('tab', { name: 'Assembly' }).click();
-  await expect(page.getByRole('treeitem', { name: /BODBYN Glass 40×40/ })).toBeVisible();
+  await expect(page.getByRole('treeitem', { name: /BODBYN glass front 40×40 cm/ })).toBeVisible();
 });
 
 test('a BORGHAMN handle inserts as square-bar hardware', async ({ page }) => {
   await page.goto('/');
   await page.getByRole('tab', { name: 'Library' }).click();
-  await page.getByRole('button', { name: /BORGHAMN 17 cm/ }).click();
-  await expect(page.getByText('BORGHAMN added to scene')).toBeVisible();
+  await page.getByRole('button', { name: /BORGHAMN handle 17 cm/ }).click();
+  await expect(page.getByText('BORGHAMN handle added to scene')).toBeVisible();
   await page.getByRole('tab', { name: 'Assembly' }).click();
   await expect(page.getByRole('treeitem', { name: /BORGHAMN/ })).toBeVisible();
 });
@@ -579,7 +579,7 @@ test('viewport clicks select one grouped piece while the Assembly group row sele
 }) => {
   await gotoMm(page);
   await page.getByRole('tab', { name: 'Library' }).click();
-  await page.getByRole('button', { name: /Base 600/ }).click();
+  await page.getByRole('button', { name: /Base cabinet 60 cm/ }).click();
   await page.getByRole('button', { name: 'Clear', exact: true }).click();
 
   const canvasBox = await page.locator('canvas').boundingBox();
@@ -592,8 +592,8 @@ test('viewport clicks select one grouped piece while the Assembly group row sele
 
   await page.getByRole('tab', { name: 'Assembly' }).click();
   await expect(page.getByText('1 selected')).toBeVisible();
-  await groupRow(page, 'Base 600').click();
-  await expect(page.getByText('Editing: Base 600')).toBeVisible();
+  await groupRow(page, 'Base cabinet 60 cm').click();
+  await expect(page.getByText('Editing: Base cabinet 60 cm')).toBeVisible();
   await expect(page.getByText('Configurable cabinet · 6 pieces')).toBeVisible();
   await expect(page.getByRole('button', { name: 'Add Shelf' })).toBeVisible();
   await expect(page.getByRole('button', { name: 'Add Panel' })).toBeVisible();
@@ -604,7 +604,7 @@ test('viewport clicks select one grouped piece while the Assembly group row sele
 test('duplicating one cabinet piece copies only that piece', async ({ page }) => {
   await gotoMm(page);
   await page.getByRole('tab', { name: 'Library' }).click();
-  await page.getByRole('button', { name: /Base 600/ }).click();
+  await page.getByRole('button', { name: /Base cabinet 60 cm/ }).click();
   await page.getByRole('button', { name: 'Clear', exact: true }).click();
 
   const canvasBox = await page.locator('canvas').boundingBox();
@@ -620,7 +620,7 @@ test('duplicating one cabinet piece copies only that piece', async ({ page }) =>
 test('a demoted cabinet can restore Add Shelf from its pieces', async ({ page }) => {
   await gotoMm(page);
   await page.getByRole('tab', { name: 'Library' }).click();
-  await page.getByRole('button', { name: /Base 600/ }).click();
+  await page.getByRole('button', { name: /Base cabinet 60 cm/ }).click();
   await page.getByRole('button', { name: 'Clear', exact: true }).click();
 
   const canvasBox = await page.locator('canvas').boundingBox();
@@ -666,16 +666,16 @@ test('Snap Together moves a whole group without breaking its cabinet configurati
 }) => {
   await gotoMm(page);
   await page.getByRole('tab', { name: 'Library' }).click();
-  await page.getByRole('button', { name: /Base 600/ }).click();
-  await page.getByRole('button', { name: /Base 600/ }).click();
+  await page.getByRole('button', { name: /Base cabinet 60 cm/ }).click();
+  await page.getByRole('button', { name: /Base cabinet 60 cm/ }).click();
   await page.getByRole('tab', { name: 'Assembly' }).click();
 
-  const cabinets = groupRow(page, 'Base 600');
+  const cabinets = groupRow(page, 'Base cabinet 60 cm');
   await expect(cabinets).toHaveCount(2);
   await cabinets.nth(0).click();
   await cabinets.nth(1).click({ modifiers: ['Shift'] });
   await page.getByRole('button', { name: 'Snap Together' }).click();
-  await expect(page.getByText('Base 600 snapped to Base 600')).toBeVisible();
+  await expect(page.getByText('Base cabinet 60 cm snapped to Base cabinet 60 cm')).toBeVisible();
 
   await cabinets.nth(1).click();
   await expect(page.getByLabel('Group X Position in millimetres')).toHaveValue('600');
@@ -687,12 +687,12 @@ test('Align Left lines a wall cabinet up with a floor cabinet without dropping i
 }) => {
   await gotoMm(page);
   await page.getByRole('tab', { name: 'Library' }).click();
-  await page.getByRole('button', { name: /Base 600/ }).click();
-  await page.getByRole('button', { name: /Wall 600/ }).click();
+  await page.getByRole('button', { name: /Base cabinet 60 cm/ }).click();
+  await page.getByRole('button', { name: /Wall cabinet 60 cm/ }).click();
   await page.getByRole('tab', { name: 'Assembly' }).click();
 
-  const base = groupRow(page, 'Base 600');
-  const wall = groupRow(page, 'Wall 600');
+  const base = groupRow(page, 'Base cabinet 60 cm');
+  const wall = groupRow(page, 'Wall cabinet 60 cm');
   await wall.click();
   const wallY = page.getByLabel('Group Y Position in millimetres');
   const hangHeight = await wallY.inputValue();
@@ -704,7 +704,7 @@ test('Align Left lines a wall cabinet up with a floor cabinet without dropping i
   await wall.click({ modifiers: ['Shift'] });
   await expect(page.locator('canvas')).toBeVisible();
   await page.getByRole('button', { name: 'Align Left' }).click();
-  await expect(page.getByText('Wall 600 aligned left with Base 600')).toBeVisible();
+  await expect(page.getByText('Wall cabinet 60 cm aligned left with Base cabinet 60 cm')).toBeVisible();
 
   await wall.click();
   await expect(wallX).toHaveValue('0');
@@ -718,10 +718,10 @@ test('Align Left lines a wall cabinet up with a floor cabinet without dropping i
 test('duplicating a group creates an independently editable grouped copy', async ({ page }) => {
   await gotoMm(page);
   await page.getByRole('tab', { name: 'Library' }).click();
-  await page.getByRole('button', { name: /Base 600/ }).click();
+  await page.getByRole('button', { name: /Base cabinet 60 cm/ }).click();
 
   await page.getByRole('button', { name: 'Duplicate' }).click();
-  await expect(page.getByText('Base 600 group duplicated')).toBeVisible();
+  await expect(page.getByText('Base cabinet 60 cm group duplicated')).toBeVisible();
   await expect(page.getByText('12 parts').first()).toBeVisible();
   await page.getByRole('tab', { name: 'Assembly' }).click();
   await expect(page.getByText('6 selected')).toBeVisible();
@@ -731,8 +731,8 @@ test('duplicating a group creates an independently editable grouped copy', async
   const width = page.getByLabel('Cabinet Width in millimetres');
   await width.fill('800');
   await width.blur();
-  await expect(page.getByRole('treeitem', { name: /Base 600/ }).first()).toBeVisible();
-  await expect(page.getByRole('treeitem', { name: /Base 800/ }).first()).toBeVisible();
+  await expect(page.getByRole('treeitem', { name: /Base cabinet 60 cm/ }).first()).toBeVisible();
+  await expect(page.getByRole('treeitem', { name: /Base cabinet 80 cm/ }).first()).toBeVisible();
 
   // One undo restores the copy's dimensions; a second removes the duplicate.
   await page.getByRole('button', { name: 'Undo' }).click();
@@ -755,7 +755,7 @@ test('snap to floor reports nothing to do when a panel is already grounded', asy
 test('snap to floor preserves a fully selected cabinet structure', async ({ page }) => {
   await gotoMm(page);
   await page.getByRole('tab', { name: 'Library' }).click();
-  await page.getByRole('button', { name: /Base 600/ }).click();
+  await page.getByRole('button', { name: /Base cabinet 60 cm/ }).click();
   await page.getByRole('tab', { name: 'Assembly' }).click();
   await page.getByRole('button', { name: 'Select All' }).click();
   await expect(page.locator('canvas')).toBeVisible();
@@ -767,7 +767,7 @@ test('snap to floor preserves a fully selected cabinet structure', async ({ page
 
   // Y Position is the part centre: an 800-high carcass with an 18 mm top
   // puts that panel's centreline at 800 - 18 / 2.
-  await page.getByRole('treeitem', { name: /Base 600 Top Hide/ }).click();
+  await page.getByRole('treeitem', { name: /Base cabinet 60 cm Top Hide/ }).click();
   await expect(page.getByLabel('Y Position in millimetres')).toHaveValue('791');
 });
 
@@ -895,11 +895,11 @@ test('group rotation fields turn every member around the shared pivot', async ({
 test('selecting two groups shows shared position and rotation sliders', async ({ page }) => {
   await gotoMm(page);
   await page.getByRole('tab', { name: 'Library' }).click();
-  await page.getByRole('button', { name: /Base 600/ }).click();
-  await page.getByRole('button', { name: /Base 600/ }).click();
+  await page.getByRole('button', { name: /Base cabinet 60 cm/ }).click();
+  await page.getByRole('button', { name: /Base cabinet 60 cm/ }).click();
   await page.getByRole('tab', { name: 'Assembly' }).click();
 
-  const cabinets = groupRow(page, 'Base 600');
+  const cabinets = groupRow(page, 'Base cabinet 60 cm');
   await cabinets.nth(0).click();
   await cabinets.nth(1).click({ modifiers: ['Shift'] });
   await expect(page.getByText('12 selected')).toBeVisible();
@@ -920,11 +920,11 @@ test('Shift-clicking an Assembly group row adds it without replacing the first',
 }) => {
   await gotoMm(page);
   await page.getByRole('tab', { name: 'Library' }).click();
-  await page.getByRole('button', { name: /Base 600/ }).click();
-  await page.getByRole('button', { name: /Base 600/ }).click();
+  await page.getByRole('button', { name: /Base cabinet 60 cm/ }).click();
+  await page.getByRole('button', { name: /Base cabinet 60 cm/ }).click();
   await page.getByRole('tab', { name: 'Assembly' }).click();
 
-  const cabinets = groupRow(page, 'Base 600');
+  const cabinets = groupRow(page, 'Base cabinet 60 cm');
   await expect(cabinets).toHaveCount(2);
   await expect(page.getByText('6 selected')).toBeVisible();
   await cabinets.nth(0).click({ modifiers: ['Shift'] });
@@ -932,33 +932,33 @@ test('Shift-clicking an Assembly group row adds it without replacing the first',
   await expect(page.getByLabel('X Position in millimetres')).toBeVisible();
   await cabinets.nth(0).click({ modifiers: ['Shift'] });
   await expect(page.getByText('6 selected')).toBeVisible();
-  await expect(page.getByText('Editing: Base 600')).toBeVisible();
+  await expect(page.getByText('Editing: Base cabinet 60 cm')).toBeVisible();
 });
 
 test('dragging an Assembly group row reorders cabinets', async ({ page }) => {
   await gotoMm(page);
   await page.getByRole('tab', { name: 'Library' }).click();
-  await page.getByRole('button', { name: /Base 600/ }).click();
-  await page.getByRole('button', { name: /Wall 600/ }).click();
+  await page.getByRole('button', { name: /Base cabinet 60 cm/ }).click();
+  await page.getByRole('button', { name: /Wall cabinet 60 cm/ }).click();
   await page.getByRole('tab', { name: 'Assembly' }).click();
 
-  const base = groupRow(page, 'Base 600');
-  const wall = groupRow(page, 'Wall 600');
+  const base = groupRow(page, 'Base cabinet 60 cm');
+  const wall = groupRow(page, 'Wall cabinet 60 cm');
   await expect(base).toBeVisible();
   await expect(wall).toBeVisible();
-  await page.getByRole('button', { name: 'Reorder Wall 600' }).dragTo(
-    page.getByRole('button', { name: 'Reorder Base 600' }),
+  await page.getByRole('button', { name: 'Reorder Wall cabinet 60 cm' }).dragTo(
+    page.getByRole('button', { name: 'Reorder Base cabinet 60 cm' }),
     { targetPosition: { x: 8, y: 4 } },
   );
-  const handles = page.getByRole('button', { name: /Reorder (Base|Wall) 600/ });
-  await expect(handles.nth(0)).toHaveAttribute('aria-label', 'Reorder Wall 600');
-  await expect(handles.nth(1)).toHaveAttribute('aria-label', 'Reorder Base 600');
+  const handles = page.getByRole('button', { name: /Reorder (Base|Wall) cabinet 60 cm/ });
+  await expect(handles.nth(0)).toHaveAttribute('aria-label', 'Reorder Wall cabinet 60 cm');
+  await expect(handles.nth(1)).toHaveAttribute('aria-label', 'Reorder Base cabinet 60 cm');
 });
 
 test('a moved interior panel stays put when Add Shelf rebuilds', async ({ page }) => {
   await gotoMm(page);
   await page.getByRole('tab', { name: 'Library' }).click();
-  await page.getByRole('button', { name: /Base 600/ }).click();
+  await page.getByRole('button', { name: /Base cabinet 60 cm/ }).click();
   await page.getByRole('button', { name: 'Add Panel' }).click();
   await expect(page.getByLabel('Panel 1 position in millimetres')).toHaveValue('300');
 
@@ -1033,15 +1033,15 @@ test('flush faces draw an alignment witness', async ({ page }) => {
 test('a moving group shows alignment when it lines up with another group', async ({ page }) => {
   await gotoMm(page);
   await page.getByRole('tab', { name: 'Library' }).click();
-  await page.getByRole('button', { name: /Base 600/ }).click();
-  await page.getByRole('button', { name: /Wall 600/ }).click();
+  await page.getByRole('button', { name: /Base cabinet 60 cm/ }).click();
+  await page.getByRole('button', { name: /Wall cabinet 60 cm/ }).click();
   await page.getByRole('tab', { name: 'Assembly' }).click();
-  const base = groupRow(page, 'Base 600');
-  const wall = groupRow(page, 'Wall 600');
+  const base = groupRow(page, 'Base cabinet 60 cm');
+  const wall = groupRow(page, 'Wall cabinet 60 cm');
   await base.click();
   await wall.click({ modifiers: ['Shift'] });
   await page.getByRole('button', { name: 'Align Left' }).click();
-  await expect(page.getByText('Wall 600 aligned left with Base 600')).toBeVisible();
+  await expect(page.getByText('Wall cabinet 60 cm aligned left with Base cabinet 60 cm')).toBeVisible();
   await page.getByRole('button', { name: 'Move (G)' }).click();
   await expect(page.getByTestId('selection-align-dimension').filter({ hasText: '0 mm' }).first()).toBeVisible();
 });
@@ -1049,8 +1049,8 @@ test('a moving group shows alignment when it lines up with another group', async
 test('overall width, height, and depth belong to the scale gizmo', async ({ page }) => {
   await gotoMm(page);
   await page.getByRole('tab', { name: 'Library' }).click();
-  await page.getByRole('button', { name: /Base 600/ }).click();
-  await expect(page.getByText('Base 600 cabinet added')).toBeVisible();
+  await page.getByRole('button', { name: /Base cabinet 60 cm/ }).click();
+  await expect(page.getByText('Base cabinet 60 cm added to scene')).toBeVisible();
 
   // BUG-038: size witnesses are part of the resize gesture, so the move gizmo
   // an insert leaves selected must not carry them.
@@ -1250,7 +1250,7 @@ test('resizing a cabinet with the scale gizmo updates its parametric dimensions'
 }) => {
   await gotoMm(page);
   await page.getByRole('tab', { name: 'Library' }).click();
-  await page.getByRole('button', { name: /Base 600/ }).click();
+  await page.getByRole('button', { name: /Base cabinet 60 cm/ }).click();
   await expect(page.locator('canvas')).toBeVisible();
 
   await page.getByRole('button', { name: 'Frame', exact: true }).click();
@@ -1288,6 +1288,21 @@ test('resizing a cabinet with the scale gizmo updates its parametric dimensions'
   await expect(width).toHaveValue('600');
 });
 
+test('save dialog names the download and document together and cancellation preserves the title', async ({ page }) => {
+  await page.goto('/');
+  await page.getByRole('button', { name: 'Save to File' }).click();
+  await page.getByLabel('Document name', { exact: true }).fill('Kitchen cabinet.forma.json');
+  const pending = page.waitForEvent('download');
+  await page.getByRole('button', { name: 'Save design', exact: true }).click();
+  expect((await pending).suggestedFilename()).toBe('Kitchen cabinet.forma.json');
+  await expect(page.getByText('Kitchen cabinet', { exact: true })).toBeVisible();
+  await page.getByRole('button', { name: 'Save to File' }).click();
+  await page.getByLabel('Document name', { exact: true }).fill('Discarded name');
+  await page.keyboard.press('Escape');
+  await expect(page.getByRole('dialog')).toHaveCount(0);
+  await expect(page.getByText('Kitchen cabinet', { exact: true })).toBeVisible();
+});
+
 test('saving to a file and opening it round-trips the document', async ({ page }) => {
   await gotoWithDownloadFallback(page);
   await insertShelf(page);
@@ -1296,6 +1311,7 @@ test('saving to a file and opening it round-trips the document', async ({ page }
 
   const downloadPromise = page.waitForEvent('download');
   await page.getByRole('button', { name: 'Save to File' }).click();
+  await page.getByRole('button', { name: 'Save design', exact: true }).click();
   const download = await downloadPromise;
   expect(download.suggestedFilename()).toBe('Untitled Design.forma.json');
   const path = await download.path();
@@ -1321,6 +1337,7 @@ test('saving still downloads when the native picker aborts immediately', async (
   await insertShelf(page);
   const downloadPromise = page.waitForEvent('download');
   await page.getByRole('button', { name: 'Save to File' }).click();
+  await page.getByRole('button', { name: 'Save design', exact: true }).click();
   const download = await downloadPromise;
   expect(download.suggestedFilename()).toBe('Untitled Design.forma.json');
   await expect(page.getByText('Saved Untitled Design')).toBeVisible();
@@ -1364,6 +1381,7 @@ test('new file can save a copy then start a clean design', async ({ page }) => {
   await page.getByRole('button', { name: 'New File' }).click();
   const downloadPromise = page.waitForEvent('download');
   await page.getByRole('button', { name: 'Save and continue' }).click();
+  await page.getByRole('button', { name: 'Save design', exact: true }).click();
   const download = await downloadPromise;
   expect(download.suggestedFilename()).toBe('Untitled Design.forma.json');
   await expect(page.getByText('New design created')).toBeVisible();
@@ -1388,6 +1406,7 @@ test('renaming the document drives the downloaded filename without extra dialogs
   });
   const downloadPromise = page.waitForEvent('download');
   await page.getByRole('button', { name: 'Save to File' }).click();
+  await page.getByRole('button', { name: 'Save design', exact: true }).click();
   const download = await downloadPromise;
   expect(download.suggestedFilename()).toBe('Kitchen Remodel.forma.json');
 

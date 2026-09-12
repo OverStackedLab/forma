@@ -231,7 +231,7 @@ describe('persistence.normalize', () => {
       },
     });
     expect(reloaded?.groups[0]?.cabinet).toBeUndefined();
-    expect(reloaded?.groups[0]?.label).toBe('Base 600');
+    expect(reloaded?.groups[0]?.label).toBe('Base cabinet 60 cm');
   });
 });
 

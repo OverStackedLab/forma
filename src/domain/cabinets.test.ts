@@ -19,12 +19,12 @@ describe('buildCabinetLayout', () => {
     const parts = buildCabinetLayout(preset);
     expect(parts).toHaveLength(6);
     expect(parts.map((part) => part.label)).toEqual([
-      'Base 600 Left Side',
-      'Base 600 Right Side',
-      'Base 600 Bottom',
-      'Base 600 Top',
-      'Base 600 Back',
-      'Base 600 Shelf 1',
+      'Base cabinet 60 cm Left Side',
+      'Base cabinet 60 cm Right Side',
+      'Base cabinet 60 cm Bottom',
+      'Base cabinet 60 cm Top',
+      'Base cabinet 60 cm Back',
+      'Base cabinet 60 cm Shelf 1',
     ]);
     expect(parts[0]).toMatchObject({
       w: 18,
