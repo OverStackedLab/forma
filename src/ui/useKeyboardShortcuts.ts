@@ -21,7 +21,6 @@ function isEditable(target: EventTarget | null): boolean {
 
 const MODE_KEYS: Record<string, GizmoMode> = {
   q: 'select',
-  escape: 'select',
   h: 'pan',
   g: 'translate',
   m: 'translate',
@@ -46,6 +45,16 @@ export function useKeyboardShortcuts(): void {
       if (ui.viewMode !== 'model') return;
 
       const key = e.key.toLowerCase();
+
+      if (key === 'escape') {
+        // A modal owns Escape while it is open. Editable controls are already
+        // excluded above so their own cancel/revert behaviour wins too.
+        if (document.querySelector('[role="dialog"][aria-modal="true"]')) return;
+        e.preventDefault();
+        viewportApi()?.cancelGizmoDrag();
+        ui.deactivateTools();
+        return;
+      }
 
       if (e.metaKey || e.ctrlKey) {
         if (key === 'z') {

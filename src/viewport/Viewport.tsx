@@ -267,6 +267,7 @@ export function Viewport() {
       computeAlign: (targetIds, movingIds, edge) =>
         computeAlignTransforms(builder, targetIds, movingIds, edge),
       isGizmoDragging: () => gizmo.isDragging,
+      cancelGizmoDrag: () => gizmo.cancelDrag(),
       viewNudgeFrame: () => {
         const camera = scene.camera;
         camera.updateMatrixWorld();

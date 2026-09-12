@@ -341,6 +341,25 @@ describe('BUG-040 — Measure and the gizmos', () => {
     useUiStore.getState().toggleMeasure();
     expect(useUiStore.getState().measurePoints).toEqual([]);
   });
+
+  it('deactivates every temporary tool without clearing the selection', () => {
+    addCustomPanel('shelf');
+    const id = doc().customParts[0]!.id;
+    useUiStore.getState().setSelection([id]);
+    useUiStore.getState().setGizmoMode('scale');
+    useUiStore.getState().toggleMeasure();
+    useUiStore.getState().addMeasurePoint({ x: 0, y: 0, z: 0 });
+
+    useUiStore.getState().deactivateTools();
+
+    expect(useUiStore.getState()).toMatchObject({
+      selectedPartIds: [id],
+      gizmoMode: 'select',
+      measureActive: false,
+      measurePoints: [],
+      marquee: null,
+    });
+  });
 });
 
 describe('BUG-019 — duplicating more than one cabinet', () => {

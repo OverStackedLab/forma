@@ -18,6 +18,7 @@ import {
 } from '@/store/actions';
 import { useDocumentStore } from '@/store/documentStore';
 import { useUiStore } from '@/store/uiStore';
+import { libraryDescriptionInCm } from './format';
 import { Icon } from './primitives/Icon';
 import { InlineRename } from './primitives/InlineRename';
 import { OptionCard } from './primitives/OptionCard';
@@ -377,7 +378,7 @@ function LibrarySection({
           <OptionCard
             key={preset.id}
             label={preset.label}
-            description={preset.description}
+            description={libraryDescriptionInCm(preset.description)}
             icon={preset.icon}
             dragPayload={`panel:${preset.id}`}
             onClick={() => addCustomPanel(preset.id)}
@@ -392,7 +393,10 @@ function LibrarySection({
 function LibraryPanel() {
   const panels = PANEL_PRESETS.filter((preset) => preset.category === 'panel');
   const fronts = PANEL_PRESETS.filter(
-    (preset) => preset.category === 'front' && !preset.id.startsWith('bodbyn'),
+    (preset) =>
+      preset.category === 'front' &&
+      preset.id !== 'door' &&
+      !preset.id.startsWith('bodbyn'),
   );
   const bodbyn = PANEL_PRESETS.filter((preset) => preset.id.startsWith('bodbyn'));
   const hardware = PANEL_PRESETS.filter((preset) => preset.category === 'hardware');
@@ -408,7 +412,9 @@ function LibraryPanel() {
             <OptionCard
               key={preset.id}
               label={preset.label}
-              description={`${preset.width}×${preset.height}×${preset.depth} mm`}
+              description={libraryDescriptionInCm(
+                `${preset.width}×${preset.height}×${preset.depth} mm`,
+              )}
               icon={preset.icon}
               dragPayload={`cabinet:${preset.id}`}
               onClick={() => addCabinetPreset(preset.id)}
@@ -429,7 +435,7 @@ function LibraryPanel() {
             <OptionCard
               key={preset.id}
               label={preset.label}
-              description={preset.description}
+              description={libraryDescriptionInCm(preset.description)}
               icon={preset.icon}
               dragPayload={`drawer:${preset.id}`}
               onClick={() => addDrawerPreset(preset.id)}
@@ -437,7 +443,7 @@ function LibraryPanel() {
           ))}
         </div>
         <p className="mt-2 text-[10px] leading-relaxed text-ink/30">
-          Four-piece box: 18 mm sides, 8 mm bottom and back. Pair with a BODBYN drawer front.
+          Four-piece box: 1.8 cm sides, 0.8 cm bottom and back. Pair with a BODBYN drawer front.
         </p>
       </div>
 

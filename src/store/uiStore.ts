@@ -39,6 +39,7 @@ export type UiStore = {
   toggleSelection: (id: string) => void;
   clearSelection: () => void;
   setGizmoMode: (mode: GizmoMode) => void;
+  deactivateTools: () => void;
   setViewMode: (mode: ViewMode) => void;
   setLeftTab: (tab: LeftTab) => void;
   setRightTab: (tab: RightTab) => void;
@@ -95,6 +96,14 @@ export const useUiStore = create<UiStore>()(
     // TransformControls consumes its own handle drags, so measure clicks that
     // miss a handle still land.
     setGizmoMode: (gizmoMode) => set({ gizmoMode }),
+    /** Escape returns to ordinary picking without discarding the selection. */
+    deactivateTools: () =>
+      set({
+        gizmoMode: 'select',
+        measureActive: false,
+        measurePoints: [],
+        marquee: null,
+      }),
     setViewMode: (viewMode) => set({ viewMode }),
     setLeftTab: (leftTab) => set({ leftTab }),
     setRightTab: (rightTab) => set({ rightTab }),

@@ -70,15 +70,16 @@ test('boots to an empty scene with no starting model', async ({ page }) => {
   await expect(page.getByRole('heading', { name: 'BODBYN' })).toBeVisible();
   await expect(page.getByRole('heading', { name: 'Drawers' })).toBeVisible();
   await expect(page.getByRole('heading', { name: 'Hardware' }).first()).toBeVisible();
-  await expect(page.getByRole('button', { name: 'Shelf' })).toBeVisible();
-  await expect(page.getByRole('button', { name: 'Door' })).toBeVisible();
-  await expect(page.getByRole('button', { name: /AXSTAD Glass 400 400×800/ })).toBeVisible();
-  await expect(page.getByRole('button', { name: /BODBYN 45×80 450×800/ })).toBeVisible();
-  await expect(page.getByRole('button', { name: /BODBYN Glass 40×40 400×400/ })).toBeVisible();
-  await expect(page.getByRole('button', { name: /BODBYN Drawer 60×20 600×200/ })).toBeVisible();
-  await expect(page.getByRole('button', { name: /Drawer 60×20 562×180×550/ })).toBeVisible();
-  await expect(page.getByRole('button', { name: /ENHET/ })).toBeVisible();
-  await expect(page.getByRole('button', { name: /BORGHAMN/ })).toBeVisible();
+  await expect(page.getByRole('button', { name: /Base 600 60×80×60 cm/ })).toBeVisible();
+  await expect(page.getByRole('button', { name: /Shelf 80×1.8×30 cm/ })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Door' })).toHaveCount(0);
+  await expect(page.getByRole('button', { name: /AXSTAD Glass 400 40×80×1.9 cm/ })).toBeVisible();
+  await expect(page.getByRole('button', { name: /BODBYN 45×80 45×80×1.9 cm/ })).toBeVisible();
+  await expect(page.getByRole('button', { name: /BODBYN Glass 40×40 40×40×1.9 cm/ })).toBeVisible();
+  await expect(page.getByRole('button', { name: /BODBYN Drawer 60×20 60×20×1.9 cm/ })).toBeVisible();
+  await expect(page.getByRole('button', { name: /Drawer 60×20 56.2×18×55 cm/ })).toBeVisible();
+  await expect(page.getByRole('button', { name: /ENHET.*12.5 cm/ })).toBeVisible();
+  await expect(page.getByRole('button', { name: /BORGHAMN.*17 cm/ })).toBeVisible();
 
   expect(errors).toEqual([]);
 });
@@ -295,6 +296,34 @@ test('switching gizmo tools preserves the current selection', async ({ page }) =
   await expect(page.getByText('1 selected')).toBeVisible();
 });
 
+test('Escape turns off temporary tools without clearing the selection', async ({ page }) => {
+  await page.goto('/');
+  await insertShelf(page);
+  await page.getByRole('tab', { name: 'Assembly' }).click();
+  await page.getByRole('button', { name: 'Scale (S)' }).click();
+  await page.getByRole('button', { name: 'Measure' }).click();
+  await expect(page.getByRole('button', { name: 'Scale (S)' })).toHaveAttribute(
+    'aria-pressed',
+    'true',
+  );
+  await expect(page.getByRole('button', { name: 'Measure' })).toHaveAttribute(
+    'aria-pressed',
+    'true',
+  );
+
+  await page.keyboard.press('Escape');
+
+  await expect(page.getByRole('button', { name: 'Select (Q)' })).toHaveAttribute(
+    'aria-pressed',
+    'true',
+  );
+  await expect(page.getByRole('button', { name: 'Measure' })).toHaveAttribute(
+    'aria-pressed',
+    'false',
+  );
+  await expect(page.getByText('1 selected')).toBeVisible();
+});
+
 test('arrow keys nudge while the move gizmo is active', async ({ page }) => {
   await gotoMm(page);
   await insertShelf(page);
@@ -371,7 +400,7 @@ test('inserting a library panel keeps the Library tab open', async ({ page }) =>
 test('an AXSTAD glass door inserts as a front with an inset pane', async ({ page }) => {
   await page.goto('/');
   await page.getByRole('tab', { name: 'Library' }).click();
-  await page.getByRole('button', { name: /AXSTAD Glass 400 400×800/ }).click();
+  await page.getByRole('button', { name: /AXSTAD Glass 400 40×80×1.9 cm/ }).click();
   await expect(page.getByText('AXSTAD Glass 400 added to scene')).toBeVisible();
   await page.getByRole('tab', { name: 'Assembly' }).click();
   await expect(page.getByRole('treeitem', { name: /AXSTAD Glass 400/ })).toBeVisible();
@@ -380,7 +409,7 @@ test('an AXSTAD glass door inserts as a front with an inset pane', async ({ page
 test('a drawer box inserts as a four-piece group without a front', async ({ page }) => {
   await page.goto('/');
   await page.getByRole('tab', { name: 'Library' }).click();
-  await page.getByRole('button', { name: /Drawer 60×20 562×180×550/ }).click();
+  await page.getByRole('button', { name: /Drawer 60×20 56.2×18×55 cm/ }).click();
   await expect(page.getByText('Drawer 60×20 drawer added')).toBeVisible();
   await page.getByRole('tab', { name: 'Assembly' }).click();
   await expect(page.getByRole('treeitem', { name: /Drawer 60×20/ }).first()).toBeVisible();
@@ -389,7 +418,7 @@ test('a drawer box inserts as a four-piece group without a front', async ({ page
 test('a BODBYN door inserts as a framed front with a recessed panel', async ({ page }) => {
   await page.goto('/');
   await page.getByRole('tab', { name: 'Library' }).click();
-  await page.getByRole('button', { name: /BODBYN 45×80 450×800/ }).click();
+  await page.getByRole('button', { name: /BODBYN 45×80 45×80×1.9 cm/ }).click();
   await expect(page.getByText('BODBYN 45×80 added to scene')).toBeVisible();
   await page.getByRole('tab', { name: 'Assembly' }).click();
   await expect(page.getByRole('treeitem', { name: /BODBYN 45×80/ })).toBeVisible();
@@ -398,7 +427,7 @@ test('a BODBYN door inserts as a framed front with a recessed panel', async ({ p
 test('a BODBYN glass door inserts as a framed front with a cross-rail', async ({ page }) => {
   await page.goto('/');
   await page.getByRole('tab', { name: 'Library' }).click();
-  await page.getByRole('button', { name: /BODBYN Glass 40×40 400×400/ }).click();
+  await page.getByRole('button', { name: /BODBYN Glass 40×40 40×40×1.9 cm/ }).click();
   await expect(page.getByText('BODBYN Glass 40×40 added to scene')).toBeVisible();
   await page.getByRole('tab', { name: 'Assembly' }).click();
   await expect(page.getByRole('treeitem', { name: /BODBYN Glass 40×40/ })).toBeVisible();
@@ -407,7 +436,7 @@ test('a BODBYN glass door inserts as a framed front with a cross-rail', async ({
 test('a BORGHAMN handle inserts as square-bar hardware', async ({ page }) => {
   await page.goto('/');
   await page.getByRole('tab', { name: 'Library' }).click();
-  await page.getByRole('button', { name: /BORGHAMN 170 mm/ }).click();
+  await page.getByRole('button', { name: /BORGHAMN 17 cm/ }).click();
   await expect(page.getByText('BORGHAMN added to scene')).toBeVisible();
   await page.getByRole('tab', { name: 'Assembly' }).click();
   await expect(page.getByRole('treeitem', { name: /BORGHAMN/ })).toBeVisible();
