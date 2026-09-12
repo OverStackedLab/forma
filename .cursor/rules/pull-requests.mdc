@@ -1,0 +1,10 @@
+---
+description: Feature PRs always target dev, not main
+alwaysApply: true
+---
+
+# Pull requests
+
+Open and retarget PRs against `dev`. Do not use `main` as the base.
+
+`main` is updated only by merging `dev`. Feature work stays on `cursor/<name>-25a8` (or similar) and lands through `dev`.

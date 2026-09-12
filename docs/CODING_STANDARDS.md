@@ -409,3 +409,4 @@ Read these before changing picking, history, cabinets, or materials:
 5. Run `npm run typecheck` and `npm test` before you finish
 6. Update `BUGS.md` / `IMPROVEMENTS.md` when you fix or discover items
 7. Commit with a message that states *why*, push, and open/update the PR
+   against `dev` — never `main`. `main` is updated only by merging `dev`.
