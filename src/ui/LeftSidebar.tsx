@@ -1,10 +1,12 @@
 import { useMemo, useState } from 'react';
 import { CABINET_PRESETS, PANEL_PRESETS } from '@/domain/catalog';
+import { DRAWER_PRESETS } from '@/domain/drawers';
 import { groupInclusion } from '@/domain/parts';
 import type { Group, PanelPreset, PartSpec } from '@/domain/types';
 import {
   addCustomPanel,
   addCabinetPreset,
+  addDrawerPreset,
   renameGroup,
   renamePart,
   reorderGroups,
@@ -16,6 +18,7 @@ import {
 } from '@/store/actions';
 import { useDocumentStore } from '@/store/documentStore';
 import { useUiStore } from '@/store/uiStore';
+import { libraryDescriptionInCm } from './format';
 import { Icon } from './primitives/Icon';
 import { InlineRename } from './primitives/InlineRename';
 import { OptionCard } from './primitives/OptionCard';
@@ -375,7 +378,7 @@ function LibrarySection({
           <OptionCard
             key={preset.id}
             label={preset.label}
-            description={preset.description}
+            description={libraryDescriptionInCm(preset.description)}
             icon={preset.icon}
             dragPayload={`panel:${preset.id}`}
             onClick={() => addCustomPanel(preset.id)}
@@ -390,23 +393,24 @@ function LibrarySection({
 function LibraryPanel() {
   const panels = PANEL_PRESETS.filter((preset) => preset.category === 'panel');
   const fronts = PANEL_PRESETS.filter(
-    (preset) => preset.category === 'front' && !preset.id.startsWith('bodbyn'),
+    (preset) => preset.category === 'front' && preset.id !== 'door',
   );
-  const bodbyn = PANEL_PRESETS.filter((preset) => preset.id.startsWith('bodbyn'));
   const hardware = PANEL_PRESETS.filter((preset) => preset.category === 'hardware');
 
   return (
     <div className="flex flex-col gap-[18px] overflow-y-auto px-3 py-3.5">
       <div>
         <h3 className="mb-2 text-[11px] font-semibold tracking-[.04em] text-ink/45 uppercase">
-          Prebuilt Cabinets
+          Cabinets
         </h3>
         <div className="grid grid-cols-2 gap-1.5">
           {CABINET_PRESETS.map((preset) => (
             <OptionCard
               key={preset.id}
               label={preset.label}
-              description={`${preset.width}×${preset.height}×${preset.depth} mm`}
+              description={libraryDescriptionInCm(
+                `${preset.width}×${preset.height}×${preset.depth} mm`,
+              )}
               icon={preset.icon}
               dragPayload={`cabinet:${preset.id}`}
               onClick={() => addCabinetPreset(preset.id)}
@@ -414,13 +418,34 @@ function LibraryPanel() {
           ))}
         </div>
         <p className="mt-2 text-[10px] leading-relaxed text-ink/30">
-          IKEA METOD frame sizes. Heights exclude legs and worktops.
+          Standard METOD cabinet sizes. Heights exclude legs and worktops.
+        </p>
+      </div>
+
+      <div>
+        <h3 className="mb-2 text-[11px] font-semibold tracking-[.04em] text-ink/45 uppercase">
+          Drawer Boxes
+        </h3>
+        <div className="grid grid-cols-2 gap-1.5">
+          {DRAWER_PRESETS.map((preset) => (
+            <OptionCard
+              key={preset.id}
+              label={preset.label}
+              description={libraryDescriptionInCm(preset.description)}
+              icon={preset.icon}
+              dragPayload={`drawer:${preset.id}`}
+              onClick={() => addDrawerPreset(preset.id)}
+            />
+          ))}
+        </div>
+        <p className="mt-2 text-[10px] leading-relaxed text-ink/30">
+          Names indicate matching front size; dimensions show the actual box (W×H×D).
+          Fronts are added separately. Sides: 1.8 cm; bottom and back: 0.8 cm.
         </p>
       </div>
 
       <LibrarySection title="Panels" presets={panels} />
       <LibrarySection title="Fronts" presets={fronts} />
-      <LibrarySection title="BODBYN" presets={bodbyn} />
       <LibrarySection title="Hardware" presets={hardware} />
 
       <p className="text-[11px] leading-relaxed text-ink/35">

@@ -7,6 +7,7 @@ import {
   addCabinetPreset,
   addCabinetShelf,
   addCustomPanel,
+  addDrawerPreset,
   commitTransforms,
   distributeCabinetDividers,
   distributeCabinetShelves,
@@ -29,6 +30,7 @@ import {
   setCabinetDividerPositions,
   setCabinetShelfPositions,
   setCustomPartDim,
+  setDrawerDim,
   setGroupPositionAxis,
   setGroupRotationAxis,
   setHardwareDiameter,
@@ -83,7 +85,7 @@ describe('library construction actions', () => {
   it('adds ENERYDA as a bow-pull handle', () => {
     addCustomPanel('eneryda');
     expect(useDocumentStore.getState().customParts[0]).toMatchObject({
-      label: 'ENERYDA',
+      label: 'ENERYDA handle',
       category: 'hardware',
       shape: 'eneryda',
       w: 112,
@@ -97,7 +99,7 @@ describe('library construction actions', () => {
   it('adds BORGHAMN as a square-bar handle', () => {
     addCustomPanel('borghamn');
     expect(useDocumentStore.getState().customParts[0]).toMatchObject({
-      label: 'BORGHAMN',
+      label: 'BORGHAMN handle',
       category: 'hardware',
       shape: 'borghamn',
       w: 170,
@@ -111,7 +113,7 @@ describe('library construction actions', () => {
   it('adds BODBYN as a framed front with a recessed panel', () => {
     addCustomPanel('bodbyn-450');
     expect(useDocumentStore.getState().customParts[0]).toMatchObject({
-      label: 'BODBYN 45×80',
+      label: 'BODBYN panel front 45×80 cm',
       category: 'front',
       shape: 'bodbyn-door',
       w: 450,
@@ -125,7 +127,7 @@ describe('library construction actions', () => {
   it('adds a BODBYN glass door with the framed pane and cross-rail', () => {
     addCustomPanel('bodbyn-glass-400-400');
     expect(useDocumentStore.getState().customParts[0]).toMatchObject({
-      label: 'BODBYN Glass 40×40',
+      label: 'BODBYN glass front 40×40 cm',
       category: 'front',
       shape: 'bodbyn-muntin-glass',
       w: 400,
@@ -137,7 +139,7 @@ describe('library construction actions', () => {
   it('adds a BODBYN drawer front at the catalog size', () => {
     addCustomPanel('bodbyn-drawer-600-200');
     expect(useDocumentStore.getState().customParts[0]).toMatchObject({
-      label: 'BODBYN Drawer 60×20',
+      label: 'BODBYN drawer front 60×20 cm',
       category: 'front',
       shape: 'bodbyn-door',
       w: 600,
@@ -149,7 +151,7 @@ describe('library construction actions', () => {
   it('adds BAGGANÄS with its disc-knob profile', () => {
     addCustomPanel('bagganas');
     expect(useDocumentStore.getState().customParts[0]).toMatchObject({
-      label: 'BAGGANÄS',
+      label: 'BAGGANÄS knob',
       category: 'hardware',
       shape: 'bagganas',
       w: 21,
@@ -163,7 +165,7 @@ describe('library construction actions', () => {
     const part = useDocumentStore.getState().customParts[0]!;
     const transform = useDocumentStore.getState().transforms[part.id]!;
     expect(part).toMatchObject({
-      label: 'ENHET',
+      label: 'ENHET leg',
       category: 'hardware',
       shape: 'enhet-leg',
       w: 50,
@@ -202,6 +204,38 @@ describe('library construction actions', () => {
     expect(side.position[2]).toBeCloseTo(-0.2, 8);
   });
 
+  it('adds a four-piece drawer box that rebuilds when resized', () => {
+    addDrawerPreset('drawer-600-200');
+    const state = useDocumentStore.getState();
+    const group = state.groups[0]!;
+    expect(group.label).toBe('Drawer box 60×20 cm');
+    expect(group.drawer).toMatchObject({ width: 562, height: 180, depth: 550 });
+    expect(group.partIds).toHaveLength(4);
+    expect(state.customParts.map((part) => part.bomLabel)).toEqual([
+      'Drawer box 60×20 cm Side',
+      'Drawer box 60×20 cm Side',
+      'Drawer box 60×20 cm Bottom',
+      'Drawer box 60×20 cm Back',
+    ]);
+    const underside = Math.min(
+      ...group.partIds.map((id) => {
+        const part = state.customParts.find((item) => item.id === id)!;
+        const transform = state.transforms[id]!;
+        return transform.position[1] * 1000 - part.h / 2;
+      }),
+    );
+    expect(underside).toBeCloseTo(0, 5);
+
+    setDrawerDim(group.id, 'width', 700);
+    const resized = useDocumentStore.getState();
+    expect(resized.groups[0]!.drawer).toMatchObject({ width: 700, height: 180, depth: 550 });
+    const sides = resized.customParts.filter((part) => part.thicknessAxis === 'w');
+    expect(sides).toHaveLength(2);
+    expect(sides.every((part) => part.w === 18)).toBe(true);
+    const bottom = resized.customParts.find((part) => part.thicknessAxis === 'h');
+    expect(bottom?.w).toBe(664);
+  });
+
   it('resizes a cabinet parametrically without changing panel thicknesses', () => {
     addCabinetPreset('base-600');
     const group = useDocumentStore.getState().groups[0]!;
@@ -211,7 +245,7 @@ describe('library construction actions', () => {
     const resized = state.groups[0]!;
     const members = resized.partIds.map((id) => state.customParts.find((part) => part.id === id)!);
     expect(resized.cabinet?.width).toBe(800);
-    expect(resized.label).toBe('Base 800');
+    expect(resized.label).toBe('Base cabinet 80 cm');
     expect(members.slice(0, 2).map((part) => part.w)).toEqual([18, 18]);
     expect(members[2]).toMatchObject({ w: 764, h: 18, d: 592 });
     expect(members[4]).toMatchObject({ w: 764, h: 764, d: 8 });
@@ -847,18 +881,21 @@ describe('library construction actions', () => {
     addCabinetPreset('base-600');
     addCabinetPreset('wall-600');
     const [base, wall] = useDocumentStore.getState().groups;
-    expect(base?.label).toBe('Base 600');
-    expect(wall?.label).toBe('Wall 600');
+    expect(base?.label).toBe('Base cabinet 60 cm');
+    expect(wall?.label).toBe('Wall cabinet 60 cm');
 
     reorderGroups(wall!.id, base!.id, 'before');
 
     const state = useDocumentStore.getState();
-    expect(state.groups.map((group) => group.label)).toEqual(['Wall 600', 'Base 600']);
+    expect(state.groups.map((group) => group.label)).toEqual([
+      'Wall cabinet 60 cm',
+      'Base cabinet 60 cm',
+    ]);
     expect(state.customParts[0]?.id).toBe(state.groups[0]?.partIds[0]);
     expect(undo()).toBe(true);
     expect(useDocumentStore.getState().groups.map((group) => group.label)).toEqual([
-      'Base 600',
-      'Wall 600',
+      'Base cabinet 60 cm',
+      'Wall cabinet 60 cm',
     ]);
   });
 });

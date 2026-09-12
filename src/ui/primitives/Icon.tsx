@@ -15,6 +15,7 @@ import {
   GripVertical,
   Hand,
   History,
+  Layers,
   Magnet,
   MousePointer2,
   Move,
@@ -86,6 +87,7 @@ const ICONS: Record<string, LucideIcon> = {
   panel_handle: RectangleHorizontal,
   panel_leg: Cylinder,
   cabinet: Box,
+  drawer: Layers,
 };
 
 export type IconProps = {

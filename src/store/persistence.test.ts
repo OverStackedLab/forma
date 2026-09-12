@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import {
   addCabinetDivider,
   addCabinetPreset,
+  addDrawerPreset,
   setCustomPartDim,
   setPartGrainAxis,
   togglePartEdgeBand,
@@ -166,6 +167,29 @@ describe('persistence.normalize', () => {
     expect(restored?.edgeBanding).toContain('h-max');
   });
 
+  it('round-trips a generated drawer box on the current schema', () => {
+    useDocumentStore.getState().hydrate(createDefaultDocument());
+    useUiStore.setState({ selectedPartIds: [], toast: null });
+    clearHistory();
+    addDrawerPreset('drawer-600-200');
+    const saved = useDocumentStore.getState();
+    const reloaded = migrate({
+      schemaVersion: SCHEMA_VERSION,
+      doc: {
+        ...saved,
+        versions: [],
+        currentVersionId: null,
+      },
+    });
+    expect(reloaded?.groups[0]?.drawer).toMatchObject({
+      presetId: 'drawer-600-200',
+      width: 562,
+      height: 180,
+      depth: 550,
+    });
+    expect(reloaded?.customParts).toHaveLength(4);
+  });
+
   it('round-trips cabinet vertical panel positions on the current schema', () => {
     useDocumentStore.getState().hydrate(createDefaultDocument());
     useUiStore.setState({ selectedPartIds: [], toast: null });
@@ -207,7 +231,7 @@ describe('persistence.normalize', () => {
       },
     });
     expect(reloaded?.groups[0]?.cabinet).toBeUndefined();
-    expect(reloaded?.groups[0]?.label).toBe('Base 600');
+    expect(reloaded?.groups[0]?.label).toBe('Base cabinet 60 cm');
   });
 });
 

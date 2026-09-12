@@ -159,6 +159,22 @@ export type CabinetConfig = {
   dividerPositionsMm?: number[];
 };
 
+export type DrawerPresetId =
+  | 'drawer-400-200'
+  | 'drawer-400-400'
+  | 'drawer-600-100'
+  | 'drawer-600-200'
+  | 'drawer-800-200'
+  | 'drawer-800-400';
+
+/** Outer box for a generated four-piece drawer. The decorative front is separate. */
+export type DrawerConfig = {
+  presetId?: DrawerPresetId;
+  width: number;
+  height: number;
+  depth: number;
+};
+
 /** A user-inserted or cabinet-generated part. Placement lives in Transforms. */
 export type CustomPart = {
   id: string;
@@ -226,6 +242,8 @@ export type Group = {
   partIds: string[];
   /** Present only for a generated cabinet whose carcass can be rebuilt parametrically. */
   cabinet?: CabinetConfig;
+  /** Present only for a generated drawer box whose four panels can be rebuilt. */
+  drawer?: DrawerConfig;
 };
 
 /** The undoable, persisted portion of application state. */

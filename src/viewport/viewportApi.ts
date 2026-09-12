@@ -37,6 +37,8 @@ export type ViewportApi = {
     edge: AlignEdge,
   ) => Record<string, Transform> | null;
   isGizmoDragging: () => boolean;
+  /** Reverts an in-progress gizmo gesture; a no-op when no handle is being dragged. */
+  cancelGizmoDrag: () => void;
   /** Camera right / up / look for arrow-key nudges while the move gizmo is on. */
   viewNudgeFrame: () => NudgeFrame;
 };
