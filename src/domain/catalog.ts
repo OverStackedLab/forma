@@ -211,6 +211,18 @@ export const PANEL_PRESETS: readonly PanelPreset[] = [
     grainAxis: null, edgeBanding: [], defaultQuaternion: [0, 0, 0, 1],
   },
   {
+    // Placeholder appliance: bought whole, so it bills as hardware rather than sheet goods.
+    id: 'fridge-600', label: 'Fridge 60×184 cm', w: 600, h: 1840, d: 660, icon: 'appliance_fridge',
+    shape: 'fridge', category: 'hardware', description: '600×1840×660 mm · placeholder',
+    thicknessAxis: null, grainAxis: null, edgeBanding: [], defaultQuaternion: [0, 0, 0, 1],
+  },
+  {
+    // IKEA MATMÄSSIG 104.670.93: 59 cm induction hob, 56×49 cm worktop cutout.
+    id: 'matmassig-590', label: 'MATMÄSSIG hob 59 cm', w: 590, h: 49, d: 520, icon: 'appliance_hob',
+    shape: 'hob', category: 'hardware', description: '590×49×520 mm · 4 zones · 560×490 mm cutout',
+    thicknessAxis: null, grainAxis: null, edgeBanding: [], defaultQuaternion: [0, 0, 0, 1],
+  },
+  {
     id: 'enhet-leg', label: 'ENHET leg', w: 50, h: 125, d: 50, icon: 'panel_leg', shape: 'enhet-leg',
     category: 'hardware', description: '125 mm high', thicknessAxis: null,
     grainAxis: null, edgeBanding: [], defaultQuaternion: [0, 0, 0, 1],
@@ -295,6 +307,11 @@ export function findFinish(id: FinishId | HardwareFinishId | string | undefined)
 
 export function isHardwareFinishId(id: string): id is HardwareFinishId {
   return HARDWARE_FINISHES.some((finish) => finish.id === id);
+}
+
+/** Appliance placeholders get their own library section — bought whole, not made. */
+export function isAppliancePreset(preset: PanelPreset): boolean {
+  return preset.shape === 'fridge' || preset.shape === 'hob';
 }
 
 /** Round purchased knobs share diameter + projection controls. */

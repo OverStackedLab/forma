@@ -55,6 +55,8 @@ export type PanelPresetId =
   | 'bodbyn-drawer-800-200'
   | 'bodbyn-drawer-800-400'
   | 'bodbyn-glass-400-400'
+  | 'fridge-600'
+  | 'matmassig-590'
   | 'knob'
   | 'bagganas'
   | 'eneryda'
@@ -78,7 +80,9 @@ export type PanelShape =
   | 'glass-door'
   | 'bodbyn-door'
   | 'bodbyn-glass'
-  | 'bodbyn-muntin-glass';
+  | 'bodbyn-muntin-glass'
+  | 'fridge'
+  | 'hob';
 
 export type Material = {
   id: MaterialId;

@@ -386,6 +386,31 @@ test('the document persists across a reload', async ({ page }) => {
   await expect(page.getByRole('treeitem', { name: 'Shelf Hide Shelf' })).toBeVisible();
 });
 
+test('the Assembly panel can be dragged wider and remembers the width', async ({ page }) => {
+  await page.goto('/');
+  const panel = page.getByRole('complementary', { name: 'Assembly and Library' });
+  await expect(panel).toHaveCSS('width', '240px');
+
+  const handle = page.getByRole('separator', { name: 'Resize Assembly and Library panel' });
+  const box = await handle.boundingBox();
+  expect(box).not.toBeNull();
+  if (!box) return;
+  await page.mouse.move(box.x + box.width / 2, box.y + 40);
+  await page.mouse.down();
+  await page.mouse.move(box.x + box.width / 2 + 80, box.y + 40);
+  await page.mouse.up();
+
+  const dragged = await panel.evaluate((el) => el.getBoundingClientRect().width);
+  expect(dragged).toBeGreaterThanOrEqual(300);
+  expect(dragged).toBeLessThanOrEqual(340);
+
+  await page.reload();
+  await expect(page.getByRole('complementary', { name: 'Assembly and Library' })).toHaveCSS(
+    'width',
+    `${Math.round(dragged)}px`,
+  );
+});
+
 test('inserting a library panel keeps the Library tab open', async ({ page }) => {
   await page.goto('/');
   await insertShelf(page);

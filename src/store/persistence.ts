@@ -1,5 +1,6 @@
 import { DISPLAY_UNITS, type DisplayUnit } from '@/domain/units';
 import { isGridSizeM, type GridSizeM } from '@/domain/workspace';
+import { isLeftSidebarWidth } from '@/ui/sidebarWidth';
 import { buildCabinetLayout, dividerPositions, MAX_SHELF_COUNT, shelfPositions } from '@/domain/cabinets';
 import {
   buildDrawerLayout,
@@ -37,6 +38,8 @@ const STORAGE_KEY = 'forma:doc';
 const DISPLAY_UNIT_KEY = 'forma:displayUnit';
 /** Likewise a view setting: which grid the viewport draws, not part of the design. */
 const GRID_SIZE_KEY = 'forma:gridSize';
+/** Assembly / Library column width. A chrome preference, not document data. */
+const LEFT_SIDEBAR_WIDTH_KEY = 'forma:leftSidebarWidth';
 /**
  * Schema 5 adopts the KNOXHULT/ASPUDDEN appearance defaults (white panels,
  * matte-black hardware). Schema 4 gives parts explicit manufacturing metadata
@@ -161,6 +164,10 @@ function inferredPreset(label: string) {
     return PANEL_PRESETS.find((preset) => preset.id === 'eneryda');
   if (normalized.includes('baggan')) return PANEL_PRESETS.find((preset) => preset.id === 'bagganas');
   if (normalized.includes('knob')) return PANEL_PRESETS.find((preset) => preset.id === 'knob');
+  if (normalized.includes('fridge') || normalized.includes('freezer'))
+    return PANEL_PRESETS.find((preset) => preset.id === 'fridge-600');
+  if (normalized.includes('hob') || normalized.includes('matm'))
+    return PANEL_PRESETS.find((preset) => preset.id === 'matmassig-590');
   if (normalized.includes('axstad'))
     return PANEL_PRESETS.find((preset) => preset.id === 'axstad-glass-400');
   if (normalized.includes('bodbyn') && normalized.includes('glass'))
@@ -193,6 +200,8 @@ function normalizePart(value: unknown): CustomPart | null {
     && part.shape !== 'bodbyn-door'
     && part.shape !== 'bodbyn-glass'
     && part.shape !== 'bodbyn-muntin-glass'
+    && part.shape !== 'fridge'
+    && part.shape !== 'hob'
   )
     return null;
   const clampDimension = (axis: 'w' | 'h' | 'd') => {
@@ -645,6 +654,33 @@ export function startGridSizeSync(): () => void {
       } catch {
         // Same rationale as the display-unit sync: the preference just won't
         // survive a reload, and nothing else depends on it succeeding.
+      }
+    },
+  );
+}
+
+/** Null rather than the default for an unknown value, so App can skip the setter. */
+export function loadLeftSidebarWidth(): number | null {
+  try {
+    const raw = localStorage.getItem(LEFT_SIDEBAR_WIDTH_KEY);
+    if (raw === null) return null;
+    const value = Number(raw);
+    return isLeftSidebarWidth(value) ? value : null;
+  } catch {
+    return null;
+  }
+}
+
+/** Saves on each committed width — the drag handle writes the same integer many times. */
+export function startLeftSidebarWidthSync(): () => void {
+  return useUiStore.subscribe(
+    (s) => s.leftSidebarWidth,
+    (width) => {
+      try {
+        localStorage.setItem(LEFT_SIDEBAR_WIDTH_KEY, String(width));
+      } catch {
+        // Same rationale as the other chrome prefs: a failed write only
+        // means the width will not survive a reload.
       }
     },
   );

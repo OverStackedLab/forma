@@ -11,6 +11,8 @@ import {
 } from './borghamn';
 import { bodbynGlassPieces, bodbynPieces } from './bodbyn';
 import { axstadGlassPieces } from './glassDoor';
+import { fridgePieces } from './fridge';
+import { hobPieces } from './hob';
 import type { PanelShape, PartSpec } from './types';
 
 /**
@@ -490,6 +492,12 @@ export function createPartNode(
   if (spec.shape === 'bodbyn-door') {
     return createBodbynDoorNode(THREE, geometries, materials, spec, material);
   }
+  if (spec.shape === 'fridge') {
+    return createFridgeNode(THREE, geometries, materials, spec, material);
+  }
+  if (spec.shape === 'hob') {
+    return createHobNode(THREE, geometries, materials, spec, material);
+  }
   const root = new THREE.Group();
   const geometry = geometries.forShape(spec.shape);
   const mesh = new THREE.Mesh(geometry, material);
@@ -588,6 +596,127 @@ function createGlassDoorNode(
     setMaterial(m) {
       for (const frame of frames) frame.material = m;
       for (const muntin of muntins) muntin.material = m;
+    },
+  };
+  node.update(spec);
+  return node;
+}
+
+/**
+ * Placeholder hob: cutout body, glass top and four zone discs. The discs use
+ * the shared knob lathe laid on its back, so their local Z carries the relief
+ * while local X/Y carry the diameter.
+ */
+function createHobNode(
+  THREE: ThreeModule,
+  geometries: GeometryCache,
+  materials: MaterialCache,
+  spec: PartSpec,
+  material: TMaterial,
+): PartNode {
+  const root = new THREE.Group();
+  const box = geometries.unitBox();
+  const highlight = new THREE.Mesh(box, materials.ghost());
+  highlight.castShadow = false;
+  highlight.receiveShadow = false;
+  highlight.userData.partId = spec.id;
+  const slabs: TMesh[] = [];
+  for (let i = 0; i < 2; i++) {
+    const mesh = new THREE.Mesh(box, material);
+    mesh.castShadow = true;
+    mesh.receiveShadow = true;
+    mesh.userData.partId = spec.id;
+    root.add(mesh);
+    slabs.push(mesh);
+  }
+  const zones: TMesh[] = [];
+  for (let i = 0; i < 4; i++) {
+    const zone = new THREE.Mesh(geometries.unitCylinder(), material);
+    zone.rotation.x = -Math.PI / 2;
+    zone.castShadow = false;
+    zone.receiveShadow = true;
+    zone.userData.partId = spec.id;
+    root.add(zone);
+    zones.push(zone);
+  }
+  root.add(highlight);
+  root.name = spec.id;
+  root.userData.partId = spec.id;
+
+  const node: PartNode = {
+    id: spec.id,
+    root,
+    highlightTarget: highlight,
+    update(next) {
+      highlight.scale.set(next.size.x * MM, next.size.y * MM, next.size.z * MM);
+      let slabIndex = 0;
+      let zoneIndex = 0;
+      for (const piece of hobPieces(next.size.x, next.size.y, next.size.z)) {
+        if (piece.role === 'zone') {
+          const zone = zones[zoneIndex++];
+          if (!zone) continue;
+          // Laid on its back, so the lathe's length axis carries the relief.
+          zone.scale.set(piece.size.x * MM, piece.size.z * MM, piece.size.y * MM);
+          zone.position.set(piece.position.x * MM, piece.position.y * MM, piece.position.z * MM);
+          continue;
+        }
+        const slab = slabs[slabIndex++];
+        if (!slab) continue;
+        slab.scale.set(piece.size.x * MM, piece.size.y * MM, piece.size.z * MM);
+        slab.position.set(piece.position.x * MM, piece.position.y * MM, piece.position.z * MM);
+      }
+    },
+    setMaterial(m) {
+      for (const slab of slabs) slab.material = m;
+      for (const zone of zones) zone.material = m;
+    },
+  };
+  node.update(spec);
+  return node;
+}
+
+/** Placeholder appliance: one body slab and two door faces, all one material. */
+function createFridgeNode(
+  THREE: ThreeModule,
+  geometries: GeometryCache,
+  materials: MaterialCache,
+  spec: PartSpec,
+  material: TMaterial,
+): PartNode {
+  const root = new THREE.Group();
+  const box = geometries.unitBox();
+  const highlight = new THREE.Mesh(box, materials.ghost());
+  highlight.castShadow = false;
+  highlight.receiveShadow = false;
+  highlight.userData.partId = spec.id;
+  const meshes: TMesh[] = [];
+  for (let i = 0; i < 3; i++) {
+    const mesh = new THREE.Mesh(box, material);
+    mesh.castShadow = true;
+    mesh.receiveShadow = true;
+    mesh.userData.partId = spec.id;
+    root.add(mesh);
+    meshes.push(mesh);
+  }
+  root.add(highlight);
+  root.name = spec.id;
+  root.userData.partId = spec.id;
+
+  const node: PartNode = {
+    id: spec.id,
+    root,
+    highlightTarget: highlight,
+    update(next) {
+      highlight.scale.set(next.size.x * MM, next.size.y * MM, next.size.z * MM);
+      for (const [index, piece] of fridgePieces(next.size.x, next.size.y, next.size.z).entries()) {
+        const mesh = meshes[index];
+        if (!mesh) continue;
+        mesh.scale.set(piece.size.x * MM, piece.size.y * MM, piece.size.z * MM);
+        mesh.position.set(piece.position.x * MM, piece.position.y * MM, piece.position.z * MM);
+      }
+    },
+    setMaterial(m) {
+      for (const mesh of meshes) mesh.material = m;
     },
   };
   node.update(spec);

@@ -394,7 +394,7 @@ Read these before changing picking, history, cabinets, or materials:
   template while open; keep the write-up under Resolved records and a summary
   row when resolved). Next unused id after BUG-028.
 - Non-bug follow-ups → next `IMP-###` in [`IMPROVEMENTS.md`](./IMPROVEMENTS.md).
-  Next unused id after IMP-021.
+  Next unused id after IMP-022.
 - Do not invent tracker entries in PR descriptions only — write them in those
   files so the next agent can find them
 
@@ -402,11 +402,13 @@ Read these before changing picking, history, cabinets, or materials:
 
 ## 13. Change workflow (agents)
 
-1. Branch as `cursor/<descriptive-name>-25a8` (lowercase)
+1. Work on `dev` unless the user explicitly asks for a feature branch. If they
+   do, name it `cursor/<descriptive-name>-25a8` (lowercase) and PR that branch
+   against `dev`.
 2. Keep diffs focused — no drive-by refactors or unrelated doc churn
 3. Match existing naming, types, and immutability style
 4. Add or update tests for behaviour you change
 5. Run `npm run typecheck` and `npm test` before you finish
 6. Update `BUGS.md` / `IMPROVEMENTS.md` when you fix or discover items
-7. Commit with a message that states *why*, push, and open/update the PR
-   against `dev` — never `main`. `main` is updated only by merging `dev`.
+7. Commit with a message that states *why*, then push `dev`. A PR from `dev`
+   goes to `main`. `main` is updated only by merging `dev`.

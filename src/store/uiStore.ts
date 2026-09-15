@@ -2,6 +2,7 @@ import { create } from 'zustand';
 import { subscribeWithSelector } from 'zustand/middleware';
 import type { DisplayUnit } from '@/domain/units';
 import { coerceGridSize, DEFAULT_GRID_SIZE_M, type GridSizeM } from '@/domain/workspace';
+import { coerceLeftSidebarWidth, DEFAULT_LEFT_SIDEBAR_WIDTH } from '@/ui/sidebarWidth';
 
 export type ViewMode = 'model' | 'cutlist' | 'render';
 export type GizmoMode = 'select' | 'pan' | 'translate' | 'rotate' | 'scale';
@@ -26,6 +27,8 @@ export type UiStore = {
   marquee: Marquee | null;
   historyOpen: boolean;
   leftSidebarOpen: boolean;
+  /** Preferred Assembly / Library column width in CSS pixels. Not undoable. */
+  leftSidebarWidth: number;
   rightSidebarOpen: boolean;
   toast: Toast | null;
   saveStatus: SaveStatus;
@@ -50,6 +53,7 @@ export type UiStore = {
   setMarquee: (marquee: Marquee | null) => void;
   toggleHistory: () => void;
   toggleLeftSidebar: () => void;
+  setLeftSidebarWidth: (width: number) => void;
   toggleRightSidebar: () => void;
   showToast: (message: string) => void;
   dismissToast: (id: string) => void;
@@ -74,6 +78,7 @@ export const useUiStore = create<UiStore>()(
     marquee: null,
     historyOpen: false,
     leftSidebarOpen: true,
+    leftSidebarWidth: DEFAULT_LEFT_SIDEBAR_WIDTH,
     rightSidebarOpen: true,
     toast: null,
     saveStatus: 'idle',
@@ -122,6 +127,7 @@ export const useUiStore = create<UiStore>()(
     setMarquee: (marquee) => set({ marquee }),
     toggleHistory: () => set((s) => ({ historyOpen: !s.historyOpen })),
     toggleLeftSidebar: () => set((s) => ({ leftSidebarOpen: !s.leftSidebarOpen })),
+    setLeftSidebarWidth: (width) => set({ leftSidebarWidth: coerceLeftSidebarWidth(width) }),
     toggleRightSidebar: () => set((s) => ({ rightSidebarOpen: !s.rightSidebarOpen })),
     showToast: (message) => set({ toast: { id: `t${++toastSeq}`, message } }),
     dismissToast: (id) => set((s) => (s.toast?.id === id ? { toast: null } : {})),

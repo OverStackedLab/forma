@@ -12,6 +12,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - BODBYN off-white fronts from the IKEA range (IMP-019): solid doors (25/30/40/45/60 cm widths), drawer fronts, and the 40×40 glass door with a cross-rail. 19 mm thick, 70 mm frame; the 45×80 dishwasher front is IKEA 802.915.52.
 - Four-piece drawer boxes in the library (IMP-021): 18 mm sides, 8 mm bottom and back, sized to sit inside a matching METOD carcass. Decorative fronts stay separate inserts.
 - Measure locks the second click to a world axis with Shift, stays in the view plane in Front/Side/Top, and snaps to nearby vertices/edges when object snap is on (IMP-020).
+- The Assembly / Library panel can be dragged wider or narrower (200–480 px); the width survives a reload (IMP-022).
+- Fridge placeholder in a new Appliances library section: 600×1840×660 mm, drawn as a body with two doors and a shadow gap. Resizing keeps the 20 mm door faces, and it bills as hardware rather than sheet goods.
+- MATMÄSSIG induction hob in the Appliances library (IKEA 104.670.93): 590×49×520 mm with a 560×490 mm cutout body and the four product zone sizes (21/18/18/14.5 cm).
 
 ## 2026-08-28
 

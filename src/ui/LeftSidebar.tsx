@@ -1,5 +1,5 @@
-import { useMemo, useState } from 'react';
-import { CABINET_PRESETS, PANEL_PRESETS } from '@/domain/catalog';
+import { useMemo, useRef, useState, type KeyboardEvent, type PointerEvent } from 'react';
+import { CABINET_PRESETS, isAppliancePreset, PANEL_PRESETS } from '@/domain/catalog';
 import { DRAWER_PRESETS } from '@/domain/drawers';
 import { groupInclusion } from '@/domain/parts';
 import type { Group, PanelPreset, PartSpec } from '@/domain/types';
@@ -19,6 +19,10 @@ import {
 import { useDocumentStore } from '@/store/documentStore';
 import { useUiStore } from '@/store/uiStore';
 import { libraryDescriptionInCm } from './format';
+import {
+  DEFAULT_LEFT_SIDEBAR_WIDTH,
+  LEFT_SIDEBAR_WIDTH_LIMITS,
+} from './sidebarWidth';
 import { Icon } from './primitives/Icon';
 import { InlineRename } from './primitives/InlineRename';
 import { OptionCard } from './primitives/OptionCard';
@@ -33,12 +37,84 @@ const TABS = [
 export function LeftSidebar() {
   const leftTab = useUiStore((s) => s.leftTab);
   const setLeftTab = useUiStore((s) => s.setLeftTab);
+  const width = useUiStore((s) => s.leftSidebarWidth);
 
   return (
-    <aside className="flex w-60 flex-none flex-col border-r border-hairline bg-panel">
+    <aside
+      aria-label="Assembly and Library"
+      className="relative flex min-h-0 min-w-0 flex-none flex-col border-r border-hairline bg-panel"
+      style={{ width }}
+    >
       <UnderlineTabs tabs={TABS} value={leftTab} onChange={setLeftTab} ariaLabel="Left panel" />
       {leftTab === 'assembly' ? <AssemblyTree /> : <LibraryPanel />}
+      <LeftSidebarResizeHandle width={width} />
     </aside>
+  );
+}
+
+function LeftSidebarResizeHandle({ width }: { width: number }) {
+  const setLeftSidebarWidth = useUiStore((s) => s.setLeftSidebarWidth);
+  const dragging = useRef(false);
+
+  function onPointerDown(e: PointerEvent<HTMLDivElement>) {
+    if (e.button !== 0) return;
+    e.preventDefault();
+    dragging.current = true;
+    e.currentTarget.setPointerCapture(e.pointerId);
+    document.body.style.userSelect = 'none';
+    document.body.style.cursor = 'col-resize';
+  }
+
+  function onPointerMove(e: PointerEvent<HTMLDivElement>) {
+    if (!dragging.current) return;
+    const aside = e.currentTarget.parentElement;
+    if (!aside) return;
+    setLeftSidebarWidth(e.clientX - aside.getBoundingClientRect().left);
+  }
+
+  function endDrag(e: PointerEvent<HTMLDivElement>) {
+    if (!dragging.current) return;
+    dragging.current = false;
+    if (e.currentTarget.hasPointerCapture(e.pointerId)) {
+      e.currentTarget.releasePointerCapture(e.pointerId);
+    }
+    document.body.style.userSelect = '';
+    document.body.style.cursor = '';
+  }
+
+  function onKeyDown(e: KeyboardEvent<HTMLDivElement>) {
+    if (e.key === 'ArrowLeft') {
+      e.preventDefault();
+      setLeftSidebarWidth(width - 16);
+    } else if (e.key === 'ArrowRight') {
+      e.preventDefault();
+      setLeftSidebarWidth(width + 16);
+    } else if (e.key === 'Home') {
+      e.preventDefault();
+      setLeftSidebarWidth(LEFT_SIDEBAR_WIDTH_LIMITS.min);
+    } else if (e.key === 'End') {
+      e.preventDefault();
+      setLeftSidebarWidth(LEFT_SIDEBAR_WIDTH_LIMITS.max);
+    }
+  }
+
+  return (
+    <div
+      role="separator"
+      aria-orientation="vertical"
+      aria-label="Resize Assembly and Library panel"
+      aria-valuemin={LEFT_SIDEBAR_WIDTH_LIMITS.min}
+      aria-valuemax={LEFT_SIDEBAR_WIDTH_LIMITS.max}
+      aria-valuenow={width}
+      tabIndex={0}
+      onPointerDown={onPointerDown}
+      onPointerMove={onPointerMove}
+      onPointerUp={endDrag}
+      onPointerCancel={endDrag}
+      onDoubleClick={() => setLeftSidebarWidth(DEFAULT_LEFT_SIDEBAR_WIDTH)}
+      onKeyDown={onKeyDown}
+      className="absolute inset-y-0 -right-1 z-10 w-2 cursor-col-resize touch-none hover:bg-select/25 focus-visible:bg-select/25"
+    />
   );
 }
 
@@ -395,7 +471,10 @@ function LibraryPanel() {
   const fronts = PANEL_PRESETS.filter(
     (preset) => preset.category === 'front' && preset.id !== 'door',
   );
-  const hardware = PANEL_PRESETS.filter((preset) => preset.category === 'hardware');
+  const appliances = PANEL_PRESETS.filter(isAppliancePreset);
+  const hardware = PANEL_PRESETS.filter(
+    (preset) => preset.category === 'hardware' && !isAppliancePreset(preset),
+  );
 
   return (
     <div className="flex flex-col gap-[18px] overflow-y-auto px-3 py-3.5">
@@ -446,6 +525,7 @@ function LibraryPanel() {
 
       <LibrarySection title="Panels" presets={panels} />
       <LibrarySection title="Fronts" presets={fronts} />
+      <LibrarySection title="Appliances" presets={appliances} />
       <LibrarySection title="Hardware" presets={hardware} />
 
       <p className="text-[11px] leading-relaxed text-ink/35">

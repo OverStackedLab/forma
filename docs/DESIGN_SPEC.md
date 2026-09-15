@@ -48,7 +48,7 @@ Fixed full-viewport layout, no page scroll (`html,body{margin:0;height:100%;over
 | Status bar | `height:28px`, flex none | |
 
 Body row, left → right:
-- **Left sidebar** — `width:240px`, `#1E1B17`, `border-right:1px solid rgba(255,255,255,.08)`. Hidden (`display:none`) in Render mode.
+- **Left sidebar** — default `width:240px`, resizable `200–480px` via the right-edge handle (double-click resets; Arrow keys nudge 16px). Preference persists in `localStorage`, not the document. `#1E1B17`, `border-right:1px solid rgba(255,255,255,.08)`. Hidden (`display:none`) in Render mode.
 - **Viewport** — `flex:1`, `position:relative`, background `linear-gradient(160deg,#E9E5DC 0%,#C9C3B6 100%)`. The only light surface in the app.
 - **Right sidebar** — `width:300px`, `#1E1B17`, `border-left:1px solid rgba(255,255,255,.08)`, `overflow-y:auto`. Hidden in Render mode.
 
@@ -79,6 +79,8 @@ Icon button base: 32×32, `border-radius:7px`, transparent background, `rgba(238
 **Purpose:** browse and manage the part hierarchy.
 
 Tab strip at top: two underline tabs (Assembly / Library), each `flex:1`, `height:40px`, 12px/600, `border-bottom:2px solid` — `#C68A46` when active with `#EEE9E2` text, transparent with `rgba(238,233,226,.5)` when not.
+
+A vertical separator on the right edge resizes the panel. Hover tints `#4FA3FF` at 25% opacity. Double-click returns to 240 px. Arrow Left / Right nudge 16 px; Home / End jump to 200 / 480.
 
 Header row beneath: part count on the left (`{n} selected` when there is a selection, otherwise `{total} parts`), and on the right "Select All" (11px/600, `#4FA3FF`) plus "Clear" (`rgba(238,233,226,.5)`) which appears only when something is selected.
 
