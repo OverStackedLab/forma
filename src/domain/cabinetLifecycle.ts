@@ -10,12 +10,14 @@ import {
 } from './cabinets';
 import { CABINET_PRESETS } from './catalog';
 import { inferCabinetConfig, restorableCabinetGroup } from './restoreCabinet';
-import { anchorPlacement, applyGeneratedLayout, type AssemblyPlacement } from './generatedAssembly';
+import { anchorPlacement, applyGeneratedLayout, withGeneratedMemberFields, type AssemblyPlacement } from './generatedAssembly';
+import { buildDrawerLayout, DRAWER_MEMBER_COUNT } from './drawers';
 import { invertQuaternion } from './rotation';
 import { rotateVectorByQuaternion } from './spatial';
 import type {
   CabinetConfig,
   CustomPart,
+  DrawerConfig,
   DocumentSnapshot,
   Group,
   Transform,
@@ -450,23 +452,7 @@ export function withCabinetMemberFields(
   legacyAxes: boolean,
 ): CustomPart[] {
   const layout = buildGroupCabinetLayout({ id: '', label, partIds: [...partIds], cabinet }, cabinet);
-  const indexById = new Map(partIds.map((id, index) => [id, index]));
-  return parts.map((part) => {
-    const index = indexById.get(part.id);
-    const generated = index === undefined ? undefined : layout[index];
-    if (!generated) return part;
-    const next: CustomPart = {
-      ...part,
-      category: generated.category,
-      bomLabel: generated.bomLabel,
-      thicknessAxis: generated.thicknessAxis,
-    };
-    if (legacyAxes) {
-      next.grainAxis = generated.grainAxis;
-      next.edgeBanding = [...generated.edgeBanding];
-    }
-    return next;
-  });
+  return withGeneratedMemberFields(parts, partIds, layout, legacyAxes);
 }
 
 /**
@@ -486,5 +472,43 @@ export function cabinetLoadedFromGroup(input: {
   return {
     cabinet,
     parts: withCabinetMemberFields(input.parts, input.partIds, input.label, cabinet, input.legacyAxes),
+  };
+}
+
+/**
+ * Repairs one saved group. A cabinet configuration wins over a drawer
+ * configuration. A missing cabinet configuration is inferred only for a legacy
+ * file. A drawer needs four parts. A current file with neither stays plain.
+ */
+export function loadedGeneratedGroup(input: {
+  label: string;
+  partIds: readonly string[];
+  parts: readonly CustomPart[];
+  cabinet: CabinetConfig | undefined;
+  drawer: DrawerConfig | undefined;
+  legacyAxes: boolean;
+}): {
+  cabinet: CabinetConfig | undefined;
+  drawer: DrawerConfig | undefined;
+  parts: readonly CustomPart[];
+} {
+  const loadedCabinet = cabinetLoadedFromGroup({
+    label: input.label,
+    partIds: input.partIds,
+    parts: input.parts,
+    cabinet: input.cabinet,
+    legacyAxes: input.legacyAxes,
+  });
+  if (loadedCabinet.cabinet) {
+    return { cabinet: loadedCabinet.cabinet, drawer: undefined, parts: loadedCabinet.parts };
+  }
+  if (!input.drawer || input.partIds.length !== DRAWER_MEMBER_COUNT) {
+    return { cabinet: undefined, drawer: undefined, parts: input.parts };
+  }
+  const layout = buildDrawerLayout({ ...input.drawer, label: input.label });
+  return {
+    cabinet: undefined,
+    drawer: input.drawer,
+    parts: withGeneratedMemberFields(input.parts, input.partIds, layout, false),
   };
 }
