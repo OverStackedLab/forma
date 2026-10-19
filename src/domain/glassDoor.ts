@@ -4,7 +4,12 @@
  * of three.js so a resize keeps the frame width instead of stretching it.
  */
 
+import { localDimensionForWorldAxis } from './spatial';
+import type { DimensionAxis, PanelShape, Transform } from './types';
+
 export const AXSTAD_FRAME_MM = 78;
+/** Stile depth shared by AXSTAD and BODBYN. The rail width stays fixed inside this. */
+export const FRAMED_FRONT_THICKNESS_MM = 19;
 export const AXSTAD_GLASS_MM = 4;
 /** How far the glass sits behind the front face, so the inner stile reads as a rebate. */
 export const AXSTAD_GLASS_INSET_MM = 5;
@@ -72,4 +77,44 @@ export function framedGlassPieces(
  */
 export function axstadGlassPieces(w: number, h: number, d: number): DoorPiece[] {
   return framedGlassPieces(w, h, d, AXSTAD_FRAME_MM);
+}
+
+export type FrontDimensions = { w: number; h: number; d: number };
+
+const FRAMED_FRONT_SHAPES = ['glass-door', 'bodbyn-door', 'bodbyn-glass', 'bodbyn-muntin-glass'] as const;
+
+export type FramedFrontShape = (typeof FRAMED_FRONT_SHAPES)[number];
+
+export function isFramedFrontShape(shape: PanelShape): shape is FramedFrontShape {
+  return FRAMED_FRONT_SHAPES.some((candidate) => candidate === shape);
+}
+
+/**
+ * Outer width, height, and thickness after one typed size. The piece layout
+ * reads these as the door's outside; the rail width stays in the frame.
+ */
+export function framedFrontSize(
+  current: FrontDimensions,
+  key: DimensionAxis,
+  millimetres: number,
+): FrontDimensions {
+  return {
+    w: key === 'w' ? millimetres : current.w,
+    h: key === 'h' ? millimetres : current.h,
+    d: key === 'd' ? millimetres : current.d,
+  };
+}
+
+/**
+ * The stored size for a typed overall witness. The world axis is resolved here
+ * so a rotated front writes the local dimension that now runs that way.
+ */
+export function framedFrontResize(
+  current: FrontDimensions,
+  quaternion: Transform['quaternion'],
+  axis: 'x' | 'y' | 'z',
+  millimetres: number,
+): { key: DimensionAxis; size: FrontDimensions } {
+  const key = localDimensionForWorldAxis(quaternion, axis);
+  return { key, size: framedFrontSize(current, key, millimetres) };
 }

@@ -12,6 +12,7 @@ import type {
   PanelPresetId,
   PanelShape,
 } from './types';
+import { FRAMED_FRONT_THICKNESS_MM } from './glassDoor';
 
 /** The wood species a part is milled from. Its own color/roughness shows through when the color is 'natural'. */
 export const MATERIALS: readonly Material[] = [
@@ -58,6 +59,7 @@ export const ALL_FINISHES: readonly Finish[] = [...FINISHES, ...HARDWARE_FINISHE
  * Properties labels literal: changing Depth always changes front-to-back
  * depth, even for side panels and hardware.
  */
+
 const FRONT_EDGE: PanelPreset['edgeBanding'] = ['w-min', 'w-max', 'h-min', 'h-max'];
 
 function bodbynFront(
@@ -70,7 +72,7 @@ function bodbynFront(
   icon: string,
 ): PanelPreset {
   return {
-    id, label, w, h, d: 19, icon, shape, category: 'front', description,
+    id, label, w, h, d: FRAMED_FRONT_THICKNESS_MM, icon, shape, category: 'front', description,
     thicknessAxis: 'd', grainAxis: 'h', edgeBanding: FRONT_EDGE,
     defaultQuaternion: [0, 0, 0, 1],
   };
@@ -103,25 +105,25 @@ export const PANEL_PRESETS: readonly PanelPreset[] = [
     edgeBanding: ['w-min', 'w-max', 'h-min', 'h-max'], defaultQuaternion: [0, 0, 0, 1],
   },
   {
-    id: 'axstad-glass-400', label: 'AXSTAD glass front 40×80 cm', w: 400, h: 800, d: 19, icon: 'panel_glass_door',
+    id: 'axstad-glass-400', label: 'AXSTAD glass front 40×80 cm', w: 400, h: 800, d: FRAMED_FRONT_THICKNESS_MM, icon: 'panel_glass_door',
     shape: 'glass-door', category: 'front', description: '400×800×19 mm · 78 mm frame · inset glass',
     thicknessAxis: 'd', grainAxis: 'h', edgeBanding: ['w-min', 'w-max', 'h-min', 'h-max'],
     defaultQuaternion: [0, 0, 0, 1],
   },
   {
-    id: 'axstad-glass-600', label: 'AXSTAD glass front 60×80 cm', w: 600, h: 800, d: 19, icon: 'panel_glass_door',
+    id: 'axstad-glass-600', label: 'AXSTAD glass front 60×80 cm', w: 600, h: 800, d: FRAMED_FRONT_THICKNESS_MM, icon: 'panel_glass_door',
     shape: 'glass-door', category: 'front', description: '600×800×19 mm · 78 mm frame · inset glass',
     thicknessAxis: 'd', grainAxis: 'h', edgeBanding: ['w-min', 'w-max', 'h-min', 'h-max'],
     defaultQuaternion: [0, 0, 0, 1],
   },
   {
-    id: 'axstad-glass-400-1000', label: 'AXSTAD glass front 40×100 cm', w: 400, h: 1000, d: 19, icon: 'panel_glass_door',
+    id: 'axstad-glass-400-1000', label: 'AXSTAD glass front 40×100 cm', w: 400, h: 1000, d: FRAMED_FRONT_THICKNESS_MM, icon: 'panel_glass_door',
     shape: 'glass-door', category: 'front', description: '400×1000×19 mm · 78 mm frame · inset glass',
     thicknessAxis: 'd', grainAxis: 'h', edgeBanding: ['w-min', 'w-max', 'h-min', 'h-max'],
     defaultQuaternion: [0, 0, 0, 1],
   },
   {
-    id: 'axstad-glass-600-1000', label: 'AXSTAD glass front 60×100 cm', w: 600, h: 1000, d: 19, icon: 'panel_glass_door',
+    id: 'axstad-glass-600-1000', label: 'AXSTAD glass front 60×100 cm', w: 600, h: 1000, d: FRAMED_FRONT_THICKNESS_MM, icon: 'panel_glass_door',
     shape: 'glass-door', category: 'front', description: '600×1000×19 mm · 78 mm frame · inset glass',
     thicknessAxis: 'd', grainAxis: 'h', edgeBanding: ['w-min', 'w-max', 'h-min', 'h-max'],
     defaultQuaternion: [0, 0, 0, 1],

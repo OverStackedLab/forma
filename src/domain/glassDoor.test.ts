@@ -3,7 +3,10 @@ import {
   AXSTAD_FRAME_MM,
   AXSTAD_GLASS_MM,
   axstadGlassPieces,
+  framedFrontResize,
+  framedFrontSize,
 } from './glassDoor';
+import { eulerDegreesToQuaternion } from './rotation';
 
 describe('axstadGlassPieces', () => {
   it('keeps 78 mm stiles on a 400×800 AXSTAD door', () => {
@@ -30,5 +33,25 @@ describe('axstadGlassPieces', () => {
     const glass = pieces.find((piece) => piece.role === 'glass');
     expect(pieces[0]?.size.x).toBeLessThan(AXSTAD_FRAME_MM);
     expect(glass?.size.x).toBeGreaterThanOrEqual(40);
+  });
+});
+
+describe('framedFrontSize', () => {
+  const current = { w: 400, h: 800, d: 19 };
+
+  it('changes the outer width and leaves the stile depth', () => {
+    expect(framedFrontSize(current, 'w', 600)).toEqual({ w: 600, h: 800, d: 19 });
+    expect(axstadGlassPieces(600, 800, 19)[0]?.size.x).toBe(AXSTAD_FRAME_MM);
+  });
+
+  it('writes a rotated front on the local dimension that faces the typed axis', () => {
+    const resized = framedFrontResize(
+      current,
+      eulerDegreesToQuaternion({ x: 0, y: 90, z: 0 }),
+      'x',
+      600,
+    );
+    expect(resized.key).toBe('d');
+    expect(resized.size).toEqual({ w: 400, h: 800, d: 600 });
   });
 });

@@ -40,6 +40,7 @@ import {
   isLegHardwareShape,
   PANEL_PRESETS,
 } from '@/domain/catalog';
+import { framedFrontSize, isFramedFrontShape } from '@/domain/glassDoor';
 import { overallSizeEdit } from '@/viewport/clearance';
 import {
   cabinetContainingSelection,
@@ -445,47 +446,83 @@ function announceDemotions(before: readonly Group[]): boolean {
 
 const DIM_AXIS_INDEX = { w: 0, h: 1, d: 2 } as const;
 
-export function setCustomPartDim(id: string, key: 'w' | 'h' | 'd', value: number): void {
-  if (!Number.isFinite(value) || value <= 0) return;
+function withPartDimension(
+  part: CustomPart,
+  transform: Transform | undefined,
+  key: DimensionAxis,
+  value: number,
+): { part: CustomPart; transform: Transform | undefined } {
   const limits = CUSTOM_PANEL_LIMITS[key];
   const clamped = Math.min(limits.max, Math.max(limits.min, value));
+  if (!transform) return { part: { ...part, [key]: clamped }, transform };
+  // The typed value becomes the new absolute size on this axis only —
+  // other axes keep whatever the gizmo scaled them to.
+  const scale: Transform['scale'] = [transform.scale[0], transform.scale[1], transform.scale[2]];
+  const oldSize = part[key] * Math.max(scale[DIM_AXIS_INDEX[key]], 0.001);
+  scale[DIM_AXIS_INDEX[key]] = 1;
+  const localDelta = { x: 0, y: 0, z: 0 };
+  const component = key === 'w' ? 'x' : key === 'h' ? 'y' : 'z';
+  localDelta[component] = (clamped - oldSize) / 2000;
+  const worldDelta = rotateVectorByQuaternion(localDelta, transform.quaternion);
+  return {
+    part: { ...part, [key]: clamped },
+    transform: {
+      ...transform,
+      position: [
+        transform.position[0] + worldDelta.x,
+        transform.position[1] + worldDelta.y,
+        transform.position[2] + worldDelta.z,
+      ],
+      scale,
+    },
+  };
+}
+
+function commitPartDimensions(
+  id: string,
+  updates: { w?: number; h?: number; d?: number },
+  edited: DimensionAxis,
+): void {
+  const current = doc().customParts.find((candidate) => candidate.id === id);
+  if (!current) return;
+  const keys = (['w', 'h', 'd'] as const).flatMap((key) => {
+    const value = updates[key];
+    if (value === undefined || !Number.isFinite(value) || value <= 0) return [];
+    if (key !== edited && value === current[key]) return [];
+    return [{ key, value }];
+  });
+  if (!keys.length) return;
   const groupsBefore = doc().groups;
   commit(() => {
-    useDocumentStore.setState((s) => {
-      const t = s.transforms[id];
-      let transforms = s.transforms;
-      const part = s.customParts.find((p) => p.id === id);
-      if (t) {
-        // The typed value becomes the new absolute size on this axis only —
-        // other axes keep whatever the gizmo scaled them to.
-        const scale = [...t.scale] as [number, number, number];
-        const oldSize = part ? part[key] * Math.max(scale[DIM_AXIS_INDEX[key]], 0.001) : clamped;
-        scale[DIM_AXIS_INDEX[key]] = 1;
-        const localDelta = { x: 0, y: 0, z: 0 };
-        const component = key === 'w' ? 'x' : key === 'h' ? 'y' : 'z';
-        localDelta[component] = (clamped - oldSize) / 2000;
-        const worldDelta = rotateVectorByQuaternion(localDelta, t.quaternion);
-        transforms = {
-          ...s.transforms,
-          [id]: {
-            ...t,
-            position: [
-              t.position[0] + worldDelta.x,
-              t.position[1] + worldDelta.y,
-              t.position[2] + worldDelta.z,
-            ],
-            scale,
-          },
-        };
+    useDocumentStore.setState((state) => {
+      const part = state.customParts.find((candidate) => candidate.id === id);
+      if (!part) return {};
+      let nextPart = part;
+      let nextTransform = state.transforms[id];
+      for (const { key, value } of keys) {
+        const applied = withPartDimension(nextPart, nextTransform, key, value);
+        nextPart = applied.part;
+        nextTransform = applied.transform;
       }
+      const transforms = nextTransform ? { ...state.transforms, [id]: nextTransform } : state.transforms;
       return {
-        customParts: s.customParts.map((p) => (p.id === id ? { ...p, [key]: clamped } : p)),
+        customParts: state.customParts.map((candidate) => (candidate.id === id ? nextPart : candidate)),
         transforms,
-        groups: cabinetGroupsAfterMemberEdit(s.groups, transforms, [id], [id]),
+        groups: cabinetGroupsAfterMemberEdit(state.groups, transforms, [id], [id]),
       };
     });
   });
   announceDemotions(groupsBefore);
+}
+
+export function setCustomPartDim(id: string, key: 'w' | 'h' | 'd', value: number): void {
+  if (!Number.isFinite(value) || value <= 0) return;
+  const part = doc().customParts.find((candidate) => candidate.id === id);
+  if (part && isFramedFrontShape(part.shape)) {
+    commitPartDimensions(id, framedFrontSize({ w: part.w, h: part.h, d: part.d }, key, value), key);
+    return;
+  }
+  commitPartDimensions(id, { [key]: value }, key);
 }
 
 /** Keeps round hardware circular while exposing one Diameter control. */
@@ -1522,6 +1559,10 @@ export function setSelectedOverallDim(axis: 'x' | 'y' | 'z', millimetres: number
   }
   if (edit.kind === 'part-size') {
     setCustomPartDim(edit.partId, edit.key, edit.millimetres);
+    return;
+  }
+  if (edit.kind === 'front-size') {
+    commitPartDimensions(edit.partId, edit.size, edit.key);
     return;
   }
   if (edit.kind === 'hardware-diameter') {
