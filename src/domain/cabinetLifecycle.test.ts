@@ -5,9 +5,10 @@ import {
   cabinetConfigAfterInteriorDelete,
   cabinetGroupsAfterMemberEdit,
   cabinetLoadedFromGroup,
+  loadedGeneratedGroup,
   rebuildCabinet,
 } from './cabinetLifecycle';
-import type { CabinetConfig, CustomPart, Group, Transform, Transforms } from './types';
+import type { CabinetConfig, CustomPart, DrawerConfig, Group, Transform, Transforms } from './types';
 
 const base = CABINET_PRESETS.find((preset) => preset.id === 'base-600')!;
 
@@ -133,5 +134,76 @@ describe('cabinetLoadedFromGroup', () => {
     });
     expect(loaded.parts[0]?.grainAxis).toBe('d');
     expect(loaded.parts[0]?.bomLabel).toBe('Base cabinet 60 cm Side');
+  });
+});
+
+describe('loadedGeneratedGroup', () => {
+  const drawer: DrawerConfig = { width: 562, height: 180, depth: 550 };
+  const label = 'Drawer box 60×20 cm';
+
+  function drawerParts(): CustomPart[] {
+    return ['a', 'b', 'c', 'd'].map((id) => ({
+      id,
+      label: id,
+      w: 18,
+      h: 180,
+      d: 550,
+      shape: 'box',
+      category: 'hardware',
+      bomLabel: 'Old',
+      thicknessAxis: 'd',
+      grainAxis: 'd',
+      edgeBanding: [],
+    }));
+  }
+
+  it('repairs a drawer from its layout and keeps the saved grain', () => {
+    const parts = drawerParts();
+    const loaded = loadedGeneratedGroup({
+      label,
+      partIds: parts.map((part) => part.id),
+      parts,
+      cabinet: undefined,
+      drawer,
+      legacyAxes: false,
+    });
+    expect(loaded.drawer).toEqual(drawer);
+    expect(loaded.cabinet).toBeUndefined();
+    expect(loaded.parts[0]).toMatchObject({
+      category: 'panel',
+      bomLabel: `${label} Side`,
+      thicknessAxis: 'w',
+      grainAxis: 'd',
+      edgeBanding: [],
+    });
+  });
+
+  it('keeps a cabinet and drops a drawer on the same group', () => {
+    const { group, parts } = placedCabinet();
+    const loaded = loadedGeneratedGroup({
+      label: group.label,
+      partIds: group.partIds,
+      parts,
+      cabinet: group.cabinet,
+      drawer,
+      legacyAxes: false,
+    });
+    expect(loaded.cabinet?.width).toBe(group.cabinet?.width);
+    expect(loaded.drawer).toBeUndefined();
+    expect(loaded.parts[0]?.bomLabel).toBe('Base cabinet 60 cm Side');
+  });
+
+  it('drops a drawer that does not have four parts', () => {
+    const parts = drawerParts().slice(0, 3);
+    const loaded = loadedGeneratedGroup({
+      label,
+      partIds: parts.map((part) => part.id),
+      parts,
+      cabinet: undefined,
+      drawer,
+      legacyAxes: false,
+    });
+    expect(loaded.drawer).toBeUndefined();
+    expect(loaded.parts[0]?.bomLabel).toBe('Old');
   });
 });

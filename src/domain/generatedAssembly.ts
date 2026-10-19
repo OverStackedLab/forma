@@ -72,6 +72,36 @@ function memberTransform(
   };
 }
 
+/**
+ * Copies a generated layout's category, cut-list label, and thickness onto the
+ * stored parts. A legacy file also takes the layout grain and edge banding.
+ * A current file keeps the grain and edge banding the user saved.
+ */
+export function withGeneratedMemberFields(
+  parts: readonly CustomPart[],
+  partIds: readonly string[],
+  layout: readonly CabinetLayoutPart[],
+  legacyAxes: boolean,
+): CustomPart[] {
+  const indexById = new Map(partIds.map((id, index) => [id, index]));
+  return parts.map((part) => {
+    const index = indexById.get(part.id);
+    const generated = index === undefined ? undefined : layout[index];
+    if (!generated) return part;
+    const next: CustomPart = {
+      ...part,
+      category: generated.category,
+      bomLabel: generated.bomLabel,
+      thicknessAxis: generated.thicknessAxis,
+    };
+    if (legacyAxes) {
+      next.grainAxis = generated.grainAxis;
+      next.edgeBanding = [...generated.edgeBanding];
+    }
+    return next;
+  });
+}
+
 function partFromLayout(id: string, item: CabinetLayoutPart): CustomPart {
   return {
     id,

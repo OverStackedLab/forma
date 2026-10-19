@@ -1,14 +1,9 @@
 import { DISPLAY_UNITS, type DisplayUnit } from '@/domain/units';
 import { isGridSizeM, type GridSizeM } from '@/domain/workspace';
 import { isLeftSidebarWidth } from '@/ui/sidebarWidth';
-import { cabinetLoadedFromGroup } from '@/domain/cabinetLifecycle';
+import { loadedGeneratedGroup } from '@/domain/cabinetLifecycle';
 import { dividerPositions, MAX_SHELF_COUNT, shelfPositions } from '@/domain/cabinets';
-import {
-  buildDrawerLayout,
-  DRAWER_DIM_LIMITS,
-  DRAWER_MEMBER_COUNT,
-  resolveDrawerPresetId,
-} from '@/domain/drawers';
+import { DRAWER_DIM_LIMITS, resolveDrawerPresetId } from '@/domain/drawers';
 import {
   CUSTOM_PANEL_LIMITS,
   isColorId,
@@ -22,7 +17,6 @@ import type {
   CustomPart,
   DimensionAxis,
   DocumentSnapshot,
-  DrawerConfig,
   EdgeBandSide,
   FormaDocument,
   Group,
@@ -398,44 +392,39 @@ function normalizeSnapshot(value: unknown, legacyAxes = false): DocumentSnapshot
         dividerPositionsMm: dividerPositionsMm?.length ? dividerPositionsMm : undefined,
       };
     }
-    const loadedCabinet = cabinetLoadedFromGroup({
+    const rawDrawer = asRecord(raw.drawer);
+    const drawerDimensionsValid = rawDrawer &&
+      typeof rawDrawer.width === 'number' && Number.isFinite(rawDrawer.width) &&
+      typeof rawDrawer.height === 'number' && Number.isFinite(rawDrawer.height) &&
+      typeof rawDrawer.depth === 'number' && Number.isFinite(rawDrawer.depth);
+    const drawer = drawerDimensionsValid
+      ? {
+          presetId: resolveDrawerPresetId(
+            typeof rawDrawer.presetId === 'string' ? rawDrawer.presetId : undefined,
+          ),
+          width: Math.min(DRAWER_DIM_LIMITS.width.max, Math.max(DRAWER_DIM_LIMITS.width.min, rawDrawer.width as number)),
+          height: Math.min(DRAWER_DIM_LIMITS.height.max, Math.max(DRAWER_DIM_LIMITS.height.min, rawDrawer.height as number)),
+          depth: Math.min(DRAWER_DIM_LIMITS.depth.max, Math.max(DRAWER_DIM_LIMITS.depth.min, rawDrawer.depth as number)),
+        }
+      : undefined;
+    const loaded = loadedGeneratedGroup({
       label,
       partIds,
       parts: customParts,
       cabinet,
+      drawer,
       legacyAxes,
     });
-    cabinet = loadedCabinet.cabinet;
-    loadedCabinet.parts.forEach((part, index) => {
+    loaded.parts.forEach((part, index) => {
       customParts[index] = part;
     });
-    let drawer: DrawerConfig | undefined;
-    const rawDrawer = asRecord(raw.drawer);
-    const drawerValid = !cabinet && rawDrawer &&
-      typeof rawDrawer.width === 'number' && Number.isFinite(rawDrawer.width) &&
-      typeof rawDrawer.height === 'number' && Number.isFinite(rawDrawer.height) &&
-      typeof rawDrawer.depth === 'number' && Number.isFinite(rawDrawer.depth) &&
-      partIds.length === DRAWER_MEMBER_COUNT;
-    if (drawerValid) {
-      drawer = {
-        presetId: resolveDrawerPresetId(
-          typeof rawDrawer.presetId === 'string' ? rawDrawer.presetId : undefined,
-        ),
-        width: Math.min(DRAWER_DIM_LIMITS.width.max, Math.max(DRAWER_DIM_LIMITS.width.min, rawDrawer.width as number)),
-        height: Math.min(DRAWER_DIM_LIMITS.height.max, Math.max(DRAWER_DIM_LIMITS.height.min, rawDrawer.height as number)),
-        depth: Math.min(DRAWER_DIM_LIMITS.depth.max, Math.max(DRAWER_DIM_LIMITS.depth.min, rawDrawer.depth as number)),
-      };
-      const layout = buildDrawerLayout({ ...drawer, label });
-      partIds.forEach((id, index) => {
-        const stored = customParts.find((part) => part.id === id);
-        const generated = layout[index];
-        if (!stored || !generated) return;
-        stored.category = generated.category;
-        stored.bomLabel = generated.bomLabel;
-        stored.thicknessAxis = generated.thicknessAxis;
-      });
-    }
-    groups.push({ id: raw.id, label, partIds, cabinet, drawer });
+    groups.push({
+      id: raw.id,
+      label,
+      partIds,
+      cabinet: loaded.cabinet,
+      drawer: loaded.drawer,
+    });
   }
 
   return {
