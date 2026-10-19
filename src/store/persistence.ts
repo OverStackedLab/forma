@@ -1,7 +1,8 @@
 import { DISPLAY_UNITS, type DisplayUnit } from '@/domain/units';
 import { isGridSizeM, type GridSizeM } from '@/domain/workspace';
 import { isLeftSidebarWidth } from '@/ui/sidebarWidth';
-import { buildCabinetLayout, dividerPositions, MAX_SHELF_COUNT, shelfPositions } from '@/domain/cabinets';
+import { cabinetLoadedFromGroup } from '@/domain/cabinetLifecycle';
+import { dividerPositions, MAX_SHELF_COUNT, shelfPositions } from '@/domain/cabinets';
 import {
   buildDrawerLayout,
   DRAWER_DIM_LIMITS,
@@ -9,7 +10,6 @@ import {
   resolveDrawerPresetId,
 } from '@/domain/drawers';
 import {
-  CABINET_PRESETS,
   CUSTOM_PANEL_LIMITS,
   isColorId,
   isHardwareFinishId,
@@ -397,62 +397,18 @@ function normalizeSnapshot(value: unknown, legacyAxes = false): DocumentSnapshot
         shelfPositionsMm: shelfPositionsMm?.length ? shelfPositionsMm : undefined,
         dividerPositionsMm: dividerPositionsMm?.length ? dividerPositionsMm : undefined,
       };
-    } else if (legacyAxes) {
-      // Label/member-count inference is only for schema-3 saves that predate
-      // explicit cabinet configs. On current-schema loads, a missing cabinet
-      // means the group was deliberately demoted after a partial edit — do
-      // not resurrect stock dimensions from the group label.
-      const memberLabels = partIds
-        .map((id) => customParts.find((part) => part.id === id)?.label ?? '')
-        .join(' ');
-      const inferredCabinet = CABINET_PRESETS.find(
-        (preset) => {
-          const family = preset.id.split('-')[0]!;
-          const legacyLabel = `${family[0]!.toUpperCase()}${family.slice(1)} ${preset.width}`;
-          return [preset.label, legacyLabel].some(
-            (name) => name === label || memberLabels.includes(`${name} Left Side`),
-          );
-        },
-      );
-      if (inferredCabinet && partIds.length === 5 + inferredCabinet.shelfCount) {
-        cabinet = {
-          presetId: inferredCabinet.id,
-          width: inferredCabinet.width,
-          height: inferredCabinet.height,
-          depth: inferredCabinet.depth,
-          shelfCount: inferredCabinet.shelfCount,
-        };
-      }
     }
-    if (cabinet) {
-      const layout = buildCabinetLayout({
-        id: cabinet.presetId ?? CABINET_PRESETS[0]!.id,
-        label,
-        width: cabinet.width,
-        height: cabinet.height,
-        depth: cabinet.depth,
-        shelfCount: cabinet.shelfCount,
-        shelfPositionsMm: cabinet.shelfPositionsMm,
-        dividerPositionsMm: cabinet.dividerPositionsMm,
-        icon: 'cabinet',
-      });
-      partIds.forEach((id, index) => {
-        const stored = customParts.find((part) => part.id === id);
-        const generated = layout[index];
-        if (!stored || !generated) return;
-        stored.category = generated.category;
-        stored.bomLabel = generated.bomLabel;
-        stored.thicknessAxis = generated.thicknessAxis;
-        // Grain and edge banding are user-editable on cabinet panels. Current-
-        // schema saves already carry the chosen values — overwriting them here
-        // would revert cut-list edits on every reload. Legacy migration still
-        // needs the generated defaults.
-        if (legacyAxes) {
-          stored.grainAxis = generated.grainAxis;
-          stored.edgeBanding = [...generated.edgeBanding];
-        }
-      });
-    }
+    const loadedCabinet = cabinetLoadedFromGroup({
+      label,
+      partIds,
+      parts: customParts,
+      cabinet,
+      legacyAxes,
+    });
+    cabinet = loadedCabinet.cabinet;
+    loadedCabinet.parts.forEach((part, index) => {
+      customParts[index] = part;
+    });
     let drawer: DrawerConfig | undefined;
     const rawDrawer = asRecord(raw.drawer);
     const drawerValid = !cabinet && rawDrawer &&
