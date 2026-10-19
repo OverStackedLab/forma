@@ -34,9 +34,9 @@ import {
   findFinish,
   isHardwareFinishId,
   isLegHardwareShape,
-  isRoundHardwareShape,
   PANEL_PRESETS,
 } from '@/domain/catalog';
+import { overallSizeEdit } from '@/viewport/clearance';
 import {
   cabinetContainingSelection,
   gizmoPartIds,
@@ -51,7 +51,6 @@ import {
 import { eulerDegreesToQuaternion, invertQuaternion, multiplyQuaternions, quaternionToEulerDegrees } from '@/domain/rotation';
 import {
   halfExtentAlongNormalMm,
-  localDimensionForWorldAxis,
   orientedHalfExtentsMm,
   rotateVectorByQuaternion,
   type Vector3,
@@ -1599,56 +1598,33 @@ export function setSelectionSizeAxis(
  * single part writes its catalog size, a rigid group scales around the pivot.
  */
 export function setSelectedOverallDim(axis: 'x' | 'y' | 'z', millimetres: number): void {
-  if (!Number.isFinite(millimetres) || millimetres <= 0) return;
   const state = doc();
-  const ids = gizmoPartIds(state.groups, ui().selectedPartIds);
-  if (!ids.length) return;
-
-  const selected = new Set(ids);
-  const cabinet = cabinetContainingSelection(state.groups, ids);
-  if (
-    cabinet?.cabinet &&
-    cabinet.partIds.length === ids.length &&
-    cabinet.partIds.every((id) => selected.has(id))
-  ) {
-    const key = axis === 'x' ? 'width' : axis === 'y' ? 'height' : 'depth';
-    setCabinetDim(cabinet.id, key, millimetres);
+  const edit = overallSizeEdit({
+    axis,
+    millimetres,
+    groups: state.groups,
+    selectedIds: ui().selectedPartIds,
+    parts: state.customParts,
+    quaternionOf: (id) => transformOf(id).quaternion,
+  });
+  if (!edit) return;
+  if (edit.kind === 'cabinet') {
+    setCabinetDim(edit.groupId, edit.key, edit.millimetres);
     return;
   }
-  const drawerGroup = groupMatching(state.groups, ids);
-  if (drawerGroup?.drawer) {
-    const key = axis === 'x' ? 'width' : axis === 'y' ? 'height' : 'depth';
-    setDrawerDim(drawerGroup.id, key, millimetres);
+  if (edit.kind === 'drawer') {
+    setDrawerDim(edit.groupId, edit.key, edit.millimetres);
     return;
   }
-
-  if (ids.length === 1) {
-    const id = ids[0];
-    if (!id) return;
-    const part = state.customParts.find((candidate) => candidate.id === id);
-    if (!part) return;
-    // The witness measures the world AABB, so the world axis must be mapped
-    // back onto the part's own axis before writing a catalog dimension.
-    // Assuming x→w unconditionally meant typing the W label on a door rotated
-    // 90° about Y resized its depth instead (BUG-037).
-    const key = localDimensionForWorldAxis(transformOf(id).quaternion, axis);
-    if (part.category === 'hardware') {
-      if (isLegHardwareShape(part.shape)) {
-        if (key === 'h') setCustomPartDim(id, 'h', millimetres);
-        else setHardwareDiameter(id, millimetres);
-        return;
-      }
-      if (isRoundHardwareShape(part.shape)) {
-        if (key === 'd') setCustomPartDim(id, 'd', millimetres);
-        else setHardwareDiameter(id, millimetres);
-        return;
-      }
-    }
-    setCustomPartDim(id, key, millimetres);
+  if (edit.kind === 'part-size') {
+    setCustomPartDim(edit.partId, edit.key, edit.millimetres);
     return;
   }
-
-  setSelectionSizeAxis(ids, axis, millimetres);
+  if (edit.kind === 'hardware-diameter') {
+    setHardwareDiameter(edit.partId, edit.millimetres);
+    return;
+  }
+  setSelectionSizeAxis(edit.partIds, edit.axis, edit.millimetres);
 }
 
 /** Sets one exact overall dimension of a regular group as one rigid resize. */

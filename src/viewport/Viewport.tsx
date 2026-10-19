@@ -6,7 +6,9 @@ import {
   addCustomPanel,
   addDrawerPreset,
   commitTransforms,
+  nudgeSelected,
   resizeCabinetFromGizmo,
+  setSelectedOverallDim,
 } from '@/store/actions';
 import { useDocumentStore } from '@/store/documentStore';
 import { useUiStore } from '@/store/uiStore';
@@ -62,7 +64,10 @@ export function Viewport() {
     const camera = new CameraController(scene, builder);
     const measure = new MeasureController(scene);
     measure.setLabelElement(measureLabelRef.current);
-    const dimensions = new SelectionDimensions(scene);
+    const dimensions = new SelectionDimensions(scene, (edit) => {
+      if (edit.kind === 'nudge') nudgeSelected(edit.deltaMm);
+      else setSelectedOverallDim(edit.axis, edit.millimetres);
+    });
     dimensions.setLabelRoot(gapLabelsRef.current);
 
     const gizmo = new GizmoController(scene, builder, (transforms, context) => {

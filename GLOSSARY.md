@@ -23,3 +23,7 @@ _Avoid_: preset, cabinet settings
 **Drawer**:
 A group of four panels that has a drawer configuration. The decorative front is a separate part.
 _Avoid_: drawer box
+
+**Clearance**:
+The open distance between a selected part or group and the nearest facing face.
+_Avoid_: spacing, offset, distance
