@@ -1,4 +1,3 @@
-import type { CabinetLayoutPart } from '@/domain/cabinets';
 import {
   buildCabinetLayout,
   distributedDividerPositions,
@@ -27,6 +26,11 @@ import {
   DRAWER_DIM_LIMITS,
   DRAWER_PRESETS,
 } from '@/domain/drawers';
+import {
+  anchorPlacement,
+  applyGeneratedLayout,
+  type AssemblyPlacement,
+} from '@/domain/generatedAssembly';
 import {
   CABINET_DIM_LIMITS,
   CABINET_PRESETS,
@@ -1023,30 +1027,9 @@ function drawerPlacement(
   group: Group,
   config: DrawerConfig,
   transforms: Transforms = doc().transforms,
-): {
-  origin: [number, number, number];
-  quaternion: Transform['quaternion'];
-} {
+): AssemblyPlacement {
   const layout = buildDrawerLayout({ ...config, label: group.label });
-  const anchorId = group.partIds[0];
-  const anchor = (anchorId ? transforms[anchorId] : undefined) ?? IDENTITY_TRANSFORM;
-  const local = layout[0]?.positionMm ?? [0, 0, 0];
-  const offset = rotateVectorByQuaternion(
-    {
-      x: local[0] * anchor.scale[0] / 1000,
-      y: local[1] * anchor.scale[1] / 1000,
-      z: local[2] * anchor.scale[2] / 1000,
-    },
-    anchor.quaternion,
-  );
-  return {
-    origin: [
-      anchor.position[0] - offset.x,
-      anchor.position[1] - offset.y,
-      anchor.position[2] - offset.z,
-    ],
-    quaternion: [...anchor.quaternion],
-  };
+  return anchorPlacement(group.partIds, layout[0]?.positionMm, transforms);
 }
 
 /** Rebuilds a generated cabinet while keeping its bottom-centre placement. */
@@ -1092,105 +1075,26 @@ function drawerResizeMetadata(group: Group, requested: DrawerConfig): {
 function commitDrawerResize(
   group: Group,
   requested: DrawerConfig,
-  placement: { origin: [number, number, number]; quaternion: Transform['quaternion'] },
+  placement: AssemblyPlacement,
 ): void {
   const { config, label } = drawerResizeMetadata(group, requested);
   const layout = buildDrawerLayout({ ...config, label });
   const nextIds = group.partIds.length === layout.length
     ? [...group.partIds]
     : layout.map((_, index) => group.partIds[index] ?? nextCustomId());
-  const indexById = new Map(nextIds.map((id, index) => [id, index]));
-  const nextIdSet = new Set(nextIds);
-  const removedIds = group.partIds.filter((id) => !nextIdSet.has(id));
-
-  const layoutTransform = (item: CabinetLayoutPart): Transform => {
-    const offset = rotateVectorByQuaternion(
-      {
-        x: item.positionMm[0] / 1000,
-        y: item.positionMm[1] / 1000,
-        z: item.positionMm[2] / 1000,
-      },
-      placement.quaternion,
-    );
-    return {
-      position: [
-        placement.origin[0] + offset.x,
-        placement.origin[1] + offset.y,
-        placement.origin[2] + offset.z,
-      ],
-      quaternion: [...placement.quaternion],
-      scale: [1, 1, 1],
-    };
-  };
-
   commit(() => {
-    useDocumentStore.setState((previous) => {
-      const transforms = { ...previous.transforms };
-      const overrides = { ...previous.overrides };
-      for (const [index, id] of nextIds.entries()) transforms[id] = layoutTransform(layout[index]!);
-      for (const id of removedIds) {
-        delete transforms[id];
-        delete overrides[id];
-      }
-      const existing = new Set(group.partIds);
-      const addedParts: CustomPart[] = nextIds
-        .map((id, index) => ({ id, item: layout[index]! }))
-        .filter(({ id }) => !existing.has(id))
-        .map(({ id, item }) => ({
-          id,
-          label: item.label,
-          w: item.w,
-          h: item.h,
-          d: item.d,
-          shape: item.shape,
-          category: item.category,
-          bomLabel: item.bomLabel,
-          thicknessAxis: item.thicknessAxis,
-          grainAxis: item.grainAxis,
-          edgeBanding: [...item.edgeBanding],
-        }));
-
-      return {
-        customParts: [
-          ...previous.customParts
-            .filter((part) => !removedIds.includes(part.id))
-            .map((part) => {
-              const index = indexById.get(part.id);
-              const item = index === undefined ? undefined : layout[index];
-              if (!item) return part;
-              return {
-                ...part,
-                label: item.label,
-                bomLabel: item.bomLabel,
-                w: item.w,
-                h: item.h,
-                d: item.d,
-                category: item.category,
-                thicknessAxis: item.thicknessAxis,
-              };
-            }),
-          ...addedParts,
-        ],
-        hiddenIds: previous.hiddenIds.filter((id) => !removedIds.includes(id)),
-        transforms,
-        overrides,
-        groups: previous.groups.map((candidate) =>
-          candidate.id === group.id
-            ? { ...candidate, label, partIds: nextIds, drawer: config }
-            : candidate,
-        ),
-      };
-    });
+    useDocumentStore.setState((previous) =>
+      applyGeneratedLayout(previous, group, layout, nextIds, placement, { label, drawer: config }),
+    );
   });
 
   const selected = ui().selectedPartIds;
   if (!selected.some((id) => group.partIds.includes(id))) return;
-  const selectedWhole = group.partIds.every((id) => selected.includes(id));
-  if (selectedWhole) {
+  if (group.partIds.every((id) => selected.includes(id))) {
     ui().setSelection(nextIds);
     return;
   }
-  const stillLive = selected.filter((id) => nextIdSet.has(id));
+  const stillLive = selected.filter((id) => nextIds.includes(id));
   if (stillLive.length) ui().setSelection(stillLive);
 }
 
