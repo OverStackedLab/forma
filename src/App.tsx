@@ -1,4 +1,5 @@
 import { lazy, Suspense, useEffect, useState } from 'react';
+import { createDemoKitchen } from '@/domain/demoKitchen';
 import { useDocumentStore } from '@/store/documentStore';
 import { clearHistory } from '@/store/history';
 import {
@@ -26,6 +27,15 @@ const Viewport = lazy(() => import('@/viewport/Viewport').then((m) => ({ default
 
 /** Restore autosave and prefs before the first paint so the viewport can frame them. */
 function restoreSession(): void {
+  const params = new URLSearchParams(window.location.search);
+  if (params.get('demo') === 'kitchen') {
+    useDocumentStore.getState().hydrate(createDemoKitchen());
+    clearHistory();
+    params.delete('demo');
+    const query = params.size ? `?${params}` : '';
+    window.history.replaceState(null, '', `${window.location.pathname}${query}${window.location.hash}`);
+    return;
+  }
   const saved = loadDocument();
   if (saved) {
     useDocumentStore.getState().hydrate(saved);
