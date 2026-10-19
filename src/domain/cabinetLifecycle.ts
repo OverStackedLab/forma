@@ -10,6 +10,7 @@ import {
 } from './cabinets';
 import { CABINET_PRESETS } from './catalog';
 import { inferCabinetConfig, restorableCabinetGroup } from './restoreCabinet';
+import { anchorPlacement, applyGeneratedLayout, type AssemblyPlacement } from './generatedAssembly';
 import { invertQuaternion } from './rotation';
 import { rotateVectorByQuaternion } from './spatial';
 import type {
@@ -40,11 +41,6 @@ export type CabinetDocument = Pick<
   DocumentSnapshot,
   'customParts' | 'transforms' | 'groups' | 'overrides' | 'hiddenIds'
 >;
-
-type Placement = {
-  origin: [number, number, number];
-  quaternion: Transform['quaternion'];
-};
 
 /** Where a rebuild keeps the cabinet while the parts are generated again. */
 export type CabinetPlacement = 'anchor' | 'pivot';
@@ -94,31 +90,21 @@ function layoutMatchesMembers(group: Group, config: CabinetConfig): boolean {
 }
 
 /** Finds the cabinet's bottom-centre origin and shared assembly orientation. */
-function cabinetPlacement(group: Group, config: CabinetConfig, transforms: Transforms): Placement {
+function cabinetPlacement(
+  group: Group,
+  config: CabinetConfig,
+  transforms: Transforms,
+): AssemblyPlacement {
   const layout = buildGroupCabinetLayout(group, config);
-  const anchorId = group.partIds[0];
-  const anchor = (anchorId ? transforms[anchorId] : undefined) ?? IDENTITY_TRANSFORM;
-  const local = layout[0]?.positionMm ?? [0, 0, 0];
-  const offset = rotateVectorByQuaternion(
-    {
-      x: (local[0] * anchor.scale[0]) / 1000,
-      y: (local[1] * anchor.scale[1]) / 1000,
-      z: (local[2] * anchor.scale[2]) / 1000,
-    },
-    anchor.quaternion,
-  );
-  return {
-    origin: [
-      anchor.position[0] - offset.x,
-      anchor.position[1] - offset.y,
-      anchor.position[2] - offset.z,
-    ],
-    quaternion: [...anchor.quaternion],
-  };
+  return anchorPlacement(group.partIds, layout[0]?.positionMm, transforms);
 }
 
 /** Keeps the shared member-centroid fixed while a cabinet is rebuilt. */
-function cabinetPivotPlacement(group: Group, config: CabinetConfig, transforms: Transforms): Placement {
+function cabinetPivotPlacement(
+  group: Group,
+  config: CabinetConfig,
+  transforms: Transforms,
+): AssemblyPlacement {
   const memberTransforms = group.partIds.map((id) => transforms[id] ?? IDENTITY_TRANSFORM);
   const pivot = [0, 1, 2].map(
     (index) =>
@@ -361,26 +347,6 @@ function cabinetResizeMetadata(group: Group, requested: CabinetConfig): {
   return { config, label };
 }
 
-function layoutTransform(item: CabinetLayoutPart, placement: Placement): Transform {
-  const offset = rotateVectorByQuaternion(
-    {
-      x: item.positionMm[0] / 1000,
-      y: item.positionMm[1] / 1000,
-      z: item.positionMm[2] / 1000,
-    },
-    placement.quaternion,
-  );
-  return {
-    position: [
-      placement.origin[0] + offset.x,
-      placement.origin[1] + offset.y,
-      placement.origin[2] + offset.z,
-    ],
-    quaternion: [...placement.quaternion],
-    scale: [1, 1, 1],
-  };
-}
-
 /**
  * Rebuilds a cabinet from its configuration. Carcass, shelf, and panel ids
  * stay bound to those roles. New members mint ids; removed roles drop theirs.
@@ -408,63 +374,7 @@ export function rebuildCabinet(
     config,
     mintId,
   );
-  const nextIdSet = new Set(nextIds);
-  const removedIds = group.partIds.filter((id) => !nextIdSet.has(id));
-  const indexById = new Map(nextIds.map((id, index) => [id, index]));
-  const transforms = { ...document.transforms };
-  const overrides = { ...document.overrides };
-  for (const [index, id] of nextIds.entries()) transforms[id] = layoutTransform(layout[index]!, placement);
-  for (const id of removedIds) {
-    delete transforms[id];
-    delete overrides[id];
-  }
-
-  const existing = new Set(group.partIds);
-  const addedParts: CustomPart[] = nextIds
-    .map((id, index) => ({ id, item: layout[index]! }))
-    .filter(({ id }) => !existing.has(id))
-    .map(({ id, item }) => ({
-      id,
-      label: item.label,
-      w: item.w,
-      h: item.h,
-      d: item.d,
-      shape: item.shape,
-      category: item.category,
-      bomLabel: item.bomLabel,
-      thicknessAxis: item.thicknessAxis,
-      grainAxis: item.grainAxis,
-      edgeBanding: [...item.edgeBanding],
-    }));
-
-  return {
-    customParts: [
-      ...document.customParts
-        .filter((part) => !removedIds.includes(part.id))
-        .map((part) => {
-          const index = indexById.get(part.id);
-          const item = index === undefined ? undefined : layout[index];
-          if (!item) return part;
-          return {
-            ...part,
-            label: item.label,
-            bomLabel: item.bomLabel,
-            w: item.w,
-            h: item.h,
-            d: item.d,
-            category: item.category,
-            thicknessAxis: item.thicknessAxis,
-          };
-        }),
-      ...addedParts,
-    ],
-    hiddenIds: document.hiddenIds.filter((id) => !removedIds.includes(id)),
-    transforms,
-    overrides,
-    groups: document.groups.map((candidate) =>
-      candidate.id === group.id ? { ...candidate, label, partIds: nextIds, cabinet: config } : candidate,
-    ),
-  };
+  return applyGeneratedLayout(document, group, layout, nextIds, placement, { label, cabinet: config });
 }
 
 /** Puts every member back on the cabinet layout and clears rotation and scale. */
