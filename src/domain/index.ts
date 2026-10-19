@@ -12,3 +12,4 @@ export * from './drawers';
 export * from './rotation';
 export * from './units';
 export * from './workspace';
+export * from './demoKitchen';
