@@ -1,4 +1,5 @@
 import { isLegHardwareShape, isRoundHardwareShape } from '@/domain/catalog';
+import { framedFrontResize, isFramedFrontShape } from '@/domain/glassDoor';
 import {
   cabinetContainingSelection,
   dimensionNeighborIds,
@@ -33,6 +34,7 @@ export type OverallSizeEdit =
   | { kind: 'cabinet'; groupId: string; key: 'width' | 'height' | 'depth'; millimetres: number }
   | { kind: 'drawer'; groupId: string; key: 'width' | 'height' | 'depth'; millimetres: number }
   | { kind: 'part-size'; partId: string; key: DimensionAxis; millimetres: number }
+  | { kind: 'front-size'; partId: string; key: DimensionAxis; size: { w: number; h: number; d: number } }
   | { kind: 'hardware-diameter'; partId: string; millimetres: number }
   | { kind: 'rigid-group'; partIds: readonly string[]; axis: Axis; millimetres: number };
 
@@ -172,6 +174,15 @@ export function overallSizeEdit(input: {
     if (!id) return null;
     const part = input.parts.find((candidate) => candidate.id === id);
     if (!part) return null;
+    if (isFramedFrontShape(part.shape)) {
+      const resized = framedFrontResize(
+        { w: part.w, h: part.h, d: part.d },
+        input.quaternionOf(id),
+        input.axis,
+        input.millimetres,
+      );
+      return { kind: 'front-size', partId: id, key: resized.key, size: resized.size };
+    }
     const key = localDimensionForWorldAxis(input.quaternionOf(id), input.axis);
     if (part.category === 'hardware') {
       if (isLegHardwareShape(part.shape)) {

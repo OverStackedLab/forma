@@ -143,6 +143,23 @@ describe('overallSizeEdit', () => {
     expect(edit).toEqual({ kind: 'part-size', partId: 'door', key: 'd', millimetres: 600 });
   });
 
+  it('asks a framed front for its outer size', () => {
+    const edit = overallSizeEdit({
+      axis: 'x',
+      millimetres: 600,
+      groups: [],
+      selectedIds: ['front'],
+      parts: [{ ...part('front', 'glass-door', 'front'), d: 19 }],
+      quaternionOf: () => [0, 0, 0, 1],
+    });
+    expect(edit).toEqual({
+      kind: 'front-size',
+      partId: 'front',
+      key: 'w',
+      size: { w: 600, h: 800, d: 19 },
+    });
+  });
+
   it('resizes a fully selected cabinet on the configuration', () => {
     const group: Group = {
       id: 'cab',

@@ -9,8 +9,7 @@ import {
   BORGHAMN_PROJECTION_MM,
   borghamnCenterline,
 } from './borghamn';
-import { bodbynGlassPieces, bodbynPieces } from './bodbyn';
-import { axstadGlassPieces } from './glassDoor';
+import { bodbynPieces, glassFrontPieces } from './bodbyn';
 import { fridgePieces } from './fridge';
 import { hobPieces } from './hob';
 import type { PanelShape, PartSpec } from './types';
@@ -571,12 +570,7 @@ function createGlassDoorNode(
     highlightTarget: highlight,
     update(next) {
       highlight.scale.set(next.size.x * MM, next.size.y * MM, next.size.z * MM);
-      const pieces =
-        next.shape === 'bodbyn-muntin-glass'
-          ? bodbynGlassPieces(next.size.x, next.size.y, next.size.z, true)
-          : next.shape === 'bodbyn-glass'
-            ? bodbynGlassPieces(next.size.x, next.size.y, next.size.z)
-            : axstadGlassPieces(next.size.x, next.size.y, next.size.z);
+      const pieces = glassFrontPieces(next.shape, next.size.x, next.size.y, next.size.z);
       let frameIndex = 0;
       let muntinIndex = 0;
       for (const muntin of muntins) muntin.visible = false;

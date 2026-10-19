@@ -5,7 +5,8 @@
  * millimetres so a resize keeps the frame instead of stretching it.
  */
 
-import { framedGlassPieces, type DoorPiece } from './glassDoor';
+import { axstadGlassPieces, framedGlassPieces, type DoorPiece } from './glassDoor';
+import type { PanelShape } from './types';
 
 export const BODBYN_FRAME_MM = 70;
 export const BODBYN_BEVEL_WIDTH_MM = 14;
@@ -100,6 +101,13 @@ export function bodbynPieces(w: number, h: number, d: number): BodbynPiece[] {
       position: { x: 0, y: 0, z: panelZ },
     },
   ];
+}
+
+/** Glass-front pieces for the shape the mesh is rebuilding. */
+export function glassFrontPieces(shape: PanelShape, w: number, h: number, d: number): DoorPiece[] {
+  if (shape === 'bodbyn-muntin-glass') return bodbynGlassPieces(w, h, d, true);
+  if (shape === 'bodbyn-glass') return bodbynGlassPieces(w, h, d);
+  return axstadGlassPieces(w, h, d);
 }
 
 /**

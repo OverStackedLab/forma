@@ -261,6 +261,13 @@ describe('library construction actions', () => {
     expect(useDocumentStore.getState().customParts[0]?.w).toBe(900);
 
     newDocument();
+    addCustomPanel('axstad-glass-400');
+    const front = useDocumentStore.getState().customParts[0]!;
+    useUiStore.getState().setSelection([front.id]);
+    setSelectedOverallDim('x', 600);
+    expect(useDocumentStore.getState().customParts[0]).toMatchObject({ w: 600, h: 800, d: 19 });
+
+    newDocument();
     addCabinetPreset('base-600');
     const group = useDocumentStore.getState().groups[0]!;
     useUiStore.getState().setSelection([...group.partIds]);
