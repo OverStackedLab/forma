@@ -168,4 +168,5 @@ a 78 mm frame that keeps its width on resize, plus an inset pane. Traditional
 framed fronts are BODBYN-style (`shape: 'bodbyn-door'`): a 70 mm frame, bevelled
 rebate and recessed panel. BODBYN glass (`bodbyn-muntin-glass`, and `bodbyn-glass` on older files)
 uses the same 70 mm frame with an inset pane; the library SKU is the 40×40 with a + cross-rail.
+Drawer boxes are generated assemblies (`group.drawer`): four panels, no decorative front, rebuilt from Width/Height/Depth like a cabinet.
 Bar handles are ENERYDA (round bow) and BORGHAMN (10×10 mm square profile, 170 mm).

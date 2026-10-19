@@ -1,0 +1,14 @@
+---
+description: Work on dev unless a feature branch is requested
+alwaysApply: true
+---
+
+# Branches and pull requests
+
+Work on `dev` unless the user explicitly asks for a feature branch.
+
+If they ask for a feature branch, name it `cursor/<name>-25a8` and open that PR against `dev`.
+
+When the work is already on `dev` and they ask for a PR, open it from `dev` to `main`. Do not create a feature branch for that.
+
+`main` is updated only by merging `dev`.

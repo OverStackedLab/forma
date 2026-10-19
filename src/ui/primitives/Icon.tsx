@@ -11,10 +11,12 @@ import {
   Eye,
   EyeOff,
   FilePlus2,
+  Grid2x2,
   Grid3x3,
   GripVertical,
   Hand,
   History,
+  Layers,
   Magnet,
   MousePointer2,
   Move,
@@ -22,6 +24,7 @@ import {
   PanelRight,
   RectangleHorizontal,
   Redo2,
+  Refrigerator,
   RotateCw,
   Rows3,
   Ruler,
@@ -85,7 +88,10 @@ const ICONS: Record<string, LucideIcon> = {
   panel_knob: Circle,
   panel_handle: RectangleHorizontal,
   panel_leg: Cylinder,
+  appliance_fridge: Refrigerator,
+  appliance_hob: Grid2x2,
   cabinet: Box,
+  drawer: Layers,
 };
 
 export type IconProps = {

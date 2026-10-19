@@ -33,6 +33,7 @@ export function Toolbar() {
   );
 
   const [newFilePrompt, setNewFilePrompt] = useState(false);
+  const [savePrompt, setSavePrompt] = useState<'save' | 'new' | null>(null);
 
   const requestNewFile = () => {
     if (!hasDocumentContent) {
@@ -44,8 +45,9 @@ export function Toolbar() {
 
   const finishNewFile = async (saveFirst: boolean) => {
     if (saveFirst) {
-      const saved = await saveToFile();
-      if (!saved) return;
+      setNewFilePrompt(false);
+      setSavePrompt('new');
+      return;
     }
     setNewFilePrompt(false);
     newDocument();
@@ -145,7 +147,7 @@ export function Toolbar() {
         />
         <div className="h-5 w-px flex-none bg-white/10" />
         <IconButton icon="new_file" label="New File" onClick={requestNewFile} />
-        <IconButton icon="save_file" label="Save to File" onClick={() => void saveToFile()} />
+        <IconButton icon="save_file" label="Save to File" onClick={() => setSavePrompt('save')} />
         <OpenFileButton />
         <div className="h-5 w-px flex-none bg-white/10" />
         <button
@@ -157,6 +159,18 @@ export function Toolbar() {
         </button>
       </div>
       </header>
+      {savePrompt && (
+        <SaveFilePrompt
+          initialTitle={docTitle}
+          onCancel={() => setSavePrompt(null)}
+          onSave={async (title) => {
+            if (!await saveToFile(title)) return false;
+            if (savePrompt === 'new') newDocument();
+            setSavePrompt(null);
+            return true;
+          }}
+        />
+      )}
       {newFilePrompt && (
         <NewFilePrompt
           onCancel={() => setNewFilePrompt(false)}
@@ -165,6 +179,55 @@ export function Toolbar() {
         />
       )}
     </>
+  );
+}
+
+function SaveFilePrompt({ initialTitle, onCancel, onSave }: {
+  initialTitle: string;
+  onCancel: () => void;
+  onSave: (title: string) => Promise<boolean>;
+}) {
+  const dialog = useRef<HTMLDialogElement>(null);
+  const input = useRef<HTMLInputElement>(null);
+  const [title, setTitle] = useState(initialTitle);
+  const [saving, setSaving] = useState(false);
+  useEffect(() => {
+    const previous = document.activeElement as HTMLElement | null;
+    dialog.current?.showModal();
+    input.current?.select();
+    return () => { previous?.focus(); };
+  }, []);
+  return (
+    <dialog
+      ref={dialog}
+      aria-modal="true"
+      aria-labelledby="save-file-title"
+      onCancel={(event) => { event.preventDefault(); if (!saving) onCancel(); }}
+      className="fixed inset-0 m-auto w-[min(26rem,calc(100vw-2rem))] rounded-lg border border-hairline bg-panel p-4 text-ink shadow-xl backdrop:bg-black/50"
+    >
+      <form onSubmit={async (event) => {
+        event.preventDefault();
+        if (!title.trim() || saving) return;
+        setSaving(true);
+        if (!await onSave(title.trim())) setSaving(false);
+      }}>
+        <h2 id="save-file-title" className="text-[14px] font-semibold">Save design</h2>
+        <label className="mt-4 block text-[12px]">
+          Document name
+          <input ref={input} value={title} onChange={(event) => setTitle(event.target.value)}
+            required disabled={saving}
+            className="mt-2 block w-full rounded border border-hairline bg-input px-3 py-2 text-ink outline-none focus:border-select" />
+        </label>
+        <p className="mt-2 text-[12px] text-ink/60">This name updates the title in Forma. The .forma.json extension is added automatically.</p>
+        <div className="mt-4 flex justify-end gap-2">
+          <Button disabled={saving} onClick={onCancel}>Cancel</Button>
+          <button type="submit" disabled={saving || !title.trim()}
+            className="rounded-md bg-accent px-3 py-1 text-[12px] font-semibold text-canvas disabled:opacity-40">
+            {saving ? 'Saving…' : 'Save design'}
+          </button>
+        </div>
+      </form>
+    </dialog>
   );
 }
 

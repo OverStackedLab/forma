@@ -2,6 +2,7 @@ import { create } from 'zustand';
 import { subscribeWithSelector } from 'zustand/middleware';
 import type { DisplayUnit } from '@/domain/units';
 import { coerceGridSize, DEFAULT_GRID_SIZE_M, type GridSizeM } from '@/domain/workspace';
+import { coerceLeftSidebarWidth, DEFAULT_LEFT_SIDEBAR_WIDTH } from '@/ui/sidebarWidth';
 
 export type ViewMode = 'model' | 'cutlist' | 'render';
 export type GizmoMode = 'select' | 'pan' | 'translate' | 'rotate' | 'scale';
@@ -26,6 +27,8 @@ export type UiStore = {
   marquee: Marquee | null;
   historyOpen: boolean;
   leftSidebarOpen: boolean;
+  /** Preferred Assembly / Library column width in CSS pixels. Not undoable. */
+  leftSidebarWidth: number;
   rightSidebarOpen: boolean;
   toast: Toast | null;
   saveStatus: SaveStatus;
@@ -39,6 +42,7 @@ export type UiStore = {
   toggleSelection: (id: string) => void;
   clearSelection: () => void;
   setGizmoMode: (mode: GizmoMode) => void;
+  deactivateTools: () => void;
   setViewMode: (mode: ViewMode) => void;
   setLeftTab: (tab: LeftTab) => void;
   setRightTab: (tab: RightTab) => void;
@@ -49,6 +53,7 @@ export type UiStore = {
   setMarquee: (marquee: Marquee | null) => void;
   toggleHistory: () => void;
   toggleLeftSidebar: () => void;
+  setLeftSidebarWidth: (width: number) => void;
   toggleRightSidebar: () => void;
   showToast: (message: string) => void;
   dismissToast: (id: string) => void;
@@ -73,6 +78,7 @@ export const useUiStore = create<UiStore>()(
     marquee: null,
     historyOpen: false,
     leftSidebarOpen: true,
+    leftSidebarWidth: DEFAULT_LEFT_SIDEBAR_WIDTH,
     rightSidebarOpen: true,
     toast: null,
     saveStatus: 'idle',
@@ -95,6 +101,14 @@ export const useUiStore = create<UiStore>()(
     // TransformControls consumes its own handle drags, so measure clicks that
     // miss a handle still land.
     setGizmoMode: (gizmoMode) => set({ gizmoMode }),
+    /** Escape returns to ordinary picking without discarding the selection. */
+    deactivateTools: () =>
+      set({
+        gizmoMode: 'select',
+        measureActive: false,
+        measurePoints: [],
+        marquee: null,
+      }),
     setViewMode: (viewMode) => set({ viewMode }),
     setLeftTab: (leftTab) => set({ leftTab }),
     setRightTab: (rightTab) => set({ rightTab }),
@@ -113,6 +127,7 @@ export const useUiStore = create<UiStore>()(
     setMarquee: (marquee) => set({ marquee }),
     toggleHistory: () => set((s) => ({ historyOpen: !s.historyOpen })),
     toggleLeftSidebar: () => set((s) => ({ leftSidebarOpen: !s.leftSidebarOpen })),
+    setLeftSidebarWidth: (width) => set({ leftSidebarWidth: coerceLeftSidebarWidth(width) }),
     toggleRightSidebar: () => set((s) => ({ rightSidebarOpen: !s.rightSidebarOpen })),
     showToast: (message) => set({ toast: { id: `t${++toastSeq}`, message } }),
     dismissToast: (id) => set((s) => (s.toast?.id === id ? { toast: null } : {})),

@@ -1,8 +1,10 @@
 import { DISPLAY_UNITS, type DisplayUnit } from '@/domain/units';
 import { isGridSizeM, type GridSizeM } from '@/domain/workspace';
-import { buildCabinetLayout, dividerPositions, MAX_SHELF_COUNT, shelfPositions } from '@/domain/cabinets';
+import { isLeftSidebarWidth } from '@/ui/sidebarWidth';
+import { loadedGeneratedGroup } from '@/domain/cabinetLifecycle';
+import { dividerPositions, MAX_SHELF_COUNT, shelfPositions } from '@/domain/cabinets';
+import { DRAWER_DIM_LIMITS, resolveDrawerPresetId } from '@/domain/drawers';
 import {
-  CABINET_PRESETS,
   CUSTOM_PANEL_LIMITS,
   isColorId,
   isHardwareFinishId,
@@ -30,6 +32,8 @@ const STORAGE_KEY = 'forma:doc';
 const DISPLAY_UNIT_KEY = 'forma:displayUnit';
 /** Likewise a view setting: which grid the viewport draws, not part of the design. */
 const GRID_SIZE_KEY = 'forma:gridSize';
+/** Assembly / Library column width. A chrome preference, not document data. */
+const LEFT_SIDEBAR_WIDTH_KEY = 'forma:leftSidebarWidth';
 /**
  * Schema 5 adopts the KNOXHULT/ASPUDDEN appearance defaults (white panels,
  * matte-black hardware). Schema 4 gives parts explicit manufacturing metadata
@@ -154,6 +158,10 @@ function inferredPreset(label: string) {
     return PANEL_PRESETS.find((preset) => preset.id === 'eneryda');
   if (normalized.includes('baggan')) return PANEL_PRESETS.find((preset) => preset.id === 'bagganas');
   if (normalized.includes('knob')) return PANEL_PRESETS.find((preset) => preset.id === 'knob');
+  if (normalized.includes('fridge') || normalized.includes('freezer'))
+    return PANEL_PRESETS.find((preset) => preset.id === 'fridge-600');
+  if (normalized.includes('hob') || normalized.includes('matm'))
+    return PANEL_PRESETS.find((preset) => preset.id === 'matmassig-590');
   if (normalized.includes('axstad'))
     return PANEL_PRESETS.find((preset) => preset.id === 'axstad-glass-400');
   if (normalized.includes('bodbyn') && normalized.includes('glass'))
@@ -186,6 +194,8 @@ function normalizePart(value: unknown): CustomPart | null {
     && part.shape !== 'bodbyn-door'
     && part.shape !== 'bodbyn-glass'
     && part.shape !== 'bodbyn-muntin-glass'
+    && part.shape !== 'fridge'
+    && part.shape !== 'hob'
   )
     return null;
   const clampDimension = (axis: 'w' | 'h' | 'd') => {
@@ -381,57 +391,40 @@ function normalizeSnapshot(value: unknown, legacyAxes = false): DocumentSnapshot
         shelfPositionsMm: shelfPositionsMm?.length ? shelfPositionsMm : undefined,
         dividerPositionsMm: dividerPositionsMm?.length ? dividerPositionsMm : undefined,
       };
-    } else if (legacyAxes) {
-      // Label/member-count inference is only for schema-3 saves that predate
-      // explicit cabinet configs. On current-schema loads, a missing cabinet
-      // means the group was deliberately demoted after a partial edit — do
-      // not resurrect stock dimensions from the group label.
-      const memberLabels = partIds
-        .map((id) => customParts.find((part) => part.id === id)?.label ?? '')
-        .join(' ');
-      const inferredCabinet = CABINET_PRESETS.find(
-        (preset) => preset.label === label || memberLabels.includes(`${preset.label} Left Side`),
-      );
-      if (inferredCabinet && partIds.length === 5 + inferredCabinet.shelfCount) {
-        cabinet = {
-          presetId: inferredCabinet.id,
-          width: inferredCabinet.width,
-          height: inferredCabinet.height,
-          depth: inferredCabinet.depth,
-          shelfCount: inferredCabinet.shelfCount,
-        };
-      }
     }
-    if (cabinet) {
-      const layout = buildCabinetLayout({
-        id: cabinet.presetId ?? CABINET_PRESETS[0]!.id,
-        label,
-        width: cabinet.width,
-        height: cabinet.height,
-        depth: cabinet.depth,
-        shelfCount: cabinet.shelfCount,
-        shelfPositionsMm: cabinet.shelfPositionsMm,
-        dividerPositionsMm: cabinet.dividerPositionsMm,
-        icon: 'cabinet',
-      });
-      partIds.forEach((id, index) => {
-        const stored = customParts.find((part) => part.id === id);
-        const generated = layout[index];
-        if (!stored || !generated) return;
-        stored.category = generated.category;
-        stored.bomLabel = generated.bomLabel;
-        stored.thicknessAxis = generated.thicknessAxis;
-        // Grain and edge banding are user-editable on cabinet panels. Current-
-        // schema saves already carry the chosen values — overwriting them here
-        // would revert cut-list edits on every reload. Legacy migration still
-        // needs the generated defaults.
-        if (legacyAxes) {
-          stored.grainAxis = generated.grainAxis;
-          stored.edgeBanding = [...generated.edgeBanding];
+    const rawDrawer = asRecord(raw.drawer);
+    const drawerDimensionsValid = rawDrawer &&
+      typeof rawDrawer.width === 'number' && Number.isFinite(rawDrawer.width) &&
+      typeof rawDrawer.height === 'number' && Number.isFinite(rawDrawer.height) &&
+      typeof rawDrawer.depth === 'number' && Number.isFinite(rawDrawer.depth);
+    const drawer = drawerDimensionsValid
+      ? {
+          presetId: resolveDrawerPresetId(
+            typeof rawDrawer.presetId === 'string' ? rawDrawer.presetId : undefined,
+          ),
+          width: Math.min(DRAWER_DIM_LIMITS.width.max, Math.max(DRAWER_DIM_LIMITS.width.min, rawDrawer.width as number)),
+          height: Math.min(DRAWER_DIM_LIMITS.height.max, Math.max(DRAWER_DIM_LIMITS.height.min, rawDrawer.height as number)),
+          depth: Math.min(DRAWER_DIM_LIMITS.depth.max, Math.max(DRAWER_DIM_LIMITS.depth.min, rawDrawer.depth as number)),
         }
-      });
-    }
-    groups.push({ id: raw.id, label, partIds, cabinet });
+      : undefined;
+    const loaded = loadedGeneratedGroup({
+      label,
+      partIds,
+      parts: customParts,
+      cabinet,
+      drawer,
+      legacyAxes,
+    });
+    loaded.parts.forEach((part, index) => {
+      customParts[index] = part;
+    });
+    groups.push({
+      id: raw.id,
+      label,
+      partIds,
+      cabinet: loaded.cabinet,
+      drawer: loaded.drawer,
+    });
   }
 
   return {
@@ -606,6 +599,33 @@ export function startGridSizeSync(): () => void {
       } catch {
         // Same rationale as the display-unit sync: the preference just won't
         // survive a reload, and nothing else depends on it succeeding.
+      }
+    },
+  );
+}
+
+/** Null rather than the default for an unknown value, so App can skip the setter. */
+export function loadLeftSidebarWidth(): number | null {
+  try {
+    const raw = localStorage.getItem(LEFT_SIDEBAR_WIDTH_KEY);
+    if (raw === null) return null;
+    const value = Number(raw);
+    return isLeftSidebarWidth(value) ? value : null;
+  } catch {
+    return null;
+  }
+}
+
+/** Saves on each committed width — the drag handle writes the same integer many times. */
+export function startLeftSidebarWidthSync(): () => void {
+  return useUiStore.subscribe(
+    (s) => s.leftSidebarWidth,
+    (width) => {
+      try {
+        localStorage.setItem(LEFT_SIDEBAR_WIDTH_KEY, String(width));
+      } catch {
+        // Same rationale as the other chrome prefs: a failed write only
+        // means the width will not survive a reload.
       }
     },
   );

@@ -18,6 +18,7 @@ import { quaternionToEulerDegrees } from '@/domain/rotation';
 import type { CabinetConfig } from '@/domain/types';
 import { convertedValue, convertRange, toMm, DISPLAY_UNIT_NAMES, type DisplayUnit } from '@/domain/units';
 import { dividerPositions, shelfPositions } from '@/domain/cabinets';
+import { DRAWER_DIM_LIMITS } from '@/domain/drawers';
 import {
   addCabinetDivider,
   addCabinetShelf,
@@ -39,6 +40,7 @@ import {
   setCabinetDividerPositions,
   setCabinetShelfPositions,
   setCustomPartDim,
+  setDrawerDim,
   setHardwareDiameter,
   setSelectionPositionAxis,
   setSelectionRotationAxis,
@@ -97,6 +99,12 @@ const CABINET_DIM_FIELDS = [
   { key: 'width', label: 'Cabinet Width' },
   { key: 'height', label: 'Cabinet Height' },
   { key: 'depth', label: 'Cabinet Depth' },
+] as const;
+
+const DRAWER_DIM_FIELDS = [
+  { key: 'width', label: 'Drawer Width' },
+  { key: 'height', label: 'Drawer Height' },
+  { key: 'depth', label: 'Drawer Depth' },
 ] as const;
 
 const ROTATION_AXES: { axis: 'x' | 'y' | 'z'; label: string }[] = [
@@ -861,7 +869,34 @@ function PropertiesTab() {
         </>
       )}
 
-      {selection.kind === 'multi' && matchedGroup && !matchedGroup.cabinet && selection.size && (
+      {selection.kind === 'multi' && matchedGroup?.drawer && (
+        <>
+          <SectionHeader>Drawer Dimensions</SectionHeader>
+          {DRAWER_DIM_FIELDS.map(({ key, label }) => {
+            const range = convertRange(DRAWER_DIM_LIMITS[key], unit);
+            return (
+              <SliderField
+                key={key}
+                label={label}
+                value={convertedValue(matchedGroup.drawer![key], unit)}
+                min={range.min}
+                max={range.max}
+                step={range.step}
+                unit={unit}
+                unitName={DISPLAY_UNIT_NAMES[unit]}
+                onChange={(value) => setDrawerDim(matchedGroup.id, key, toMm(value, unit))}
+              />
+            );
+          })}
+          <p className="mb-4 text-[10.5px] leading-relaxed text-ink/35">
+            Resizing rebuilds the box: 18 mm sides, 8 mm bottom and back. The front is a separate
+            library piece.
+          </p>
+          <hr className="my-4 border-hairline" />
+        </>
+      )}
+
+      {selection.kind === 'multi' && matchedGroup && !matchedGroup.cabinet && !matchedGroup.drawer && selection.size && (
         <SelectionSizeFields partIds={matchedGroup.partIds} size={selection.size} asGroup />
       )}
 

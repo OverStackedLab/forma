@@ -67,16 +67,18 @@ export class SceneManager {
     // Keeps the camera from dropping below the floor plane.
     this.controls.maxPolarAngle = Math.PI * 0.49;
 
-    const hemi = new THREE.HemisphereLight(0xfff4e6, 0x3a3229, 1.0);
-    this.key = new THREE.DirectionalLight(0xfff2df, 2.4);
+    // Neutral studio light keeps painted finishes true to their swatches.
+    // Gray ground bounce lifts undersides without tinting them brown.
+    const hemi = new THREE.HemisphereLight(0xffffff, 0xb8b8b8, 1.5);
+    this.key = new THREE.DirectionalLight(0xffffff, 2.0);
     this.key.position.set(3, 5, 2.2);
     this.key.castShadow = true;
     this.key.shadow.mapSize.set(2048, 2048);
     this.key.shadow.bias = -0.0002;
     this.key.shadow.normalBias = 0.003;
     this.key.shadow.camera.near = 0.1;
-    const fill = new THREE.DirectionalLight(0xdfe8ff, 0.35);
-    fill.position.set(-3, 2, -2);
+    const fill = new THREE.DirectionalLight(0xffffff, 0.8);
+    fill.position.set(-3, 2, 4);
     this.scene.add(hemi, this.key, fill);
 
     // Geometry is sized by setGridSize; this placeholder is disposed there.

@@ -1,5 +1,12 @@
 import * as THREE from 'three';
-import type { Marquee } from '@/store/uiStore';
+import {
+  constrainMeasurePoint,
+  MEASURE_SNAP_MM,
+  snapMeasurePoint,
+  viewLockAxisFromLook,
+} from '@/domain/measure';
+import type { Marquee, MeasurePoint } from '@/store/uiStore';
+import { visibleMeasureFeatures } from './measureSnap';
 import type { ModelBuilder } from './ModelBuilder';
 import type { SceneManager } from './SceneManager';
 
@@ -10,15 +17,18 @@ const CLICK_SLOP = 5;
 
 export type PickCallbacks = {
   isMeasureActive: () => boolean;
+  isSnapEnabled: () => boolean;
+  measureAnchor: () => MeasurePoint | null;
   isPanMode: () => boolean;
   isGizmoDragging: () => boolean;
   onSelect: (partId: string, additive: boolean) => void;
   onClearSelection: () => void;
   onMarqueeChange: (marquee: Marquee | null) => void;
   onMarqueeCommit: (partIds: string[], additive: boolean) => void;
-  onMeasurePoint: (point: THREE.Vector3) => void;
+  onMeasurePoint: (point: MeasurePoint) => void;
+  onMeasureHover: (point: MeasurePoint | null) => void;
   onDropLibraryItem: (
-    kind: 'panel' | 'cabinet',
+    kind: 'panel' | 'cabinet' | 'drawer',
     presetId: string,
     placement: { point: { x: number; y: number; z: number }; normal: { x: number; y: number; z: number } } | null,
   ) => void;
@@ -35,8 +45,15 @@ export class PickController {
   private marqueeStart: { x: number; y: number } | null = null;
   private marqueeAdditive = false;
   private marqueeBox: Marquee | null = null;
+  private lastClient: { clientX: number; clientY: number } | null = null;
 
   private readonly handlers: Array<[HTMLElement, string, EventListener]> = [];
+  private readonly onShift = (event: KeyboardEvent) => {
+    if (event.key !== 'Shift' || !this.callbacks.isMeasureActive() || !this.lastClient) return;
+    this.callbacks.onMeasureHover(
+      this.resolveMeasurePoint({ ...this.lastClient, shiftKey: event.shiftKey }),
+    );
+  };
 
   constructor(
     private readonly scene: SceneManager,
@@ -58,6 +75,8 @@ export class PickController {
     this.on(this.element, 'pointerleave', () => this.onPointerLeave());
     this.on(this.dropElement, 'dragover', (e) => e.preventDefault());
     this.on(this.dropElement, 'drop', (e) => this.onDrop(e as DragEvent));
+    window.addEventListener('keydown', this.onShift);
+    window.addEventListener('keyup', this.onShift);
   }
 
   private on(target: HTMLElement, type: string, handler: EventListener): void {
@@ -85,6 +104,10 @@ export class PickController {
   }
 
   private onPointerMove(e: PointerEvent): void {
+    this.lastClient = { clientX: e.clientX, clientY: e.clientY };
+    if (this.callbacks.isMeasureActive()) {
+      this.callbacks.onMeasureHover(this.resolveMeasurePoint(e));
+    }
     const p = this.localPoint(e);
 
     if (this.marqueePending && !this.marqueeStart) {
@@ -119,25 +142,56 @@ export class PickController {
     if (!down) return;
     if (Math.hypot(e.clientX - down.x, e.clientY - down.y) > CLICK_SLOP) return;
 
-    const hit = this.raycast(e);
-
     if (this.callbacks.isMeasureActive()) {
-      if (hit) this.callbacks.onMeasurePoint(hit.point);
+      const point = this.resolveMeasurePoint(e);
+      if (point) this.callbacks.onMeasurePoint(point);
       return;
     }
 
+    const hit = this.raycast(e);
     const additive = e.shiftKey || e.metaKey || e.ctrlKey;
     if (hit?.partId) this.callbacks.onSelect(hit.partId, additive);
     else if (!additive) this.callbacks.onClearSelection();
   }
 
   private onPointerLeave(): void {
+    this.lastClient = null;
+    this.callbacks.onMeasureHover(null);
     if (this.marqueeStart) this.finishMarquee();
     else this.marqueePending = null;
   }
 
+  /**
+   * Snap to a nearby vertex or edge, then lock the second point to the view
+   * plane (ortho) and/or a world axis (Shift).
+   */
+  private resolveMeasurePoint(
+    e: { clientX: number; clientY: number; shiftKey?: boolean },
+  ): MeasurePoint | null {
+    const hit = this.raycast(e);
+    if (!hit) return null;
+    const hitMm = { x: hit.point.x * 1000, y: hit.point.y * 1000, z: hit.point.z * 1000 };
+    let snapped = hitMm;
+    if (this.callbacks.isSnapEnabled()) {
+      const features = visibleMeasureFeatures(this.builder);
+      snapped = snapMeasurePoint(hitMm, features.vertices, features.edges, MEASURE_SNAP_MM);
+    }
+    const from = this.callbacks.measureAnchor();
+    if (!from) return { x: snapped.x / 1000, y: snapped.y / 1000, z: snapped.z / 1000 };
+    const fromMm = { x: from.x * 1000, y: from.y * 1000, z: from.z * 1000 };
+    const look = new THREE.Vector3();
+    this.scene.camera.getWorldDirection(look);
+    const constrained = constrainMeasurePoint(fromMm, snapped, {
+      viewLockAxis: this.scene.isOrthographic
+        ? viewLockAxisFromLook({ x: look.x, y: look.y, z: look.z })
+        : null,
+      axisLock: Boolean(e.shiftKey),
+    });
+    return { x: constrained.x / 1000, y: constrained.y / 1000, z: constrained.z / 1000 };
+  }
+
   private raycast(
-    e: PointerEvent | DragEvent,
+    e: { clientX: number; clientY: number },
   ): { partId?: string; point: THREE.Vector3; normal: THREE.Vector3 } | null {
     const rect = this.element.getBoundingClientRect();
     this.pointer.x = ((e.clientX - rect.left) / rect.width) * 2 - 1;
@@ -195,7 +249,7 @@ export class PickController {
     const data = e.dataTransfer?.getData('text/plain');
     if (!data) return;
     const [kind, id] = data.split(':');
-    if ((kind !== 'panel' && kind !== 'cabinet') || !id) return;
+    if ((kind !== 'panel' && kind !== 'cabinet' && kind !== 'drawer') || !id) return;
 
     const rect = this.element.getBoundingClientRect();
     this.pointer.x = ((e.clientX - rect.left) / rect.width) * 2 - 1;
@@ -223,6 +277,8 @@ export class PickController {
   }
 
   dispose(): void {
+    window.removeEventListener('keydown', this.onShift);
+    window.removeEventListener('keyup', this.onShift);
     for (const [target, type, handler] of this.handlers) target.removeEventListener(type, handler);
     this.handlers.length = 0;
   }

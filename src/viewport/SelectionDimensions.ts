@@ -1,25 +1,13 @@
 import * as THREE from 'three';
-import { convertedValue, formatLength, parseLength, type DisplayUnit } from '@/domain/units';
-import { selectionUnits, dimensionNeighborIds, gizmoPartIds } from '@/domain/parts';
+import { convertedValue, formatLength } from '@/domain/units';
 import type { Group } from '@/domain/types';
-import { nudgeSelected, setSelectedOverallDim } from '@/store/actions';
-import { useUiStore, type GizmoMode } from '@/store/uiStore';
+import { useUiStore } from '@/store/uiStore';
 import { combinedWorldBounds } from './bounds';
+import { clearanceTypedEdit, clearanceWitnesses, type ClearanceEdit } from './clearance';
 import { layoutLabels, type LabelCandidate } from './labelLayout';
 import type { ModelBuilder } from './ModelBuilder';
 import type { SceneManager } from './SceneManager';
-import {
-  coplanarAlignments,
-  gapsBetweenBoxes,
-  gapDeltaMm,
-  nearestCoplanarAlignments,
-  nearestFacingGaps,
-  overallDimensions,
-  type Aabb,
-  type Axis,
-  type GapDimension,
-  type Vec3,
-} from './selectionGap';
+import { type Aabb, type Axis, type GapDimension, type Vec3 } from './selectionGap';
 
 const LINE_COLOR = 0x4fa3ff;
 const ALIGN_COLOR = 0xc68a46;
@@ -76,7 +64,10 @@ export class SelectionDimensions {
   /** Inputs of the last `sync`, so an unchanged frame costs nothing. */
   private lastInputs = '';
 
-  constructor(private readonly scene: SceneManager) {
+  constructor(
+    private readonly scene: SceneManager,
+    private readonly onEdit: (edit: ClearanceEdit) => void,
+  ) {
     this.group.renderOrder = 10;
     scene.scene.add(this.group);
   }
@@ -115,76 +106,22 @@ export class SelectionDimensions {
     const inputs = `${sceneRevision}|${gizmoMode}|${selectedIds.join(',')}`;
     if (inputs === this.lastInputs) return;
     this.lastInputs = inputs;
-    const units = selectionUnits(groups, selectedIds);
     if (this.editing?.kind === 'align' && gizmoMode !== 'translate') this.cancelEdit();
-    if (units.length === 2) {
-      const first = units[0];
-      const second = units[1];
-      if (!first || !second) {
-        this.clear();
-        return;
-      }
-      const boxA = combinedWorldBounds(first.partIds.map((id) => builder.getRoot(id)));
-      const boxB = combinedWorldBounds(second.partIds.map((id) => builder.getRoot(id)));
-      if (!boxA || !boxB) {
-        this.clear();
-        return;
-      }
-      const pair = alignmentsForMode(
-        [
-          ...gapsBetweenBoxes(boxA, boxB),
-          ...(first.kind === 'group' && second.kind === 'group' ? coplanarAlignments(boxA, boxB) : []),
-        ],
-        gizmoMode,
-      );
-      const overall =
-        gizmoMode === 'scale' ? overallForIds(builder, gizmoPartIds(groups, selectedIds)) : [];
-      this.draw([...overall, ...pair]);
-      return;
-    }
-    if (units.length !== 1) {
+    const witnesses = clearanceWitnesses({
+      groups,
+      selectedIds,
+      visibleIds,
+      gizmoMode,
+      bounds: (partIds) => {
+        const box = combinedWorldBounds(partIds.map((id) => builder.getRoot(id)));
+        return box ? aabbFromBox(box) : null;
+      },
+    });
+    if (!witnesses) {
       this.clear();
       return;
     }
-    const selected = units[0];
-    if (!selected) {
-      this.clear();
-      return;
-    }
-    const selectedBox = combinedWorldBounds(selected.partIds.map((id) => builder.getRoot(id)));
-    if (!selectedBox) {
-      this.clear();
-      return;
-    }
-    const others: Aabb[] = [];
-    const groupOthers: Aabb[] = [];
-    for (const partIds of dimensionNeighborIds(groups, visibleIds, selected.partIds)) {
-      const box = combinedWorldBounds(partIds.map((id) => builder.getRoot(id)));
-      if (!box) continue;
-      others.push(box);
-    }
-    if (selected.kind === 'group') {
-      const live = new Set(visibleIds);
-      for (const group of groups) {
-        if (group.id === selected.id) continue;
-        const ids = group.partIds.filter((id) => live.has(id));
-        if (!ids.length) continue;
-        const box = combinedWorldBounds(ids.map((id) => builder.getRoot(id)));
-        if (box) groupOthers.push(box);
-      }
-    }
-    const overallIds = previewOverallIds(groups, selectedIds, gizmoMode);
-    const overall = overallForIds(builder, overallIds);
-    this.draw([
-      ...overall,
-      ...alignmentsForMode(
-        [
-          ...nearestFacingGaps(selectedBox, others),
-          ...(selected.kind === 'group' ? nearestCoplanarAlignments(selectedBox, groupOthers) : []),
-        ],
-        gizmoMode,
-      ),
-    ]);
+    this.draw(witnesses);
   }
 
   updateLabels(): void {
@@ -375,22 +312,15 @@ export class SelectionDimensions {
   }
 
   private applyEdit(editing: GapEdit): void {
-    const unit = useUiStore.getState().displayUnit;
-    const raw = editing.input.value;
-    if (typedMatchesDisplay(raw, editing.gapMm, unit)) return;
-    const target = parseLength(raw, unit);
-    if (editing.kind === 'overall') {
-      if (target === null || target <= 0) return;
-      setSelectedOverallDim(editing.axis, target);
-      return;
-    }
-    const delta = target === null ? null : gapDeltaMm(editing.movableIsHigh, editing.gapMm, target);
-    if (delta === null || delta === 0) return;
-    nudgeSelected({
-      x: editing.axis === 'x' ? delta : 0,
-      y: editing.axis === 'y' ? delta : 0,
-      z: editing.axis === 'z' ? delta : 0,
+    const edit = clearanceTypedEdit({
+      kind: editing.kind,
+      axis: editing.axis,
+      gapMm: editing.gapMm,
+      movableIsHigh: editing.movableIsHigh,
+      raw: editing.input.value,
+      unit: useUiStore.getState().displayUnit,
     });
+    if (edit) this.onEdit(edit);
   }
 
   private commitEdit(): void {
@@ -422,37 +352,6 @@ export class SelectionDimensions {
     this.lines = null;
     this.alignLines = null;
   }
-}
-
-/**
- * Overall W/H/D belongs to the resize gesture, so it draws only while the
- * scale gizmo is on — mirroring alignment witnesses, which draw only while the
- * move gizmo is on. The always-on preview this replaces (IMP-012) put three
- * extra lines and labels on screen in every mode, crowding the clearance
- * witnesses the user was actually reading (BUG-038).
- */
-function previewOverallIds(
-  groups: readonly Group[],
-  selectedIds: readonly string[],
-  gizmoMode: GizmoMode,
-): readonly string[] | null {
-  if (gizmoMode !== 'scale') return null;
-  const ids = gizmoPartIds(groups, selectedIds);
-  return ids.length ? ids : null;
-}
-
-function alignmentsForMode(
-  dimensions: readonly GapDimension[],
-  gizmoMode: GizmoMode,
-): GapDimension[] {
-  if (gizmoMode === 'translate') return [...dimensions];
-  return dimensions.filter((dimension) => dimension.kind !== 'align');
-}
-
-function overallForIds(builder: ModelBuilder, ids: readonly string[] | null): GapDimension[] {
-  if (!ids?.length) return [];
-  const box = combinedWorldBounds(ids.map((id) => builder.getRoot(id)));
-  return box ? overallDimensions(aabbFromBox(box)) : [];
 }
 
 /**
@@ -510,12 +409,6 @@ function aabbFromBox(box: THREE.Box3): Aabb {
     min: { x: box.min.x, y: box.min.y, z: box.min.z },
     max: { x: box.max.x, y: box.max.y, z: box.max.z },
   };
-}
-
-function typedMatchesDisplay(raw: string, gapMm: number, unit: DisplayUnit): boolean {
-  const typed = raw.trim().replace(/,/g, '').toLowerCase();
-  const shown = String(convertedValue(gapMm, unit));
-  return typed === shown || typed === `${shown} ${unit}` || typed === `${shown}${unit}`;
 }
 
 function addSegment(positions: number[], segment: [Vec3, Vec3]): void {

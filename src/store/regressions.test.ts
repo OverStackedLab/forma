@@ -211,7 +211,7 @@ describe('BUG-032 — cabinets with fractional even shelf spacing', () => {
 
     setCabinetDim(firstGroup().id, 'width', 600);
     expect(firstGroup().cabinet?.presetId).toBe('high-600');
-    expect(firstGroup().label).toBe('High 600');
+    expect(firstGroup().label).toBe('Tall cabinet 60 cm');
   });
 
   it('redistributes shelves when the cabinet gets taller', () => {
@@ -341,6 +341,25 @@ describe('BUG-040 — Measure and the gizmos', () => {
     useUiStore.getState().toggleMeasure();
     expect(useUiStore.getState().measurePoints).toEqual([]);
   });
+
+  it('deactivates every temporary tool without clearing the selection', () => {
+    addCustomPanel('shelf');
+    const id = doc().customParts[0]!.id;
+    useUiStore.getState().setSelection([id]);
+    useUiStore.getState().setGizmoMode('scale');
+    useUiStore.getState().toggleMeasure();
+    useUiStore.getState().addMeasurePoint({ x: 0, y: 0, z: 0 });
+
+    useUiStore.getState().deactivateTools();
+
+    expect(useUiStore.getState()).toMatchObject({
+      selectedPartIds: [id],
+      gizmoMode: 'select',
+      measureActive: false,
+      measurePoints: [],
+      marquee: null,
+    });
+  });
 });
 
 describe('BUG-019 — duplicating more than one cabinet', () => {
@@ -357,7 +376,10 @@ describe('BUG-019 — duplicating more than one cabinet', () => {
     expect(after).toHaveLength(4);
     // Previously both cabinets were cloned as loose parts with no config.
     expect(after.slice(2).every((group) => Boolean(group.cabinet))).toBe(true);
-    expect(after.slice(2).map((group) => group.label)).toEqual(['Base 600', 'Wall 600']);
+    expect(after.slice(2).map((group) => group.label)).toEqual([
+      'Base cabinet 60 cm',
+      'Wall cabinet 60 cm',
+    ]);
     expect(after[2]!.partIds).toHaveLength(before[0]!.partIds.length);
   });
 

@@ -5,9 +5,11 @@ import {
   loadDisplayUnit,
   loadDocument,
   loadGridSize,
+  loadLeftSidebarWidth,
   startAutosave,
   startDisplayUnitSync,
   startGridSizeSync,
+  startLeftSidebarWidthSync,
 } from '@/store/persistence';
 import { useUiStore } from '@/store/uiStore';
 import { CutList } from '@/ui/CutList';
@@ -34,6 +36,8 @@ function restoreSession(): void {
   if (savedUnit) useUiStore.getState().setDisplayUnit(savedUnit);
   const savedGrid = loadGridSize();
   if (savedGrid) useUiStore.getState().setGridSize(savedGrid);
+  const savedLeftWidth = loadLeftSidebarWidth();
+  if (savedLeftWidth) useUiStore.getState().setLeftSidebarWidth(savedLeftWidth);
 }
 
 export function App() {
@@ -50,10 +54,12 @@ export function App() {
     const stopAutosave = startAutosave();
     const stopUnitSync = startDisplayUnitSync();
     const stopGridSync = startGridSizeSync();
+    const stopLeftWidthSync = startLeftSidebarWidthSync();
     return () => {
       stopAutosave();
       stopUnitSync();
       stopGridSync();
+      stopLeftWidthSync();
     };
   }, []);
 

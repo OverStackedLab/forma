@@ -102,6 +102,18 @@ export class GizmoController {
     return this.dragging;
   }
 
+  /** Restore the gesture start before Escape detaches the active gizmo. */
+  cancelDrag(): void {
+    if (!this.dragging) return;
+    // reset() emits objectChange. Suppress face snapping for that event or a
+    // translated object could immediately snap away from its restored start.
+    const snapEnabled = this.snapEnabled;
+    this.snapEnabled = false;
+    this.controls.reset();
+    this.snapEnabled = snapEnabled;
+    this.guide.clear();
+  }
+
   setSnapEnabled(enabled: boolean): void {
     this.snapEnabled = enabled;
     this.applyGizmoIncrements();

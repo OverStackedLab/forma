@@ -4,8 +4,11 @@ import { gizmoPartIds } from '@/domain/parts';
 import {
   addCabinetPreset,
   addCustomPanel,
+  addDrawerPreset,
   commitTransforms,
+  nudgeSelected,
   resizeCabinetFromGizmo,
+  setSelectedOverallDim,
 } from '@/store/actions';
 import { useDocumentStore } from '@/store/documentStore';
 import { useUiStore } from '@/store/uiStore';
@@ -61,7 +64,10 @@ export function Viewport() {
     const camera = new CameraController(scene, builder);
     const measure = new MeasureController(scene);
     measure.setLabelElement(measureLabelRef.current);
-    const dimensions = new SelectionDimensions(scene);
+    const dimensions = new SelectionDimensions(scene, (edit) => {
+      if (edit.kind === 'nudge') nudgeSelected(edit.deltaMm);
+      else setSelectedOverallDim(edit.axis, edit.millimetres);
+    });
     dimensions.setLabelRoot(gapLabelsRef.current);
 
     const gizmo = new GizmoController(scene, builder, (transforms, context) => {
@@ -77,6 +83,11 @@ export function Viewport() {
       isMeasureActive: () => {
         const state = useUiStore.getState();
         return state.viewMode === 'model' && state.measureActive;
+      },
+      isSnapEnabled: () => useUiStore.getState().snapEnabled,
+      measureAnchor: () => {
+        const points = useUiStore.getState().measurePoints;
+        return points.length === 1 ? points[0] ?? null : null;
       },
       isPanMode: () => useUiStore.getState().gizmoMode === 'pan',
       isGizmoDragging: () => gizmo.isDragging,
@@ -99,9 +110,11 @@ export function Viewport() {
         ui.showToast(`${selectedIds.length} part${selectedIds.length > 1 ? 's' : ''} selected`);
       },
       onMeasurePoint: (point) =>
-        useUiStore.getState().addMeasurePoint({ x: point.x, y: point.y, z: point.z }),
+        useUiStore.getState().addMeasurePoint(point),
+      onMeasureHover: (point) => measure.setPreview(point),
       onDropLibraryItem: (kind, presetId, placement) => {
         if (kind === 'cabinet') addCabinetPreset(presetId, placement ?? undefined);
+        else if (kind === 'drawer') addDrawerPreset(presetId, placement ?? undefined);
         else addCustomPanel(presetId, placement ?? undefined);
       },
     });
@@ -259,6 +272,7 @@ export function Viewport() {
       computeAlign: (targetIds, movingIds, edge) =>
         computeAlignTransforms(builder, targetIds, movingIds, edge),
       isGizmoDragging: () => gizmo.isDragging,
+      cancelGizmoDrag: () => gizmo.cancelDrag(),
       viewNudgeFrame: () => {
         const camera = scene.camera;
         camera.updateMatrixWorld();
@@ -317,7 +331,7 @@ export function Viewport() {
       <MarqueeRect />
       <div
         ref={measureLabelRef}
-        className="pointer-events-none absolute hidden -translate-x-1/2 -translate-y-[130%] rounded-[5px] border border-select/40 bg-canvas px-1.5 py-0.5 font-mono text-[11px] text-select"
+        className="pointer-events-none absolute hidden -translate-x-1/2 -translate-y-[130%] whitespace-pre-line rounded-[5px] border border-select/40 bg-canvas px-1.5 py-0.5 text-center font-mono text-[11px] text-select"
       />
       <div ref={gapLabelsRef} className="pointer-events-none absolute inset-0" />
     </div>
