@@ -10,6 +10,7 @@ import {
   borghamnCenterline,
 } from './borghamn';
 import { bodbynPieces, glassFrontPieces } from './bodbyn';
+import { dishwasherPieces } from './dishwasher';
 import { fridgePieces } from './fridge';
 import { hobPieces } from './hob';
 import type { PanelShape, PartSpec } from './types';
@@ -494,6 +495,9 @@ export function createPartNode(
   if (spec.shape === 'fridge') {
     return createFridgeNode(THREE, geometries, materials, spec, material);
   }
+  if (spec.shape === 'dishwasher' || spec.shape === 'oven') {
+    return createDishwasherNode(THREE, geometries, materials, spec, material);
+  }
   if (spec.shape === 'hob') {
     return createHobNode(THREE, geometries, materials, spec, material);
   }
@@ -677,6 +681,32 @@ function createFridgeNode(
   spec: PartSpec,
   material: TMaterial,
 ): PartNode {
+  return createSlabApplianceNode(THREE, geometries, materials, spec, material, 3, fridgePieces);
+}
+
+/** Placeholder single-door appliance (dishwasher / oven): body + one door face. */
+function createDishwasherNode(
+  THREE: ThreeModule,
+  geometries: GeometryCache,
+  materials: MaterialCache,
+  spec: PartSpec,
+  material: TMaterial,
+): PartNode {
+  return createSlabApplianceNode(THREE, geometries, materials, spec, material, 2, dishwasherPieces);
+}
+
+function createSlabApplianceNode(
+  THREE: ThreeModule,
+  geometries: GeometryCache,
+  materials: MaterialCache,
+  spec: PartSpec,
+  material: TMaterial,
+  meshCount: number,
+  piecesFor: (w: number, h: number, d: number) => readonly {
+    size: { x: number; y: number; z: number };
+    position: { x: number; y: number; z: number };
+  }[],
+): PartNode {
   const root = new THREE.Group();
   const box = geometries.unitBox();
   const highlight = new THREE.Mesh(box, materials.ghost());
@@ -684,7 +714,7 @@ function createFridgeNode(
   highlight.receiveShadow = false;
   highlight.userData.partId = spec.id;
   const meshes: TMesh[] = [];
-  for (let i = 0; i < 3; i++) {
+  for (let i = 0; i < meshCount; i++) {
     const mesh = new THREE.Mesh(box, material);
     mesh.castShadow = true;
     mesh.receiveShadow = true;
@@ -702,7 +732,7 @@ function createFridgeNode(
     highlightTarget: highlight,
     update(next) {
       highlight.scale.set(next.size.x * MM, next.size.y * MM, next.size.z * MM);
-      for (const [index, piece] of fridgePieces(next.size.x, next.size.y, next.size.z).entries()) {
+      for (const [index, piece] of piecesFor(next.size.x, next.size.y, next.size.z).entries()) {
         const mesh = meshes[index];
         if (!mesh) continue;
         mesh.scale.set(piece.size.x * MM, piece.size.y * MM, piece.size.z * MM);

@@ -7,6 +7,8 @@ import {
   AppWindow,
   DoorClosed,
   Download,
+  Droplets,
+  Flame,
   Frame,
   Eye,
   EyeOff,
@@ -22,6 +24,7 @@ import {
   Move,
   PanelLeft,
   PanelRight,
+  PanelTop,
   RectangleHorizontal,
   Redo2,
   Refrigerator,
@@ -79,6 +82,7 @@ const ICONS: Record<string, LucideIcon> = {
 
   // Library panels
   panel_shelf: Rows3,
+  panel_countertop: PanelTop,
   panel_flat: PanelLeft,
   panel_back: RectangleHorizontal,
   panel_divider: Columns2,
@@ -90,6 +94,8 @@ const ICONS: Record<string, LucideIcon> = {
   panel_leg: Cylinder,
   appliance_fridge: Refrigerator,
   appliance_hob: Grid2x2,
+  appliance_dishwasher: Droplets,
+  appliance_oven: Flame,
   cabinet: Box,
   drawer: Layers,
 };

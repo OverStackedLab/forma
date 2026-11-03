@@ -172,7 +172,8 @@ function frameInsertedParts(ids: readonly string[], placement?: DropPlacement): 
 }
 
 export function addCustomPanel(presetId: string, placement?: DropPlacement): void {
-  const preset = PANEL_PRESETS.find((p) => p.id === presetId) ?? PANEL_PRESETS[0]!;
+  const preset = PANEL_PRESETS.find((p) => p.id === presetId);
+  if (!preset) return;
   const s = doc();
   const id = nextCustomId();
   const halfExtents = orientedHalfExtentsMm(preset, preset.defaultQuaternion);
@@ -186,6 +187,7 @@ export function addCustomPanel(presetId: string, placement?: DropPlacement): voi
         placement.point.z + placement.normal.z * supportMm / 1000,
       ]
     : [nextInsertionX(s, halfExtents.x), halfExtents.y / 1000, 0];
+  const finish = preset.finishId ? findFinish(preset.finishId) : undefined;
 
   commit(() => {
     useDocumentStore.setState((prev) => ({
@@ -213,6 +215,14 @@ export function addCustomPanel(presetId: string, placement?: DropPlacement): voi
           scale: [1, 1, 1],
         },
       },
+      ...(finish
+        ? {
+            overrides: {
+              ...prev.overrides,
+              [id]: { material: finish.materialId, color: finish.colorId },
+            },
+          }
+        : {}),
     }));
   });
 
@@ -245,7 +255,8 @@ function cabinetInsertionOrigin(
 
 /** Adds a complete open-front cabinet as one named, selectable group. */
 export function addCabinetPreset(presetId: string, placement?: DropPlacement): void {
-  const preset = CABINET_PRESETS.find((candidate) => candidate.id === presetId) ?? CABINET_PRESETS[0]!;
+  const preset = CABINET_PRESETS.find((candidate) => candidate.id === presetId);
+  if (!preset) return;
   const state = doc();
   const layout = buildCabinetLayout(preset);
   const supportMm = placement
@@ -324,7 +335,8 @@ export function addCabinetPreset(presetId: string, placement?: DropPlacement): v
 
 /** Adds a four-piece drawer box as one named, selectable group. */
 export function addDrawerPreset(presetId: string, placement?: DropPlacement): void {
-  const preset = DRAWER_PRESETS.find((candidate) => candidate.id === presetId) ?? DRAWER_PRESETS[0]!;
+  const preset = DRAWER_PRESETS.find((candidate) => candidate.id === presetId);
+  if (!preset) return;
   const state = doc();
   const layout = buildDrawerLayout(preset);
   const supportMm = placement

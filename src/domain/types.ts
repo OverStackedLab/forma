@@ -26,49 +26,13 @@ export type ColorId =
   | 'matte-black'
   | 'steel';
 /** Panel colors exposed in the UI. */
-export type FinishId = 'oak' | 'walnut' | 'dark-gray' | 'dark-gray-green' | 'white';
+export type FinishId = 'oak' | 'walnut' | 'ash' | 'dark-gray' | 'dark-gray-green' | 'white';
 export type HardwareFinishId = 'brushed-brass' | 'matte-black' | 'brushed-steel' | 'matte-white';
 export type AppearanceFinishId = FinishId | HardwareFinishId;
-export type PanelPresetId =
-  | 'flat'
-  | 'shelf'
-  | 'divider'
-  | 'back'
-  | 'door'
-  | 'axstad-glass-400'
-  | 'axstad-glass-600'
-  | 'axstad-glass-400-1000'
-  | 'axstad-glass-600-1000'
-  | 'bodbyn-250'
-  | 'bodbyn-300'
-  | 'bodbyn-400'
-  | 'bodbyn-400-1000'
-  | 'bodbyn-450'
-  | 'bodbyn-600-400'
-  | 'bodbyn-600-600'
-  | 'bodbyn-600'
-  | 'bodbyn-600-1400'
-  | 'bodbyn-drawer-400-200'
-  | 'bodbyn-drawer-400-400'
-  | 'bodbyn-drawer-600-100'
-  | 'bodbyn-drawer-600-200'
-  | 'bodbyn-drawer-800-200'
-  | 'bodbyn-drawer-800-400'
-  | 'bodbyn-glass-400-400'
-  | 'fridge-600'
-  | 'matmassig-590'
-  | 'knob'
-  | 'bagganas'
-  | 'eneryda'
-  | 'borghamn'
-  | 'enhet-leg';
-export type CabinetPresetId =
-  | 'base-400'
-  | 'base-600'
-  | 'base-800'
-  | 'wall-600'
-  | 'wall-800'
-  | 'high-600';
+/** Library panel id — open string while the catalog is rebuilt. */
+export type PanelPresetId = string;
+/** Library cabinet id — open string while the catalog is rebuilt. */
+export type CabinetPresetId = string;
 /** Every part renders as one of a few shared unit geometries, scaled per instance. */
 export type PanelShape =
   | 'box'
@@ -82,7 +46,9 @@ export type PanelShape =
   | 'bodbyn-glass'
   | 'bodbyn-muntin-glass'
   | 'fridge'
-  | 'hob';
+  | 'hob'
+  | 'dishwasher'
+  | 'oven';
 
 export type Material = {
   id: MaterialId;
@@ -127,6 +93,11 @@ export type PanelPreset = {
   edgeBanding: readonly EdgeBandSide[];
   /** Orientation used when the preset first enters the scene. */
   defaultQuaternion: [number, number, number, number];
+  /**
+   * When set, a freshly inserted part gets this finish as a per-part override
+   * instead of inheriting the design default.
+   */
+  finishId?: AppearanceFinishId;
 };
 
 /** External carcass dimensions for a standard open-front cabinet. */
@@ -163,13 +134,8 @@ export type CabinetConfig = {
   dividerPositionsMm?: number[];
 };
 
-export type DrawerPresetId =
-  | 'drawer-400-200'
-  | 'drawer-400-400'
-  | 'drawer-600-100'
-  | 'drawer-600-200'
-  | 'drawer-800-200'
-  | 'drawer-800-400';
+/** Library drawer-box id — open string while the catalog is rebuilt. */
+export type DrawerPresetId = string;
 
 /** Outer box for a generated four-piece drawer. The decorative front is separate. */
 export type DrawerConfig = {

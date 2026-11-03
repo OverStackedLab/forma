@@ -467,7 +467,12 @@ function LibrarySection({
 
 /** Library entry point for cabinet assemblies, panels, fronts and hardware. */
 function LibraryPanel() {
-  const panels = PANEL_PRESETS.filter((preset) => preset.category === 'panel');
+  const countertops = PANEL_PRESETS.filter((preset) =>
+    preset.id.startsWith('countertop-'),
+  );
+  const panels = PANEL_PRESETS.filter(
+    (preset) => preset.category === 'panel' && !preset.id.startsWith('countertop-'),
+  );
   const fronts = PANEL_PRESETS.filter(
     (preset) => preset.category === 'front' && preset.id !== 'door',
   );
@@ -475,58 +480,80 @@ function LibraryPanel() {
   const hardware = PANEL_PRESETS.filter(
     (preset) => preset.category === 'hardware' && !isAppliancePreset(preset),
   );
+  const isEmpty =
+    CABINET_PRESETS.length === 0 &&
+    DRAWER_PRESETS.length === 0 &&
+    PANEL_PRESETS.length === 0;
+
+  if (isEmpty) {
+    return (
+      <div className="flex flex-col gap-3 overflow-y-auto px-3 py-3.5">
+        <p className="text-[12px] leading-relaxed text-ink/45">
+          The library is empty while the catalog is rebuilt. New cabinets, panels,
+          fronts and hardware will show up here.
+        </p>
+      </div>
+    );
+  }
 
   return (
     <div className="flex flex-col gap-[18px] overflow-y-auto px-3 py-3.5">
-      <div>
-        <h3 className="mb-2 text-[11px] font-semibold tracking-[.04em] text-ink/45 uppercase">
-          Cabinets
-        </h3>
-        <div className="grid grid-cols-2 gap-1.5">
-          {CABINET_PRESETS.map((preset) => (
-            <OptionCard
-              key={preset.id}
-              label={preset.label}
-              description={libraryDescriptionInCm(
-                `${preset.width}×${preset.height}×${preset.depth} mm`,
-              )}
-              icon={preset.icon}
-              dragPayload={`cabinet:${preset.id}`}
-              onClick={() => addCabinetPreset(preset.id)}
-            />
-          ))}
+      {CABINET_PRESETS.length > 0 && (
+        <div>
+          <h3 className="mb-2 text-[11px] font-semibold tracking-[.04em] text-ink/45 uppercase">
+            Cabinets
+          </h3>
+          <div className="grid grid-cols-2 gap-1.5">
+            {CABINET_PRESETS.map((preset) => (
+              <OptionCard
+                key={preset.id}
+                label={preset.label}
+                description={libraryDescriptionInCm(
+                  `${preset.width}×${preset.height}×${preset.depth} mm`,
+                )}
+                icon={preset.icon}
+                dragPayload={`cabinet:${preset.id}`}
+                onClick={() => addCabinetPreset(preset.id)}
+              />
+            ))}
+          </div>
+          <p className="mt-2 text-[10px] leading-relaxed text-ink/30">
+            Standard METOD cabinet sizes. Heights exclude legs and worktops.
+          </p>
         </div>
-        <p className="mt-2 text-[10px] leading-relaxed text-ink/30">
-          Standard METOD cabinet sizes. Heights exclude legs and worktops.
-        </p>
-      </div>
+      )}
 
-      <div>
-        <h3 className="mb-2 text-[11px] font-semibold tracking-[.04em] text-ink/45 uppercase">
-          Drawer Boxes
-        </h3>
-        <div className="grid grid-cols-2 gap-1.5">
-          {DRAWER_PRESETS.map((preset) => (
-            <OptionCard
-              key={preset.id}
-              label={preset.label}
-              description={libraryDescriptionInCm(preset.description)}
-              icon={preset.icon}
-              dragPayload={`drawer:${preset.id}`}
-              onClick={() => addDrawerPreset(preset.id)}
-            />
-          ))}
+      {DRAWER_PRESETS.length > 0 && (
+        <div>
+          <h3 className="mb-2 text-[11px] font-semibold tracking-[.04em] text-ink/45 uppercase">
+            Drawer Boxes
+          </h3>
+          <div className="grid grid-cols-2 gap-1.5">
+            {DRAWER_PRESETS.map((preset) => (
+              <OptionCard
+                key={preset.id}
+                label={preset.label}
+                description={libraryDescriptionInCm(preset.description)}
+                icon={preset.icon}
+                dragPayload={`drawer:${preset.id}`}
+                onClick={() => addDrawerPreset(preset.id)}
+              />
+            ))}
+          </div>
+          <p className="mt-2 text-[10px] leading-relaxed text-ink/30">
+            MAXIMERA medium boxes for 15" SEKTION depth. AXSTAD fronts are added
+            separately.
+          </p>
         </div>
-        <p className="mt-2 text-[10px] leading-relaxed text-ink/30">
-          Names indicate matching front size; dimensions show the actual box (W×H×D).
-          Fronts are added separately. Sides: 1.8 cm; bottom and back: 0.8 cm.
-        </p>
-      </div>
+      )}
 
-      <LibrarySection title="Panels" presets={panels} />
-      <LibrarySection title="Fronts" presets={fronts} />
-      <LibrarySection title="Appliances" presets={appliances} />
-      <LibrarySection title="Hardware" presets={hardware} />
+      {countertops.length > 0 && (
+        <LibrarySection title="Countertops" presets={countertops} />
+      )}
+      {panels.length > 0 && <LibrarySection title="Panels" presets={panels} />}
+      {fronts.length > 0 && <LibrarySection title="Fronts" presets={fronts} />}
+      {appliances.length > 0 && <LibrarySection title="Appliances" presets={appliances} />}
+      {hardware.length > 0 && <LibrarySection title="Hardware" presets={hardware} />}
 
       <p className="text-[11px] leading-relaxed text-ink/35">
         Click an item to add it to the scene, or drag it onto the viewport.

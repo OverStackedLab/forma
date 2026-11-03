@@ -9,10 +9,7 @@ import type {
   Material,
   MaterialId,
   PanelPreset,
-  PanelPresetId,
-  PanelShape,
 } from './types';
-import { FRAMED_FRONT_THICKNESS_MM } from './glassDoor';
 
 /** The wood species a part is milled from. Its own color/roughness shows through when the color is 'natural'. */
 export const MATERIALS: readonly Material[] = [
@@ -39,6 +36,7 @@ export const COLORS: readonly Color[] = [
 export const FINISHES: readonly Finish[] = [
   { id: 'oak', label: 'Oak', materialId: 'oak', colorId: 'natural' },
   { id: 'walnut', label: 'Walnut', materialId: 'walnut', colorId: 'natural' },
+  { id: 'ash', label: 'Ash', materialId: 'ash', colorId: 'natural' },
   { id: 'dark-gray', label: 'Dark Gray', materialId: 'ash', colorId: 'dark-gray' },
   { id: 'dark-gray-green', label: 'Dark Gray-Green', materialId: 'ash', colorId: 'dark-gray-green' },
   { id: 'white', label: 'White', materialId: 'ash', colorId: 'white' },
@@ -58,196 +56,185 @@ export const ALL_FINISHES: readonly Finish[] = [...FINISHES, ...HARDWARE_FINISHE
  * W/H/D always match the visible world axes at insertion. That keeps the
  * Properties labels literal: changing Depth always changes front-to-back
  * depth, even for side panels and hardware.
+ *
+ * Cleared for a catalog rebuild — add new presets here.
+ *
+ * Countertops use IKEA US 74×25⅝" run sizes, stored as the matching metric
+ * slabs (1860×635 mm). Thickness follows each product: 1½" → 38 mm, 1⅛" → 28 mm.
  */
-
-const FRONT_EDGE: PanelPreset['edgeBanding'] = ['w-min', 'w-max', 'h-min', 'h-max'];
-
-function bodbynFront(
-  id: PanelPresetId,
+function countertopPreset(
+  id: PanelPreset['id'],
   label: string,
-  w: number,
-  h: number,
-  shape: Extract<PanelShape, 'bodbyn-door' | 'bodbyn-muntin-glass'>,
+  thicknessMm: number,
   description: string,
-  icon: string,
+  finishId: FinishId,
 ): PanelPreset {
   return {
-    id, label, w, h, d: FRAMED_FRONT_THICKNESS_MM, icon, shape, category: 'front', description,
-    thicknessAxis: 'd', grainAxis: 'h', edgeBanding: FRONT_EDGE,
+    id,
+    label,
+    w: 1860,
+    h: thicknessMm,
+    d: 635,
+    icon: 'panel_countertop',
+    shape: 'box',
+    category: 'panel',
+    description,
+    thicknessAxis: 'h',
+    grainAxis: 'w',
+    edgeBanding: ['w-min', 'w-max', 'd-min', 'd-max'],
     defaultQuaternion: [0, 0, 0, 1],
+    finishId,
   };
 }
 
 export const PANEL_PRESETS: readonly PanelPreset[] = [
-  {
-    id: 'shelf', label: 'Shelf', w: 800, h: 18, d: 300, icon: 'panel_shelf', shape: 'box',
-    category: 'panel', description: '800×18×300 mm', thicknessAxis: 'h', grainAxis: 'w',
-    edgeBanding: ['d-max'], defaultQuaternion: [0, 0, 0, 1],
-  },
-  {
-    id: 'flat', label: 'Side Panel', w: 18, h: 800, d: 600, icon: 'panel_flat', shape: 'box',
-    category: 'panel', description: '18×800×600 mm', thicknessAxis: 'w', grainAxis: 'h',
-    edgeBanding: ['d-max'], defaultQuaternion: [0, 0, 0, 1],
-  },
-  {
-    id: 'back', label: 'Back Panel', w: 600, h: 800, d: 8, icon: 'panel_back', shape: 'box',
-    category: 'panel', description: '600×800×8 mm', thicknessAxis: 'd', grainAxis: 'h',
-    edgeBanding: [], defaultQuaternion: [0, 0, 0, 1],
-  },
-  {
-    id: 'divider', label: 'Divider', w: 18, h: 800, d: 600, icon: 'panel_divider', shape: 'box',
-    category: 'panel', description: '18×800×600 mm', thicknessAxis: 'w', grainAxis: 'h',
-    edgeBanding: ['d-max'], defaultQuaternion: [0, 0, 0, 1],
-  },
-  {
-    id: 'door', label: 'Door', w: 400, h: 800, d: 18, icon: 'panel_door', shape: 'box',
-    category: 'front', description: '400×800×18 mm', thicknessAxis: 'd', grainAxis: 'h',
-    edgeBanding: ['w-min', 'w-max', 'h-min', 'h-max'], defaultQuaternion: [0, 0, 0, 1],
-  },
-  {
-    id: 'axstad-glass-400', label: 'AXSTAD glass front 40×80 cm', w: 400, h: 800, d: FRAMED_FRONT_THICKNESS_MM, icon: 'panel_glass_door',
-    shape: 'glass-door', category: 'front', description: '400×800×19 mm · 78 mm frame · inset glass',
-    thicknessAxis: 'd', grainAxis: 'h', edgeBanding: ['w-min', 'w-max', 'h-min', 'h-max'],
-    defaultQuaternion: [0, 0, 0, 1],
-  },
-  {
-    id: 'axstad-glass-600', label: 'AXSTAD glass front 60×80 cm', w: 600, h: 800, d: FRAMED_FRONT_THICKNESS_MM, icon: 'panel_glass_door',
-    shape: 'glass-door', category: 'front', description: '600×800×19 mm · 78 mm frame · inset glass',
-    thicknessAxis: 'd', grainAxis: 'h', edgeBanding: ['w-min', 'w-max', 'h-min', 'h-max'],
-    defaultQuaternion: [0, 0, 0, 1],
-  },
-  {
-    id: 'axstad-glass-400-1000', label: 'AXSTAD glass front 40×100 cm', w: 400, h: 1000, d: FRAMED_FRONT_THICKNESS_MM, icon: 'panel_glass_door',
-    shape: 'glass-door', category: 'front', description: '400×1000×19 mm · 78 mm frame · inset glass',
-    thicknessAxis: 'd', grainAxis: 'h', edgeBanding: ['w-min', 'w-max', 'h-min', 'h-max'],
-    defaultQuaternion: [0, 0, 0, 1],
-  },
-  {
-    id: 'axstad-glass-600-1000', label: 'AXSTAD glass front 60×100 cm', w: 600, h: 1000, d: FRAMED_FRONT_THICKNESS_MM, icon: 'panel_glass_door',
-    shape: 'glass-door', category: 'front', description: '600×1000×19 mm · 78 mm frame · inset glass',
-    thicknessAxis: 'd', grainAxis: 'h', edgeBanding: ['w-min', 'w-max', 'h-min', 'h-max'],
-    defaultQuaternion: [0, 0, 0, 1],
-  },
-  bodbynFront(
-    'bodbyn-250', 'BODBYN panel front 25×80 cm', 250, 800, 'bodbyn-door',
-    '250×800×19 mm · 70 mm frame · bevelled panel', 'panel_framed_door',
+  countertopPreset(
+    'countertop-karlby-walnut-1860',
+    'KARLBY walnut veneer',
+    38,
+    '1860×38×635 mm · walnut veneer',
+    'walnut',
   ),
-  bodbynFront(
-    'bodbyn-300', 'BODBYN panel front 30×80 cm', 300, 800, 'bodbyn-door',
-    '300×800×19 mm · 70 mm frame · bevelled panel', 'panel_framed_door',
+  countertopPreset(
+    'countertop-saljan-oak-1860',
+    'SÄLJAN oak effect laminate',
+    38,
+    '1860×38×635 mm · oak effect laminate',
+    'oak',
   ),
-  bodbynFront(
-    'bodbyn-400', 'BODBYN panel front 40×80 cm', 400, 800, 'bodbyn-door',
-    '400×800×19 mm · 70 mm frame · bevelled panel', 'panel_framed_door',
+  countertopPreset(
+    'countertop-jarstorp-white-1860',
+    'JÄRSTORP white laminate',
+    28,
+    '1860×28×635 mm · white laminate',
+    'white',
   ),
-  bodbynFront(
-    'bodbyn-400-1000', 'BODBYN panel front 40×100 cm', 400, 1000, 'bodbyn-door',
-    '400×1000×19 mm · 70 mm frame · bevelled panel', 'panel_framed_door',
+  countertopPreset(
+    'countertop-ekbacken-ash-1860',
+    'EKBACKEN ash effect laminate',
+    28,
+    '1860×28×635 mm · ash effect laminate',
+    'ash',
   ),
-  bodbynFront(
-    'bodbyn-450', 'BODBYN panel front 45×80 cm', 450, 800, 'bodbyn-door',
-    '450×800×19 mm · 70 mm frame · bevelled panel', 'panel_framed_door',
-  ),
-  bodbynFront(
-    'bodbyn-600-400', 'BODBYN panel front 60×40 cm', 600, 400, 'bodbyn-door',
-    '600×400×19 mm · 70 mm frame · bevelled panel', 'panel_framed_door',
-  ),
-  bodbynFront(
-    'bodbyn-600-600', 'BODBYN panel front 60×60 cm', 600, 600, 'bodbyn-door',
-    '600×600×19 mm · 70 mm frame · bevelled panel', 'panel_framed_door',
-  ),
-  bodbynFront(
-    'bodbyn-600', 'BODBYN panel front 60×80 cm', 600, 800, 'bodbyn-door',
-    '600×800×19 mm · 70 mm frame · bevelled panel', 'panel_framed_door',
-  ),
-  bodbynFront(
-    'bodbyn-600-1400', 'BODBYN panel front 60×140 cm', 600, 1400, 'bodbyn-door',
-    '600×1400×19 mm · 70 mm frame · bevelled panel', 'panel_framed_door',
-  ),
-  bodbynFront(
-    'bodbyn-drawer-400-200', 'BODBYN drawer front 40×20 cm', 400, 200, 'bodbyn-door',
-    '400×200×19 mm · 70 mm frame · bevelled panel', 'panel_framed_door',
-  ),
-  bodbynFront(
-    'bodbyn-drawer-400-400', 'BODBYN drawer front 40×40 cm', 400, 400, 'bodbyn-door',
-    '400×400×19 mm · 70 mm frame · bevelled panel', 'panel_framed_door',
-  ),
-  bodbynFront(
-    'bodbyn-drawer-600-100', 'BODBYN drawer front 60×10 cm', 600, 100, 'bodbyn-door',
-    '600×100×19 mm · 70 mm frame · bevelled panel', 'panel_framed_door',
-  ),
-  bodbynFront(
-    'bodbyn-drawer-600-200', 'BODBYN drawer front 60×20 cm', 600, 200, 'bodbyn-door',
-    '600×200×19 mm · 70 mm frame · bevelled panel', 'panel_framed_door',
-  ),
-  bodbynFront(
-    'bodbyn-drawer-800-200', 'BODBYN drawer front 80×20 cm', 800, 200, 'bodbyn-door',
-    '800×200×19 mm · 70 mm frame · bevelled panel', 'panel_framed_door',
-  ),
-  bodbynFront(
-    'bodbyn-drawer-800-400', 'BODBYN drawer front 80×40 cm', 800, 400, 'bodbyn-door',
-    '800×400×19 mm · 70 mm frame · bevelled panel', 'panel_framed_door',
-  ),
-  bodbynFront(
-    'bodbyn-glass-400-400', 'BODBYN glass front 40×40 cm', 400, 400, 'bodbyn-muntin-glass',
-    '400×400×19 mm · 70 mm frame · glass · cross-rail', 'panel_glass_door',
-  ),
-  {
-    id: 'knob', label: 'Knob', w: 32, h: 32, d: 25, icon: 'panel_knob', shape: 'cylinder',
-    category: 'hardware', description: 'Ø32 × 25 mm projection', thicknessAxis: null,
-    grainAxis: null, edgeBanding: [], defaultQuaternion: [0, 0, 0, 1],
-  },
-  {
-    id: 'bagganas', label: 'BAGGANÄS knob', w: 21, h: 21, d: 24, icon: 'panel_knob', shape: 'bagganas',
-    category: 'hardware', description: 'Ø21 × 24 mm projection', thicknessAxis: null,
-    grainAxis: null, edgeBanding: [], defaultQuaternion: [0, 0, 0, 1],
-  },
-  {
-    id: 'eneryda', label: 'ENERYDA handle', w: 112, h: 17, d: 30, icon: 'panel_handle', shape: 'eneryda',
-    category: 'hardware', description: '112 mm · 96 mm centres', thicknessAxis: null,
-    grainAxis: null, edgeBanding: [], defaultQuaternion: [0, 0, 0, 1],
-  },
-  {
-    id: 'borghamn', label: 'BORGHAMN handle', w: 170, h: 10, d: 36, icon: 'panel_handle', shape: 'borghamn',
-    category: 'hardware', description: '170 mm · 160 mm centres', thicknessAxis: null,
-    grainAxis: null, edgeBanding: [], defaultQuaternion: [0, 0, 0, 1],
-  },
-  {
-    // Placeholder appliance: bought whole, so it bills as hardware rather than sheet goods.
-    id: 'fridge-600', label: 'Fridge 60×184 cm', w: 600, h: 1840, d: 660, icon: 'appliance_fridge',
-    shape: 'fridge', category: 'hardware', description: '600×1840×660 mm · placeholder',
-    thicknessAxis: null, grainAxis: null, edgeBanding: [], defaultQuaternion: [0, 0, 0, 1],
-  },
   {
     // IKEA MATMÄSSIG 104.670.93: 59 cm induction hob, 56×49 cm worktop cutout.
-    id: 'matmassig-590', label: 'MATMÄSSIG hob 59 cm', w: 590, h: 49, d: 520, icon: 'appliance_hob',
-    shape: 'hob', category: 'hardware', description: '590×49×520 mm · 4 zones · 560×490 mm cutout',
-    thicknessAxis: null, grainAxis: null, edgeBanding: [], defaultQuaternion: [0, 0, 0, 1],
+    id: 'matmassig-590',
+    label: 'MATMÄSSIG hob 59 cm',
+    w: 590,
+    h: 49,
+    d: 520,
+    icon: 'appliance_hob',
+    shape: 'hob',
+    category: 'hardware',
+    description: '590×49×520 mm · 4 zones · 560×490 mm cutout',
+    thicknessAxis: null,
+    grainAxis: null,
+    edgeBanding: [],
+    defaultQuaternion: [0, 0, 0, 1],
   },
   {
-    id: 'enhet-leg', label: 'ENHET leg', w: 50, h: 125, d: 50, icon: 'panel_leg', shape: 'enhet-leg',
-    category: 'hardware', description: '125 mm high', thicknessAxis: null,
-    grainAxis: null, edgeBanding: [], defaultQuaternion: [0, 0, 0, 1],
+    // IKEA LAGAN 306.273.64: integrated dishwasher for a 60 cm niche.
+    id: 'lagan-dishwasher-600',
+    label: 'LAGAN dishwasher 60 cm',
+    w: 598,
+    h: 820,
+    d: 555,
+    icon: 'appliance_dishwasher',
+    shape: 'dishwasher',
+    category: 'hardware',
+    description: '598×820×555 mm · integrated · door sold separately',
+    thicknessAxis: null,
+    grainAxis: null,
+    edgeBanding: [],
+    defaultQuaternion: [0, 0, 0, 1],
+  },
+  {
+    // IKEA LAGAN 106.000.54: built-in oven, white, 60 cm niche.
+    id: 'lagan-oven-white-600',
+    label: 'LAGAN oven white',
+    w: 594,
+    h: 595,
+    d: 567,
+    icon: 'appliance_oven',
+    shape: 'oven',
+    category: 'hardware',
+    description: '594×595×567 mm · built-in · 74 L',
+    thicknessAxis: null,
+    grainAxis: null,
+    edgeBanding: [],
+    defaultQuaternion: [0, 0, 0, 1],
+    finishId: 'matte-white',
   },
 ];
 
-/** IKEA METOD frame sizes. Heights exclude legs, worktops and the 1 cm wall gap. */
+/**
+ * IKEA METOD frame sizes (HU range). Heights exclude legs, worktops and the
+ * 1 cm wall gap. Corner frames are omitted — they are not rectangular boxes.
+ * Wall units hang so their top lines up with a 2200 mm tall cabinet.
+ */
+function metodCabinet(
+  id: CabinetPresetId,
+  label: string,
+  width: number,
+  height: number,
+  depth: number,
+  shelfCount: number,
+  bottomMm?: number,
+): CabinetPreset {
+  return {
+    id,
+    label,
+    width,
+    height,
+    depth,
+    shelfCount,
+    icon: 'cabinet',
+    ...(bottomMm !== undefined ? { bottomMm } : {}),
+  };
+}
+
+const HIGH_TOP_MM = 2200;
+
 export const CABINET_PRESETS: readonly CabinetPreset[] = [
-  { id: 'base-400', label: 'Base cabinet 40 cm', width: 400, height: 800, depth: 600, shelfCount: 1, icon: 'cabinet' },
-  { id: 'base-600', label: 'Base cabinet 60 cm', width: 600, height: 800, depth: 600, shelfCount: 1, icon: 'cabinet' },
-  { id: 'base-800', label: 'Base cabinet 80 cm', width: 800, height: 800, depth: 600, shelfCount: 1, icon: 'cabinet' },
-  // 1400 mm underside so an 800 mm wall unit’s top lines up with High 2200.
-  { id: 'wall-600', label: 'Wall cabinet 60 cm', width: 600, height: 800, depth: 370, shelfCount: 1, icon: 'cabinet', bottomMm: 1400 },
-  { id: 'wall-800', label: 'Wall cabinet 80 cm', width: 800, height: 800, depth: 370, shelfCount: 1, icon: 'cabinet', bottomMm: 1400 },
-  { id: 'high-600', label: 'Tall cabinet 60 cm', width: 600, height: 2200, depth: 600, shelfCount: 4, icon: 'cabinet' },
+  // Base — 80 cm high. Widths × depths sold on the HU site (no 20×37).
+  metodCabinet('base-200-600', 'Base cabinet 20×60 cm', 200, 800, 600, 1),
+  metodCabinet('base-300-370', 'Base cabinet 30×37 cm', 300, 800, 370, 1),
+  metodCabinet('base-300-600', 'Base cabinet 30×60 cm', 300, 800, 600, 1),
+  metodCabinet('base-400-370', 'Base cabinet 40×37 cm', 400, 800, 370, 1),
+  metodCabinet('base-400-600', 'Base cabinet 40×60 cm', 400, 800, 600, 1),
+  metodCabinet('base-600-370', 'Base cabinet 60×37 cm', 600, 800, 370, 1),
+  metodCabinet('base-600-600', 'Base cabinet 60×60 cm', 600, 800, 600, 1),
+  metodCabinet('base-800-370', 'Base cabinet 80×37 cm', 800, 800, 370, 1),
+  metodCabinet('base-800-600', 'Base cabinet 80×60 cm', 800, 800, 600, 1),
+
+  // Wall — 37 cm deep. Underside chosen so top aligns with HIGH_TOP_MM.
+  metodCabinet('wall-300-400', 'Wall cabinet 30×40 cm', 300, 400, 370, 0, HIGH_TOP_MM - 400),
+  metodCabinet('wall-400-400', 'Wall cabinet 40×40 cm', 400, 400, 370, 0, HIGH_TOP_MM - 400),
+  metodCabinet('wall-600-400', 'Wall cabinet 60×40 cm', 600, 400, 370, 0, HIGH_TOP_MM - 400),
+  metodCabinet('wall-800-400', 'Wall cabinet 80×40 cm', 800, 400, 370, 0, HIGH_TOP_MM - 400),
+  metodCabinet('wall-400-600', 'Wall cabinet 40×60 cm', 400, 600, 370, 1, HIGH_TOP_MM - 600),
+  metodCabinet('wall-600-600', 'Wall cabinet 60×60 cm', 600, 600, 370, 1, HIGH_TOP_MM - 600),
+  metodCabinet('wall-800-600', 'Wall cabinet 80×60 cm', 800, 600, 370, 1, HIGH_TOP_MM - 600),
+  metodCabinet('wall-200-800', 'Wall cabinet 20×80 cm', 200, 800, 370, 1, HIGH_TOP_MM - 800),
+  metodCabinet('wall-300-800', 'Wall cabinet 30×80 cm', 300, 800, 370, 1, HIGH_TOP_MM - 800),
+  metodCabinet('wall-400-800', 'Wall cabinet 40×80 cm', 400, 800, 370, 1, HIGH_TOP_MM - 800),
+  metodCabinet('wall-600-800', 'Wall cabinet 60×80 cm', 600, 800, 370, 1, HIGH_TOP_MM - 800),
+  metodCabinet('wall-800-800', 'Wall cabinet 80×80 cm', 800, 800, 370, 1, HIGH_TOP_MM - 800),
+  metodCabinet('wall-400-1000', 'Wall cabinet 40×100 cm', 400, 1000, 370, 2, HIGH_TOP_MM - 1000),
+  metodCabinet('wall-600-1000', 'Wall cabinet 60×100 cm', 600, 1000, 370, 2, HIGH_TOP_MM - 1000),
+  metodCabinet('wall-800-1000', 'Wall cabinet 80×100 cm', 800, 1000, 370, 2, HIGH_TOP_MM - 1000),
 ];
 
 /** Older library ids, kept so saved cabinets still resolve to a catalog preset. */
 export const CABINET_PRESET_ALIASES: Readonly<Record<string, CabinetPresetId>> = {
-  'base-450': 'base-400',
-  'base-900': 'base-800',
-  'wall-900': 'wall-800',
-  'tall-600': 'high-600',
+  'base-400': 'base-400-600',
+  'base-450': 'base-400-600',
+  'base-600': 'base-600-600',
+  'base-800': 'base-800-600',
+  'base-900': 'base-800-600',
+  'wall-600': 'wall-600-800',
+  'wall-800': 'wall-800-800',
+  'wall-900': 'wall-800-800',
 };
 
 export function resolveCabinetPresetId(id: string | undefined): CabinetPresetId | undefined {
@@ -313,7 +300,12 @@ export function isHardwareFinishId(id: string): id is HardwareFinishId {
 
 /** Appliance placeholders get their own library section — bought whole, not made. */
 export function isAppliancePreset(preset: PanelPreset): boolean {
-  return preset.shape === 'fridge' || preset.shape === 'hob';
+  return (
+    preset.shape === 'fridge'
+    || preset.shape === 'hob'
+    || preset.shape === 'dishwasher'
+    || preset.shape === 'oven'
+  );
 }
 
 /** Round purchased knobs share diameter + projection controls. */
