@@ -467,7 +467,12 @@ function LibrarySection({
 
 /** Library entry point for cabinet assemblies, panels, fronts and hardware. */
 function LibraryPanel() {
-  const panels = PANEL_PRESETS.filter((preset) => preset.category === 'panel');
+  const countertops = PANEL_PRESETS.filter((preset) =>
+    preset.id.startsWith('countertop-'),
+  );
+  const panels = PANEL_PRESETS.filter(
+    (preset) => preset.category === 'panel' && !preset.id.startsWith('countertop-'),
+  );
   const fronts = PANEL_PRESETS.filter(
     (preset) => preset.category === 'front' && preset.id !== 'door',
   );
@@ -542,6 +547,9 @@ function LibraryPanel() {
         </div>
       )}
 
+      {countertops.length > 0 && (
+        <LibrarySection title="Countertops" presets={countertops} />
+      )}
       {panels.length > 0 && <LibrarySection title="Panels" presets={panels} />}
       {fronts.length > 0 && <LibrarySection title="Fronts" presets={fronts} />}
       {appliances.length > 0 && <LibrarySection title="Appliances" presets={appliances} />}

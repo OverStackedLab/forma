@@ -187,6 +187,7 @@ export function addCustomPanel(presetId: string, placement?: DropPlacement): voi
         placement.point.z + placement.normal.z * supportMm / 1000,
       ]
     : [nextInsertionX(s, halfExtents.x), halfExtents.y / 1000, 0];
+  const finish = preset.finishId ? findFinish(preset.finishId) : undefined;
 
   commit(() => {
     useDocumentStore.setState((prev) => ({
@@ -214,6 +215,14 @@ export function addCustomPanel(presetId: string, placement?: DropPlacement): voi
           scale: [1, 1, 1],
         },
       },
+      ...(finish
+        ? {
+            overrides: {
+              ...prev.overrides,
+              [id]: { material: finish.materialId, color: finish.colorId },
+            },
+          }
+        : {}),
     }));
   });
 

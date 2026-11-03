@@ -36,6 +36,7 @@ export const COLORS: readonly Color[] = [
 export const FINISHES: readonly Finish[] = [
   { id: 'oak', label: 'Oak', materialId: 'oak', colorId: 'natural' },
   { id: 'walnut', label: 'Walnut', materialId: 'walnut', colorId: 'natural' },
+  { id: 'ash', label: 'Ash', materialId: 'ash', colorId: 'natural' },
   { id: 'dark-gray', label: 'Dark Gray', materialId: 'ash', colorId: 'dark-gray' },
   { id: 'dark-gray-green', label: 'Dark Gray-Green', materialId: 'ash', colorId: 'dark-gray-green' },
   { id: 'white', label: 'White', materialId: 'ash', colorId: 'white' },
@@ -57,8 +58,114 @@ export const ALL_FINISHES: readonly Finish[] = [...FINISHES, ...HARDWARE_FINISHE
  * depth, even for side panels and hardware.
  *
  * Cleared for a catalog rebuild — add new presets here.
+ *
+ * Countertops use IKEA US 74×25⅝" run sizes, stored as the matching metric
+ * slabs (1860×635 mm). Thickness follows each product: 1½" → 38 mm, 1⅛" → 28 mm.
  */
-export const PANEL_PRESETS: readonly PanelPreset[] = [];
+function countertopPreset(
+  id: PanelPreset['id'],
+  label: string,
+  thicknessMm: number,
+  description: string,
+  finishId: FinishId,
+): PanelPreset {
+  return {
+    id,
+    label,
+    w: 1860,
+    h: thicknessMm,
+    d: 635,
+    icon: 'panel_countertop',
+    shape: 'box',
+    category: 'panel',
+    description,
+    thicknessAxis: 'h',
+    grainAxis: 'w',
+    edgeBanding: ['w-min', 'w-max', 'd-min', 'd-max'],
+    defaultQuaternion: [0, 0, 0, 1],
+    finishId,
+  };
+}
+
+export const PANEL_PRESETS: readonly PanelPreset[] = [
+  countertopPreset(
+    'countertop-karlby-walnut-1860',
+    'KARLBY walnut veneer',
+    38,
+    '1860×38×635 mm · walnut veneer',
+    'walnut',
+  ),
+  countertopPreset(
+    'countertop-saljan-oak-1860',
+    'SÄLJAN oak effect laminate',
+    38,
+    '1860×38×635 mm · oak effect laminate',
+    'oak',
+  ),
+  countertopPreset(
+    'countertop-jarstorp-white-1860',
+    'JÄRSTORP white laminate',
+    28,
+    '1860×28×635 mm · white laminate',
+    'white',
+  ),
+  countertopPreset(
+    'countertop-ekbacken-ash-1860',
+    'EKBACKEN ash effect laminate',
+    28,
+    '1860×28×635 mm · ash effect laminate',
+    'ash',
+  ),
+  {
+    // IKEA MATMÄSSIG 104.670.93: 59 cm induction hob, 56×49 cm worktop cutout.
+    id: 'matmassig-590',
+    label: 'MATMÄSSIG hob 59 cm',
+    w: 590,
+    h: 49,
+    d: 520,
+    icon: 'appliance_hob',
+    shape: 'hob',
+    category: 'hardware',
+    description: '590×49×520 mm · 4 zones · 560×490 mm cutout',
+    thicknessAxis: null,
+    grainAxis: null,
+    edgeBanding: [],
+    defaultQuaternion: [0, 0, 0, 1],
+  },
+  {
+    // IKEA LAGAN 306.273.64: integrated dishwasher for a 60 cm niche.
+    id: 'lagan-dishwasher-600',
+    label: 'LAGAN dishwasher 60 cm',
+    w: 598,
+    h: 820,
+    d: 555,
+    icon: 'appliance_dishwasher',
+    shape: 'dishwasher',
+    category: 'hardware',
+    description: '598×820×555 mm · integrated · door sold separately',
+    thicknessAxis: null,
+    grainAxis: null,
+    edgeBanding: [],
+    defaultQuaternion: [0, 0, 0, 1],
+  },
+  {
+    // IKEA LAGAN 106.000.54: built-in oven, white, 60 cm niche.
+    id: 'lagan-oven-white-600',
+    label: 'LAGAN oven white',
+    w: 594,
+    h: 595,
+    d: 567,
+    icon: 'appliance_oven',
+    shape: 'oven',
+    category: 'hardware',
+    description: '594×595×567 mm · built-in · 74 L',
+    thicknessAxis: null,
+    grainAxis: null,
+    edgeBanding: [],
+    defaultQuaternion: [0, 0, 0, 1],
+    finishId: 'matte-white',
+  },
+];
 
 /**
  * IKEA METOD frame sizes (HU range). Heights exclude legs, worktops and the
@@ -193,7 +300,12 @@ export function isHardwareFinishId(id: string): id is HardwareFinishId {
 
 /** Appliance placeholders get their own library section — bought whole, not made. */
 export function isAppliancePreset(preset: PanelPreset): boolean {
-  return preset.shape === 'fridge' || preset.shape === 'hob';
+  return (
+    preset.shape === 'fridge'
+    || preset.shape === 'hob'
+    || preset.shape === 'dishwasher'
+    || preset.shape === 'oven'
+  );
 }
 
 /** Round purchased knobs share diameter + projection controls. */

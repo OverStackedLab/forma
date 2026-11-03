@@ -162,6 +162,12 @@ function inferredPreset(label: string) {
     return PANEL_PRESETS.find((preset) => preset.id === 'fridge-600');
   if (normalized.includes('hob') || normalized.includes('matm'))
     return PANEL_PRESETS.find((preset) => preset.id === 'matmassig-590');
+  if (normalized.includes('dishwasher'))
+    return PANEL_PRESETS.find((preset) => preset.id === 'lagan-dishwasher-600');
+  if (normalized.includes('oven') || normalized.includes('horno'))
+    return PANEL_PRESETS.find((preset) => preset.id === 'lagan-oven-white-600');
+  if (normalized.includes('lagan'))
+    return PANEL_PRESETS.find((preset) => preset.id === 'lagan-dishwasher-600');
   if (normalized.includes('axstad'))
     return PANEL_PRESETS.find((preset) => preset.id === 'axstad-glass-400');
   if (normalized.includes('bodbyn') && normalized.includes('glass'))
@@ -196,6 +202,8 @@ function normalizePart(value: unknown): CustomPart | null {
     && part.shape !== 'bodbyn-muntin-glass'
     && part.shape !== 'fridge'
     && part.shape !== 'hob'
+    && part.shape !== 'dishwasher'
+    && part.shape !== 'oven'
   )
     return null;
   const clampDimension = (axis: 'w' | 'h' | 'd') => {

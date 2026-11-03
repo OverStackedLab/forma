@@ -26,7 +26,7 @@ export type ColorId =
   | 'matte-black'
   | 'steel';
 /** Panel colors exposed in the UI. */
-export type FinishId = 'oak' | 'walnut' | 'dark-gray' | 'dark-gray-green' | 'white';
+export type FinishId = 'oak' | 'walnut' | 'ash' | 'dark-gray' | 'dark-gray-green' | 'white';
 export type HardwareFinishId = 'brushed-brass' | 'matte-black' | 'brushed-steel' | 'matte-white';
 export type AppearanceFinishId = FinishId | HardwareFinishId;
 /** Library panel id — open string while the catalog is rebuilt. */
@@ -46,7 +46,9 @@ export type PanelShape =
   | 'bodbyn-glass'
   | 'bodbyn-muntin-glass'
   | 'fridge'
-  | 'hob';
+  | 'hob'
+  | 'dishwasher'
+  | 'oven';
 
 export type Material = {
   id: MaterialId;
@@ -91,6 +93,11 @@ export type PanelPreset = {
   edgeBanding: readonly EdgeBandSide[];
   /** Orientation used when the preset first enters the scene. */
   defaultQuaternion: [number, number, number, number];
+  /**
+   * When set, a freshly inserted part gets this finish as a per-part override
+   * instead of inheriting the design default.
+   */
+  finishId?: AppearanceFinishId;
 };
 
 /** External carcass dimensions for a standard open-front cabinet. */
