@@ -536,8 +536,8 @@ function LibraryPanel() {
             ))}
           </div>
           <p className="mt-2 text-[10px] leading-relaxed text-ink/30">
-            Names indicate matching front size; dimensions show the actual box (W×H×D).
-            Fronts are added separately. Sides: 1.8 cm; bottom and back: 0.8 cm.
+            MAXIMERA medium boxes for 15" SEKTION depth. AXSTAD fronts are added
+            separately.
           </p>
         </div>
       )}

@@ -60,11 +60,75 @@ export const ALL_FINISHES: readonly Finish[] = [...FINISHES, ...HARDWARE_FINISHE
  */
 export const PANEL_PRESETS: readonly PanelPreset[] = [];
 
-/** Standard cabinet carcass sizes. Cleared for a catalog rebuild. */
-export const CABINET_PRESETS: readonly CabinetPreset[] = [];
+/**
+ * IKEA METOD frame sizes (HU range). Heights exclude legs, worktops and the
+ * 1 cm wall gap. Corner frames are omitted — they are not rectangular boxes.
+ * Wall units hang so their top lines up with a 2200 mm tall cabinet.
+ */
+function metodCabinet(
+  id: CabinetPresetId,
+  label: string,
+  width: number,
+  height: number,
+  depth: number,
+  shelfCount: number,
+  bottomMm?: number,
+): CabinetPreset {
+  return {
+    id,
+    label,
+    width,
+    height,
+    depth,
+    shelfCount,
+    icon: 'cabinet',
+    ...(bottomMm !== undefined ? { bottomMm } : {}),
+  };
+}
+
+const HIGH_TOP_MM = 2200;
+
+export const CABINET_PRESETS: readonly CabinetPreset[] = [
+  // Base — 80 cm high. Widths × depths sold on the HU site (no 20×37).
+  metodCabinet('base-200-600', 'Base cabinet 20×60 cm', 200, 800, 600, 1),
+  metodCabinet('base-300-370', 'Base cabinet 30×37 cm', 300, 800, 370, 1),
+  metodCabinet('base-300-600', 'Base cabinet 30×60 cm', 300, 800, 600, 1),
+  metodCabinet('base-400-370', 'Base cabinet 40×37 cm', 400, 800, 370, 1),
+  metodCabinet('base-400-600', 'Base cabinet 40×60 cm', 400, 800, 600, 1),
+  metodCabinet('base-600-370', 'Base cabinet 60×37 cm', 600, 800, 370, 1),
+  metodCabinet('base-600-600', 'Base cabinet 60×60 cm', 600, 800, 600, 1),
+  metodCabinet('base-800-370', 'Base cabinet 80×37 cm', 800, 800, 370, 1),
+  metodCabinet('base-800-600', 'Base cabinet 80×60 cm', 800, 800, 600, 1),
+
+  // Wall — 37 cm deep. Underside chosen so top aligns with HIGH_TOP_MM.
+  metodCabinet('wall-300-400', 'Wall cabinet 30×40 cm', 300, 400, 370, 0, HIGH_TOP_MM - 400),
+  metodCabinet('wall-400-400', 'Wall cabinet 40×40 cm', 400, 400, 370, 0, HIGH_TOP_MM - 400),
+  metodCabinet('wall-600-400', 'Wall cabinet 60×40 cm', 600, 400, 370, 0, HIGH_TOP_MM - 400),
+  metodCabinet('wall-800-400', 'Wall cabinet 80×40 cm', 800, 400, 370, 0, HIGH_TOP_MM - 400),
+  metodCabinet('wall-400-600', 'Wall cabinet 40×60 cm', 400, 600, 370, 1, HIGH_TOP_MM - 600),
+  metodCabinet('wall-600-600', 'Wall cabinet 60×60 cm', 600, 600, 370, 1, HIGH_TOP_MM - 600),
+  metodCabinet('wall-800-600', 'Wall cabinet 80×60 cm', 800, 600, 370, 1, HIGH_TOP_MM - 600),
+  metodCabinet('wall-200-800', 'Wall cabinet 20×80 cm', 200, 800, 370, 1, HIGH_TOP_MM - 800),
+  metodCabinet('wall-300-800', 'Wall cabinet 30×80 cm', 300, 800, 370, 1, HIGH_TOP_MM - 800),
+  metodCabinet('wall-400-800', 'Wall cabinet 40×80 cm', 400, 800, 370, 1, HIGH_TOP_MM - 800),
+  metodCabinet('wall-600-800', 'Wall cabinet 60×80 cm', 600, 800, 370, 1, HIGH_TOP_MM - 800),
+  metodCabinet('wall-800-800', 'Wall cabinet 80×80 cm', 800, 800, 370, 1, HIGH_TOP_MM - 800),
+  metodCabinet('wall-400-1000', 'Wall cabinet 40×100 cm', 400, 1000, 370, 2, HIGH_TOP_MM - 1000),
+  metodCabinet('wall-600-1000', 'Wall cabinet 60×100 cm', 600, 1000, 370, 2, HIGH_TOP_MM - 1000),
+  metodCabinet('wall-800-1000', 'Wall cabinet 80×100 cm', 800, 1000, 370, 2, HIGH_TOP_MM - 1000),
+];
 
 /** Older library ids, kept so saved cabinets still resolve to a catalog preset. */
-export const CABINET_PRESET_ALIASES: Readonly<Record<string, CabinetPresetId>> = {};
+export const CABINET_PRESET_ALIASES: Readonly<Record<string, CabinetPresetId>> = {
+  'base-400': 'base-400-600',
+  'base-450': 'base-400-600',
+  'base-600': 'base-600-600',
+  'base-800': 'base-800-600',
+  'base-900': 'base-800-600',
+  'wall-600': 'wall-600-800',
+  'wall-800': 'wall-800-800',
+  'wall-900': 'wall-800-800',
+};
 
 export function resolveCabinetPresetId(id: string | undefined): CabinetPresetId | undefined {
   if (!id) return undefined;
