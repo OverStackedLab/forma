@@ -55,8 +55,29 @@ type PlacedFront = {
  * a hob base, and a fridge, with wall cabinets whose tops line up with the
  * pantry. Fronts, handles and the hob stay loose parts, so the carcasses
  * remain parametric cabinets.
+ *
+ * Returns an empty document while the library catalog is being rebuilt.
  */
 export function createDemoKitchen(): FormaDocument {
+  if (
+    CABINET_PRESETS.length === 0 ||
+    PANEL_PRESETS.length === 0 ||
+    DRAWER_PRESETS.length === 0
+  ) {
+    return {
+      defaultMaterialId: DEFAULT_MATERIAL_ID,
+      defaultColorId: DEFAULT_COLOR_ID,
+      defaultHardwareFinishId: DEFAULT_HARDWARE_FINISH_ID,
+      overrides: {},
+      customParts: [],
+      hiddenIds: [],
+      transforms: {},
+      groups: [],
+      docTitle: 'Demo kitchen',
+      versions: [],
+      currentVersionId: null,
+    };
+  }
   const scene = createScene();
   const run = placeRun(scene);
   placeFronts(scene, run);

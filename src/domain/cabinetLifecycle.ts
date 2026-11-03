@@ -49,7 +49,7 @@ export type CabinetPlacement = 'anchor' | 'pivot';
 
 function cabinetPreset(group: Group, config: CabinetConfig) {
   return {
-    id: config.presetId ?? CABINET_PRESETS[0]!.id,
+    id: config.presetId ?? 'custom',
     label: group.label,
     width: config.width,
     height: config.height,
