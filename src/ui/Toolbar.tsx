@@ -145,6 +145,7 @@ export function Toolbar() {
           active={historyOpen}
           onClick={toggleHistory}
         />
+        <NotesButton />
         <div className="h-5 w-px flex-none bg-white/10" />
         <IconButton icon="new_file" label="New File" onClick={requestNewFile} />
         <IconButton icon="save_file" label="Save to File" onClick={() => setSavePrompt('save')} />
@@ -335,6 +336,41 @@ function UnitToggle() {
 }
 
 /** Reports the real autosave state rather than a hardcoded "Autosaved". */
+/** Toggles the design notes panel; a dot shows when the design has notes. */
+function NotesButton() {
+  const viewMode = useUiStore((s) => s.viewMode);
+  const notesOpen = useUiStore((s) => s.notesOpen);
+  const toggleNotes = useUiStore((s) => s.toggleNotes);
+  const hasNotes = useDocumentStore((s) => s.notes.trim().length > 0);
+  const disabled = viewMode !== 'model';
+  const tone = disabled
+    ? 'text-ink/25 opacity-50'
+    : notesOpen
+      ? 'bg-accent/18 text-accent'
+      : 'text-ink/70 hover:bg-white/5';
+
+  return (
+    <button
+      type="button"
+      title={hasNotes ? 'Design notes (has notes)' : 'Design notes'}
+      aria-label="Design notes"
+      aria-pressed={notesOpen}
+      disabled={disabled}
+      onClick={toggleNotes}
+      className={`relative flex h-8 shrink-0 items-center gap-1.5 rounded-[7px] px-2.5 text-[12.5px] font-semibold whitespace-nowrap ${tone}`}
+    >
+      <Icon name="notes" size={16} />
+      Notes
+      {hasNotes && (
+        <span
+          data-testid="notes-indicator"
+          className="absolute top-1 right-1 h-2 w-2 rounded-full bg-accent ring-2 ring-surface"
+        />
+      )}
+    </button>
+  );
+}
+
 function SaveIndicator() {
   const saveStatus = useUiStore((s) => s.saveStatus);
   if (saveStatus === 'saving') return <>Saving…</>;

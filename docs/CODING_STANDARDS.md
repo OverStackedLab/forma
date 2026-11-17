@@ -78,6 +78,7 @@ commit(() => {
 | Action | Why |
 | --- | --- |
 | `saveVersion()` / `renameDocument()` | Document metadata, not a geometry edit. After writing, call `syncHistoryDocumentMeta()` so later Undo cannot resurrect a pre-save title/version list (BUG-007). |
+| `setNotes()` | Design notes are metadata like the title, so typing never adds undo steps. It calls `syncHistoryNotes()` (strings only, cheap per keystroke) so geometry Undo cannot revert the text. |
 | UI-only updates | Selection, gizmo mode, tabs, measure, toast, etc. |
 | `newDocument()` / initial hydrate | Call `clearHistory()` — a fresh document boundary, not an undo step. |
 

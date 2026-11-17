@@ -198,6 +198,8 @@ export type SavedVersion = {
   /** Epoch ms. Formatted relatively at render — never stored pre-formatted. */
   createdAt: number;
   doc: DocumentSnapshot;
+  /** Design notes when the checkpoint was saved. Absent on versions saved before notes existed. */
+  notes?: string;
 };
 
 /**
@@ -231,6 +233,8 @@ export type DocumentSnapshot = {
 
 export type FormaDocument = DocumentSnapshot & {
   docTitle: string;
+  /** Free-text design notes. Document metadata like the title: persisted, not undoable. */
+  notes: string;
   versions: SavedVersion[];
   currentVersionId: string | null;
 };
