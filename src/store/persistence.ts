@@ -478,6 +478,7 @@ function normalize(value: unknown, legacyAxes = false): FormaDocument {
       label: version.label,
       createdAt: version.createdAt,
       doc: normalizeSnapshot(version.doc, legacyAxes),
+      ...(typeof version.notes === 'string' ? { notes: version.notes } : {}),
     });
   }
   const currentVersionId =
@@ -487,6 +488,8 @@ function normalize(value: unknown, legacyAxes = false): FormaDocument {
   return {
     ...snapshot,
     docTitle: typeof raw.docTitle === 'string' && raw.docTitle.trim() ? raw.docTitle : base.docTitle,
+    // Optional field: documents saved before notes existed load with none.
+    notes: typeof raw.notes === 'string' ? raw.notes : base.notes,
     versions,
     currentVersionId,
   };
@@ -555,6 +558,7 @@ function stripActions(state: FormaDocument & Record<string, unknown>): FormaDocu
     transforms: state.transforms,
     groups: state.groups,
     docTitle: state.docTitle,
+    notes: state.notes,
     versions: state.versions,
     currentVersionId: state.currentVersionId,
   };

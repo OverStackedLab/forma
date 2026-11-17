@@ -20,6 +20,7 @@ export function createDemoKitchen(): FormaDocument {
     transforms: {},
     groups: [],
     docTitle: 'Demo kitchen',
+    notes: '',
     versions: [],
     currentVersionId: null,
   };

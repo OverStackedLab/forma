@@ -30,6 +30,7 @@ export function createDefaultDocument(): FormaDocument {
     transforms: {},
     groups: [],
     docTitle: 'Untitled Design',
+    notes: '',
     versions: [],
     currentVersionId: null,
   };
@@ -40,6 +41,7 @@ export type DocumentStore = FormaDocument & {
   replaceSnapshot: (snapshot: DocumentSnapshot) => void;
   setVersions: (versions: SavedVersion[], currentVersionId: string | null) => void;
   setDocTitle: (title: string) => void;
+  setNotes: (notes: string) => void;
   hydrate: (doc: FormaDocument) => void;
 };
 
@@ -49,6 +51,7 @@ export const useDocumentStore = create<DocumentStore>()(
     replaceSnapshot: (snapshot) => set({ ...snapshot }),
     setVersions: (versions, currentVersionId) => set({ versions, currentVersionId }),
     setDocTitle: (docTitle) => set({ docTitle }),
+    setNotes: (notes) => set({ notes }),
     hydrate: (doc) => set({ ...doc }),
   })),
 );

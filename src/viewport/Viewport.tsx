@@ -32,6 +32,7 @@ import { GizmoToolbar } from './overlays/GizmoToolbar';
 import { ViewportHint } from './overlays/ViewportHint';
 import { RenderBar } from './overlays/RenderBar';
 import { FrameButton } from './overlays/FrameButton';
+import { NotesPanel } from './overlays/NotesPanel';
 
 /**
  * World-space bounds of a selection in millimetres, with selection halos
@@ -327,6 +328,7 @@ export function Viewport() {
           <ViewportHint />
         </>
       )}
+      {viewMode === 'model' && <NotesPanel />}
       {viewMode === 'render' && <RenderBar />}
       <MarqueeRect />
       <div
