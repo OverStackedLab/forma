@@ -82,7 +82,7 @@ import {
   snapshotDocument,
   useDocumentStore,
 } from './documentStore';
-import { clearHistory, commit, syncHistoryDocumentMeta } from './history';
+import { clearHistory, commit, syncHistoryDocumentMeta, syncHistoryNotes } from './history';
 import { loadFormaText, SCHEMA_VERSION } from './persistence';
 import { useUiStore } from './uiStore';
 
@@ -1718,6 +1718,7 @@ export function saveVersion(): void {
     label: `Version ${s.versions.length + 1}`,
     createdAt: Date.now(),
     doc: snapshotDocument(s),
+    notes: s.notes,
   };
   useDocumentStore.getState().setVersions([...s.versions, version], id);
   // Versions live outside commit(); keep stacked snapshots from resurrecting
@@ -1747,6 +1748,7 @@ export function downloadVersion(id: string): void {
   const document: FormaDocument = {
     ...structuredClone(version.doc),
     docTitle: doc().docTitle,
+    notes: version.notes ?? '',
     versions: [],
     currentVersionId: null,
   };
@@ -1779,6 +1781,17 @@ export function renameDocument(title: string): void {
   syncHistoryDocumentMeta();
 }
 
+/**
+ * Replaces the design notes. Like the title, notes are document metadata, not
+ * a geometry edit: not wrapped in commit(), so typing never floods Undo, and
+ * stacked snapshots are patched so Undo cannot revert the text either.
+ */
+export function setNotes(notes: string): void {
+  if (doc().notes === notes) return;
+  useDocumentStore.getState().setNotes(notes);
+  syncHistoryNotes();
+}
+
 // ─── File ────────────────────────────────────────────────────────────────────
 
 /** Starts a clean local document while keeping workspace display preferences. */
@@ -1797,6 +1810,7 @@ export function newDocument(): void {
     measurePoints: [],
     marquee: null,
     historyOpen: false,
+    notesOpen: false,
   });
   ui().showToast('New design created');
 }
@@ -1852,6 +1866,7 @@ function serializeCurrentDocument(): string {
   const document: FormaDocument = {
     ...snapshotDocument(state),
     docTitle: state.docTitle,
+    notes: state.notes,
     versions: state.versions,
     currentVersionId: state.currentVersionId,
   };
@@ -1879,6 +1894,7 @@ export async function openFile(file: File): Promise<void> {
     useDocumentStore.getState().replaceSnapshot(structuredClone(next));
     useDocumentStore.setState({
       docTitle: title,
+      notes: next.notes,
       versions: next.versions,
       currentVersionId: next.currentVersionId,
     });

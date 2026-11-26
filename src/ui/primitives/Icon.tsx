@@ -34,6 +34,7 @@ import {
   Scaling,
   Scissors,
   Sparkles,
+  StickyNote,
   Undo2,
   Upload,
   X,
@@ -60,6 +61,7 @@ const ICONS: Record<string, LucideIcon> = {
   new_file: FilePlus2,
   sidebar_left: PanelLeft,
   sidebar_right: PanelRight,
+  notes: StickyNote,
 
   // View mode tabs
   model: Box,
