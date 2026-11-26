@@ -10,7 +10,8 @@ export type LeftTab = 'assembly' | 'library';
 export type RightTab = 'properties' | 'materials';
 export type SaveStatus = 'idle' | 'saving' | 'saved' | 'error';
 export type Marquee = { x: number; y: number; w: number; h: number };
-export type Toast = { id: string; message: string };
+/** `dismissible` opts a tool-triggered toast into the × button and click-away close. */
+export type Toast = { id: string; message: string; dismissible?: boolean };
 /** Measure points are three.js world coordinates (metres). */
 export type MeasurePoint = { x: number; y: number; z: number };
 
@@ -59,7 +60,7 @@ export type UiStore = {
   toggleLeftSidebar: () => void;
   setLeftSidebarWidth: (width: number) => void;
   toggleRightSidebar: () => void;
-  showToast: (message: string) => void;
+  showToast: (message: string, options?: { dismissible?: boolean }) => void;
   dismissToast: (id: string) => void;
   setSaveStatus: (status: SaveStatus, at?: number) => void;
   setDisplayUnit: (unit: DisplayUnit) => void;
@@ -68,8 +69,11 @@ export type UiStore = {
 
 let toastSeq = 0;
 
+/** Shown when Measure turns on (issue #36). */
+export const MEASURE_HINT = 'Click two points to measure.';
+
 export const useUiStore = create<UiStore>()(
-  subscribeWithSelector((set) => ({
+  subscribeWithSelector((set, get) => ({
     selectedPartIds: [],
     gizmoMode: 'select',
     viewMode: 'model',
@@ -119,11 +123,12 @@ export const useUiStore = create<UiStore>()(
     setRightTab: (rightTab) => set({ rightTab }),
     toggleGrid: () => set((s) => ({ gridVisible: !s.gridVisible })),
     toggleSnap: () => set((s) => ({ snapEnabled: !s.snapEnabled })),
-    toggleMeasure: () =>
-      set((s) => ({
-        measureActive: !s.measureActive,
-        measurePoints: [],
-      })),
+    // Guidance toast on enable only (a tool toast, so closeable); turning Measure off stays silent.
+    toggleMeasure: () => {
+      const turningOn = !get().measureActive;
+      set({ measureActive: turningOn, measurePoints: [] });
+      if (turningOn && get().viewMode === 'model') get().showToast(MEASURE_HINT, { dismissible: true });
+    },
     // A third click starts a fresh measurement.
     addMeasurePoint: (point) =>
       set((s) => ({
@@ -136,7 +141,8 @@ export const useUiStore = create<UiStore>()(
     toggleLeftSidebar: () => set((s) => ({ leftSidebarOpen: !s.leftSidebarOpen })),
     setLeftSidebarWidth: (width) => set({ leftSidebarWidth: coerceLeftSidebarWidth(width) }),
     toggleRightSidebar: () => set((s) => ({ rightSidebarOpen: !s.rightSidebarOpen })),
-    showToast: (message) => set({ toast: { id: `t${++toastSeq}`, message } }),
+    showToast: (message, options) =>
+      set({ toast: { id: `t${++toastSeq}`, message, ...(options?.dismissible ? { dismissible: true } : {}) } }),
     dismissToast: (id) => set((s) => (s.toast?.id === id ? { toast: null } : {})),
     setSaveStatus: (saveStatus, at) =>
       set((s) => ({ saveStatus, lastSavedAt: at ?? s.lastSavedAt })),
