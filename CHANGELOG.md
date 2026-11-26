@@ -16,6 +16,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - Fridge placeholder in a new Appliances library section: 600×1840×660 mm, drawn as a body with two doors and a shadow gap. Resizing keeps the 20 mm door faces, and it bills as hardware rather than sheet goods.
 - MATMÄSSIG induction hob in the Appliances library (IKEA 104.670.93): 590×49×520 mm with a 560×490 mm cutout body and the four product zone sizes (21/18/18/14.5 cm).
 - Turning on Measure shows a short "Click two points to measure." hint (#36). The hint can be closed with its × or by clicking elsewhere, and the click that closes it never adds a measure point. Other toasts are unchanged.
+- Design notes (#34): a toolbar Notes button opens a sticky note over the viewport for free-text notes on the whole design. Notes autosave with the design, go into Save to File, saved versions and their downloads, and are not part of Undo. A dot on the button shows when the design has notes. Older files load with empty notes.
 
 ## 2026-08-28
 

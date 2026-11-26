@@ -27,6 +27,8 @@ export type UiStore = {
   measurePoints: MeasurePoint[];
   marquee: Marquee | null;
   historyOpen: boolean;
+  /** Design notes panel over the viewport. Ephemeral, like Version History. */
+  notesOpen: boolean;
   leftSidebarOpen: boolean;
   /** Preferred Assembly / Library column width in CSS pixels. Not undoable. */
   leftSidebarWidth: number;
@@ -53,6 +55,8 @@ export type UiStore = {
   addMeasurePoint: (point: MeasurePoint) => void;
   setMarquee: (marquee: Marquee | null) => void;
   toggleHistory: () => void;
+  toggleNotes: () => void;
+  setNotesOpen: (open: boolean) => void;
   toggleLeftSidebar: () => void;
   setLeftSidebarWidth: (width: number) => void;
   toggleRightSidebar: () => void;
@@ -81,6 +85,7 @@ export const useUiStore = create<UiStore>()(
     measurePoints: [],
     marquee: null,
     historyOpen: false,
+    notesOpen: false,
     leftSidebarOpen: true,
     leftSidebarWidth: DEFAULT_LEFT_SIDEBAR_WIDTH,
     rightSidebarOpen: true,
@@ -131,6 +136,8 @@ export const useUiStore = create<UiStore>()(
       })),
     setMarquee: (marquee) => set({ marquee }),
     toggleHistory: () => set((s) => ({ historyOpen: !s.historyOpen })),
+    toggleNotes: () => set((s) => ({ notesOpen: !s.notesOpen })),
+    setNotesOpen: (notesOpen) => set({ notesOpen }),
     toggleLeftSidebar: () => set((s) => ({ leftSidebarOpen: !s.leftSidebarOpen })),
     setLeftSidebarWidth: (width) => set({ leftSidebarWidth: coerceLeftSidebarWidth(width) }),
     toggleRightSidebar: () => set((s) => ({ rightSidebarOpen: !s.rightSidebarOpen })),

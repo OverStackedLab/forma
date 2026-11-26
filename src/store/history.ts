@@ -45,6 +45,7 @@ function fullSnapshot(): FormaDocument {
   return {
     ...snapshotDocument(state),
     docTitle: state.docTitle,
+    notes: state.notes,
     // Shared, not cloned. `SavedVersion` objects are never mutated in place —
     // `saveVersion`, `normalize` and `syncHistoryDocumentMeta` all replace the
     // array — and `applySnapshot` deep-clones on the way back in, so a per-commit
@@ -83,7 +84,7 @@ function versionKey(snapshot: DocumentSnapshot): string {
  * falls back to a structural comparison.
  */
 function sameDocument(a: FormaDocument, b: FormaDocument): boolean {
-  if (a.docTitle !== b.docTitle || a.currentVersionId !== b.currentVersionId) return false;
+  if (a.docTitle !== b.docTitle || a.notes !== b.notes || a.currentVersionId !== b.currentVersionId) return false;
   if (a.versions !== b.versions && !sameSnapshot(a.versions, b.versions)) return false;
   return DOC_KEYS.every((key) => a[key] === b[key] || sameSnapshot(a[key], b[key]));
 }
@@ -175,4 +176,16 @@ export function syncHistoryDocumentMeta(): void {
     entry.docTitle = docTitle;
     entry.versions = structuredClone(versions);
   }
+  syncHistoryNotes();
+}
+
+/**
+ * Notes are metadata like the title, so stacked snapshots take the live text
+ * and geometry Undo never reverts typing. Cheaper than
+ * `syncHistoryDocumentMeta` (no version clones), so it can run per keystroke.
+ */
+export function syncHistoryNotes(): void {
+  const notes = useDocumentStore.getState().notes;
+  for (const entry of undoStack) entry.notes = notes;
+  for (const entry of redoStack) entry.notes = notes;
 }
