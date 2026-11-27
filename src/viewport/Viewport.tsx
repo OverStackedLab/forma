@@ -14,6 +14,7 @@ import { useDocumentStore } from '@/store/documentStore';
 import { useUiStore } from '@/store/uiStore';
 import { combinedWorldBounds } from './bounds';
 import { CameraController } from './CameraController';
+import { DragCursor } from './dragCursor';
 import { GizmoController } from './GizmoController';
 import { MeasureController } from './MeasureController';
 import { ModelBuilder } from './ModelBuilder';
@@ -60,6 +61,7 @@ export function Viewport() {
     if (!container) return;
 
     const scene = new SceneManager(container);
+    const dragCursor = new DragCursor(scene.renderer.domElement);
     const builder = new ModelBuilder(scene.partsGroup);
     const overlay = new SelectionOverlay(builder);
     const camera = new CameraController(scene, builder);
@@ -303,6 +305,7 @@ export function Viewport() {
       unsubMeasure();
       unsubFrame();
       pick.dispose();
+      dragCursor.dispose();
       gizmo.dispose();
       measure.dispose();
       dimensions.dispose();

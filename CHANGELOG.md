@@ -6,6 +6,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## Unreleased
 
+### Changed
+
+- Dragging in the viewport — orbit, pan, or a gizmo — shows a closed hand. The arrow returns when the pointer is released, including outside the canvas (#38).
+
 ### Added
 
 - BORGHAMN square-bar handle in the hardware library (170 mm, 160 mm centres, IKEA 203.160.46) (IMP-018).
